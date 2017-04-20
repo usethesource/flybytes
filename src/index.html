@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<script src="/dagre-d3.js"></script>
+
+<script src="/salix-dagre.js"></script>
+<script src="/salix.js"></script>
+
+<script>
+  var salix = new Salix();
+  registerDagre(salix);
+  $(document).ready(salix.start);  
+</script>
+<body>
+<style id="css">
+text {
+  font-weight: 300;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serf;
+  font-size: 14px;
+}
+.node {
+  stroke: #333;
+  fill: #fff;
+  stroke-width: 1.5px;
+}
+.edgePath path {
+  stroke: #333;
+  stroke-width: 1.5px;
+}
+
+</style>
+<div class="container">
+  <div id="root">
+  </div>
+</div>
+</body>
+
+</html>

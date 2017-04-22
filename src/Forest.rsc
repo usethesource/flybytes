@@ -13,7 +13,7 @@ import Boolean;
 import util::Math;
 
 App[Model] forest(Tree x) 
-  = app(Model () { return model(completeLocs(x)); }, view, update, |http://localhost:7002|, |project://drambiguity/src|);
+  = app(Model () { return model(completeLocs(x)); }, view, update, |http://localhost:7004|, |project://drambiguity/src|);
 
 data Model 
   = model(Tree tree, 
@@ -155,10 +155,19 @@ Tree minimize(Tree t) {
    return removeOne(t, {});
 }
 
-Tree selectNextAmb(Model m) = y 
-  when [*_, Tree x, Tree y, *_] := [a | /Tree a:amb(_) := m.tree] + [m.tree];
-
-default Tree selectNextAmb(Model m) = m.tree;
+Tree selectNextAmb(Model m) {
+  ambs = [a | /Tree a:amb(_) := m.tree];
+  
+  if (m.tree == m.current, ambs != []) {
+    return ambs[0];
+  }
+  else if ([*_, Tree x, Tree y, *_] := ambs, x == m.current, y@\loc != m.current@\loc) {
+    return y;
+  }
+  else {
+    return m.tree;
+  }
+}
  
 Tree removeOne(Tree t, set[Tree] protect) {
    found = false;
@@ -170,32 +179,32 @@ Tree removeOne(Tree t, set[Tree] protect) {
        delta = size(seps) + 1;
        rand = arbInt(size(args) mod s);
        found = true;
-       insert appl(r, args[..rand*delta] + args[(rand+1)*delta]);
+       insert appl(r, args[..rand*delta] + args[(rand+1)*delta])[@\loc=a@\loc];
      }
      // removes elements from nullable separated lists
      case a:appl(r:regular(\iter-star-seps(_,seps)),args:![]) : {
        delta = size(seps) + 1;
        rand = arbInt(size(args) mod s);
        found = true;
-       insert appl(r, args[..rand*delta] + args[(rand+1)*delta]);
+       insert appl(r, args[..rand*delta] + args[(rand+1)*delta])[@\loc=a@\loc];
      }
      // removes elements from non-nullable lists
      case a:appl(r:regular(\iter(_)),args:![_]) : {
        rand = arbInt(size(args));
        found = true;
-       insert appl(r, args[..rand] + args[(rand+1)..]);
+       insert appl(r, args[..rand] + args[(rand+1)..])[@\loc=a@\loc];
      }
      // removes elements from nullable lists
      case a:appl(r:regular(\iter-star(_)),args:![]) : {
        rand = arbInt(size(args));
        found = true;
-       insert appl(r, args[..rand] + args[(rand+1)..]);
+       insert appl(r, args[..rand] + args[(rand+1)..])[@\loc=a@\loc];
      }
      // removes optionals
      case a:appl(r:regular(\opt(_)),[_]) : {
        if (arbBool()) {
          found = true;
-         insert appl(r, []);
+         insert appl(r, [])[@\loc=a@\loc];
        }
      }
      // removes direct recursion

@@ -11,12 +11,15 @@ import IO;
 import List;
 import Boolean;
 import util::Math;
+ 
+App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
+  = app(Model () { return model(completeLocs(parse(grammar, input)), grammar); }, view, update, |http://localhost:7005|, |project://drambiguity/src|);
 
-App[Model] forest(Tree x) 
-  = app(Model () { return model(completeLocs(x)); }, view, update, |http://localhost:7004|, |project://drambiguity/src|);
+App[Model] drAmbiguity(type[&T <: Tree] grammar, str input) 
+  = app(Model () { return model(completeLocs(parse(grammar, input, |unknown:///|)), grammar); }, view, update, |http://localhost:7005|, |project://drambiguity/src|);
 
 data Model 
-  = model(Tree tree, 
+  = model(Tree tree, type[Tree] grammar, 
       Tree current = tree,
       bool labels = false, 
       bool literals = false,
@@ -34,6 +37,8 @@ data Msg
    | nextAmb()
    | minimize()
    ;
+
+Tree again(type[Tree] grammar, Tree t) = parse(grammar, "<t>");
 
 Model update(labels(), Model m) = m[labels = !m.labels];
 Model update(literals(), Model m) = m[literals = !m.literals];
@@ -169,71 +174,8 @@ Tree selectNextAmb(Model m) {
   }
 }
  
-Tree removeOne(Tree t, set[Tree] protect) {
-   found = false;
-   
-   return visit(t) {
-     case Tree a => a when found || a in protect // replace only one
-     // removes elements from non-nullable separated lists
-     case Tree a:appl(Production r:regular(\iter-seps(_,list[Symbol] seps)),list[Tree] args:![_]) : {
-       delta = size(seps) + 1;
-       rand = arbInt(size(args) mod s);
-       found = true;
-       insert appl(r, args[..rand*delta] + args[(rand+1)*delta])[@\loc=a@\loc];
-     }
-     // removes elements from nullable separated lists
-     case a:appl(r:regular(\iter-star-seps(_,seps)),args:![]) : {
-       delta = size(seps) + 1;
-       rand = arbInt(size(args) mod s);
-       found = true;
-       insert appl(r, args[..rand*delta] + args[(rand+1)*delta])[@\loc=a@\loc];
-     }
-     // removes elements from non-nullable lists
-     case a:appl(r:regular(\iter(_)),args:![_]) : {
-       rand = arbInt(size(args));
-       found = true;
-       insert appl(r, args[..rand] + args[(rand+1)..])[@\loc=a@\loc];
-     }
-     // removes elements from nullable lists
-     case a:appl(r:regular(\iter-star(_)),args:![]) : {
-       rand = arbInt(size(args));
-       found = true;
-       insert appl(r, args[..rand] + args[(rand+1)..])[@\loc=a@\loc];
-     }
-     // removes optionals
-     case a:appl(r:regular(\opt(_)),[_]) : {
-       if (arbBool()) {
-         found = true;
-         insert appl(r, [])[@\loc=a@\loc];
-       }
-     }
-     // removes direct recursion
-     case a:appl(prod(p,_,_),[*_,b:appl(prod(q,_,_),_),*_]) : {
-       if (arbBool()) {
-         fail; // skip to another match
-       } else if (delabel(p) == delabel(q)) {
-         found = true;
-         insert b;
-       } else {
-         fail;
-       }
-     }
-     // removes indirect recursion (one level removed)
-     case a:appl(prod(p,_,_),[*_,appl(_,[*_,b:appl(prod(q,_,_),_),*_]),*_]) : {
-       if (arbBool()) {
-         fail; // skip to another match
-       } else if (delabel(p) == delabel(q)) {
-         found = true;
-         insert b;
-       } else {
-         fail;
-       }
-     }
-   };
-}
 
-Symbol delabel(label(str _, Symbol s)) = s;
-default Symbol delabel(Symbol s) = s;
+
 
 str prodlabel(regular(Symbol s)) = symbol2rascal(s);
 str prodlabel(prod(label(str x,_),_,_)) = x;
@@ -297,3 +239,10 @@ Tree shared(Tree t) {
       }
    }
 }
+
+Tree parseAgain(type[Tree] _, cycle(Symbol s, int c)) = cycle(s, c);
+Tree parseAgain(type[Tree] _, char(int ch)) = char(ch);
+Tree parseAgain(type[Tree] _, amb({Tree t, *Tree _}))= parseAgain(grammar, t);
+   
+default Tree parseAgain(type[Tree] gr, Tree t) 
+  = parse(gr2, "<t>") when type[Tree] gr2 := type(delabel(t.prod.def), gr.definitions);

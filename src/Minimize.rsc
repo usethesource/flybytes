@@ -4,6 +4,11 @@ import ParseTree;
 import Boolean;
 import util::Math;
 import Detection;
+import Util;
+
+Tree readable(type[Tree] gr, Tree t, int effort=100) {
+  return t; 
+}
 
 Tree minimize(type[Tree] gr, Tree t, int effort=100) {
    solve (t) {
@@ -82,5 +87,5 @@ Tree removeOne(Tree t, set[Tree] protect) {
    };
 }
 
-Symbol delabel(label(str _, Symbol s)) = s;
-default Symbol delabel(Symbol s) = s;
+
+

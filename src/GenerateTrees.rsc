@@ -12,6 +12,7 @@ import lang::rascal::grammar::definition::Parameters;
 import IO;
 import Detection;
 import Termination;
+import Conditions;
 import Minimize;
 import Util;
 import analysis::grammars::Dependency;
@@ -63,23 +64,21 @@ Tree randomTree(\char-class(list[CharRange] ranges), int rec, map[Symbol, set[Pr
 // this certainly runs out of stack on non-productive grammars and 
 // may (low chance) run out-of stack for "hard to terminate" recursion  
 default Tree randomTree(Symbol sort, int rec, map[Symbol, set[Production]] gr) {
-  p = randomAlt(sort, gr[sort], rec);  
-  //println(p);
-  return appl(p, [randomTree(delabel(s), rec + 1, gr) | s <- p.symbols]);
+   p = randomAlt(sort, gr[sort], rec);  
+   return appl(p, [randomTree(delabel(s), rec + 1, gr) | s <- p.symbols]);
 }
 
 default Production randomAlt(Symbol sort, set[Production] alts, int rec) {
-  int weight(Production p) = rec > 10 ? (p.rec ? 1 : size(alts) * p.weight) : p.weight;
-  int total(set[Production] ps) = (1 | it + weight(p) | Production p <- ps);
+  int w(Production p) = rec > 100 ?  t : p.weight;
+  int total(set[Production] ps) = (1 | it + w(p) | Production p <- ps);
   
   r = arbInt(total(alts));
   
   count = 0;
   for (Production p <- alts) {
-    count += weight(p);
+    count += w(p);
 
     if (count >= r) {
-      //if (rec > 10, p.rec) println("selected rec <p> above the threshold");
       return p;
     }
   } 
@@ -89,9 +88,9 @@ default Production randomAlt(Symbol sort, set[Production] alts, int rec) {
 
 Tree randomChar(range(int min, int max)) = char(arbInt(max + 1 - min) + min);
 
-@memo
 type[Tree] completeGrammar(type[Tree] gr) {
   g = grammar({gr.symbol}, gr.definitions);
+  //g = simulateConditions(g);
   g = literals(g);
   g = expandParameterizedSymbols(g);
   g = expandRegularSymbols(makeRegularStubs(g));

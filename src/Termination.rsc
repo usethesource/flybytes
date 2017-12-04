@@ -4,25 +4,35 @@ import Grammar;
 import ParseTree;
 import Util;
 import analysis::grammars::Dependency;
+import Set;
 
-data Production(int weight=0, bool rec=false);
+data Production(int weight=0);
  
+
 @memo 
-Grammar terminationWeights(Grammar g) = visit (g) { 
-  case p:prod(s,ss,_) => p[weight=weight(p, g)][rec=t <- ss && <delabel(t),delabel(s)> in recursiveSymbols(g.rules)]
-};
- 
-int weight(prod(Symbol _:!layouts(_), [], set[Attr] _), Grammar g) = 15;
-int weight(prod(layouts(_), [], set[Attr] _), Grammar g)           = 15;
-int weight(prod(Symbol _, list[Symbol] ss, set[Attr] _), Grammar g) = 30 when ss != [], all(s <- ss, terminal(delabel(s)));
-default int weight(Production _, Grammar _) = 15;
+Grammar terminationWeights(Grammar g) { 
+   deps = dependencies(g.rules);
+   weights = ();
+   recProds = {p | /p:prod(s,[*_,t,*_],_) := g, <delabel(t), delabel(s)> in deps};
+   
+   for (nt <- g.rules) {
+      prods       = {p | /p:prod(_,_,_) := g.rules[nt]};
+      count       = size(prods);
+      recCount    = size(prods & recProds);
+      notRecCount = size(prods - recProds);
+      
+      // at least 50% of the weight should go to non-recursive rules if they exist
+      notRecWeight = notRecCount != 0 ? (count * 10) / (2 * notRecCount) : 0;
+      recWeight = recCount != 0 ? (count * 10) / (2 * recCount) : 0;
+      
+      weights += (p : p in recProds ? recWeight : notRecWeight | p <- prods); 
+   }
+	   
+   return visit (g) { 
+	   case p:prod(_, _, _) => p[weight=weights[p]]
+   }
+}
 
-bool terminal(lit(_))           = true;
-bool terminal(cilit(_))         = true;
-bool terminal(lex(_))           = true;
-bool terminal(\char-class(_))   = true;
-bool terminal(\layouts(_))      = true;
-default bool terminal(Symbol _) = false;
- 
-@memo rel[Symbol,Symbol] recursiveSymbols(map[Symbol, Production] gr) 
+@memo 
+rel[Symbol,Symbol] dependencies(map[Symbol, Production] gr) 
   = {<delabel(from),delabel(to)> | /prod(Symbol from,[_*,Symbol to,_*],_) := gr}+;

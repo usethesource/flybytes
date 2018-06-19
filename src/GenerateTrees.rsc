@@ -28,7 +28,7 @@ opt[str] findAmbiguousString(type[Tree] gr, int effort)
 opt[Tree] findAmbiguousTree(type[Tree] gr, int effort) {
    gr = completeGrammar(gr);
 
-   for (_ <- [0..effort], t := randomTree(gr), isAmbiguous(gr, "<t>")) {
+   for (_ <- [0..effort], t := randomTree(gr), isValid(gr, t), isAmbiguous(gr, t)) {
        return yes(t);
    }
    
@@ -39,7 +39,7 @@ set[str] randomAmbiguousStrings(type[Tree] grammar, int max)
   = {"<t>" | t <- randomAmbiguousTrees(grammar, max)};
   
 set[Tree] randomAmbiguousTrees(type[Tree] grammar, int max)
-  = {t | t <- randomTrees(grammar, max), isAmbiguous(grammar, "<t>")};
+  = {t | t <- randomTrees(grammar, max), isValid(grammar, t), isAmbiguous(grammar, t)};
 
 set[str] randomStrings(type[Tree] grammar, int max)
   = {"<t>" | t <- randomTrees(grammar, max)};
@@ -50,7 +50,7 @@ set[Tree] randomTrees(type[Tree] gr, int max) {
     return {randomTree(gr) | _ <- [0..max]};
   }
   catch StackOverflow(): {
-    println("overflow"); 
+    println("StackOverflow!?! The chance of overflow is one in a gazillion... Go buy a lottery ticket?"); 
     return {};
   }
 }
@@ -69,7 +69,7 @@ default Tree randomTree(Symbol sort, int rec, map[Symbol, set[Production]] gr) {
 }
 
 default Production randomAlt(Symbol sort, set[Production] alts, int rec) {
-  int w(Production p) = rec > 100 ?  t : p.weight;
+  int w(Production p) = rec > 100 ?  p.weight * p.weight : p.weight;
   int total(set[Production] ps) = (1 | it + w(p) | Production p <- ps);
   
   r = arbInt(total(alts));

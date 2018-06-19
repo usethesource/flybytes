@@ -11,12 +11,13 @@ import IO;
 import List;
 import Boolean;
 import util::Math;
- 
+import Minimize;
+
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
   = app(Model () { return model(completeLocs(parse(grammar, input)), grammar); }, view, update, |http://localhost:7005|, |project://drambiguity/src|);
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar, str input) 
-  = app(Model () { return model(completeLocs(parse(grammar, input, |unknown:///|)), grammar); }, view, update, |http://localhost:7005|, |project://drambiguity/src|);
+  = app(Model () { return model(completeLocs(parse(grammar, input, |unknown:///|, allowAmbiguity=true)), grammar); }, view, update, |http://localhost:7005/index.html|, |project://drambiguity/src|);
 
 data Model 
   = model(Tree tree, type[Tree] grammar, 
@@ -46,7 +47,7 @@ Model update(\layout(), Model m) = m[\layout = !m.\layout];
 Model update(chars(), Model m) = m[chars = !m.chars];
 Model update(shared(), Model m) = m[shared = !m.shared];
 Model update(nextAmb(), Model m) = m[current=selectNextAmb(m)]; 
-Model update(minimize(), Model m) = m[current=minimize(m.current)]; 
+Model update(minimize(), Model m) = m[current=minimize(m.grammar, m.current)]; 
   
 void view(Model m) {
    str id(Tree a:appl(_,_)) = "N<a@unique>";
@@ -67,10 +68,10 @@ void view(Model m) {
    list[Tree] args(char(_))   = [];
    
    t = !m.shared ? unique(m.current) : shared(unique(m.current));
-       
+
    div(class("row"), () {
-     div(class("col-md-10"), style(<"border","1">), style(("overflow-x":"hidden", "overflow-y":"hidden")), () {
-       dagre("Forest", class("col-md-10"), rankdir("TD"), (N n, E e) {
+     div(class("col-md-10"), style(<"border", "solid">,<"border-radius","5px">), () {
+       dagre("Forest",  style(<"overflow-x","scroll">,<"overflow-y","scroll">,<"height","600px">,<"width","100%">), rankdir("TD"), (N n, E e) {
          done = {};
          
          void nodes(Tree a) {
@@ -114,50 +115,51 @@ void view(Model m) {
          nodes(t);
          done = {};
          edges(t);
-       });    
+         done = {};
+       }); 
+       
+       div(style(<"position", "absolute">, <"top", "0">, <"right", "0">, <"z-index","1">), () {
+        ul(class("list-group list-group-flush"), style(<"list-style-type","none">), () {
+            li(class("list-group-item"), () { 
+              input(\type("checkbox"), checked(m.labels), onClick(labels()));
+              text("rules");
+            });
+            li(class("list-group-item"), () { 
+              input(\type("checkbox"), checked(m.literals), onClick(literals()));
+              text("literals");
+            });
+            li(class("list-group-item"), () { 
+              input(\type("checkbox"), checked(m.\layout), onClick(\layout()));
+              text("layout");
+            });
+            li(class("list-group-item"), () { 
+              input(\type("checkbox"), checked(m.chars), onClick(chars()));
+              text("chars");
+            });
+            li(class("list-group-item"), () { 
+              input(\type("checkbox"), checked(m.shared), onClick(shared()));
+              text("shared");
+            });
+        });
+     });   
      });
+     
+     
      
      div(class("col-md-2"), () {
         ul(style(<"list-style-type","none">), () {
             li(() { 
               pre(() { text("<m.current>");}); 
             });
-            li(() { 
-              pre(() { text("<m.current@\loc>");}); 
-            });
-            li(() { 
-              input(\type("checkbox"), checked(m.labels), onClick(labels()));
-              text("rules");
-            });
-            li(() { 
-              input(\type("checkbox"), checked(m.literals), onClick(literals()));
-              text("literals");
-            });
-            li(() { 
-              input(\type("checkbox"), checked(m.\layout), onClick(\layout()));
-              text("layout");
-            });
-            li(() { 
-              input(\type("checkbox"), checked(m.chars), onClick(chars()));
-              text("chars");
-            });
-            li(() { 
-              input(\type("checkbox"), checked(m.shared), onClick(shared()));
-              text("shared");
+            li(() {
+              button(onClick(nextAmb()), "Focus on next ambiguity");
             });
             li(() {
-              button(onClick(nextAmb()), "Next amb");
-            });
-            li(() {
-              button(onClick(minimize()), "Minimize");
+              button(onClick(minimize()), "Minimize sentence");
             });
         });
      });
    });
-}
-
-Tree minimize(Tree t) {
-   return removeOne(t, {});
 }
 
 Tree selectNextAmb(Model m) {
@@ -242,7 +244,6 @@ Tree shared(Tree t) {
 
 Tree parseAgain(type[Tree] _, cycle(Symbol s, int c)) = cycle(s, c);
 Tree parseAgain(type[Tree] _, char(int ch)) = char(ch);
-Tree parseAgain(type[Tree] _, amb({Tree t, *Tree _}))= parseAgain(grammar, t);
+Tree parseAgain(type[Tree] _, amb({Tree t, *Tree _})) = parseAgain(grammar, t);
    
-default Tree parseAgain(type[Tree] gr, Tree t) 
-  = parse(gr2, "<t>") when type[Tree] gr2 := type(delabel(t.prod.def), gr.definitions);
+default Tree parseAgain(type[Tree] gr, Tree t) = parse(type(delabel(t.prod.def), gr.definitions), "<t>", allowAmbiguity=true);

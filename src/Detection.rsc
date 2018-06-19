@@ -2,17 +2,33 @@ module Detection
 
 import ParseTree;
 import Node;
+import IO;
 
-bool isAmbiguous(type[Tree] grammar, Tree t) 
-  = isAmbiguous(grammar, "<t>");
+bool isValid(type[Tree] gr, Tree t)
+  = isValid(gr, "<t>");
   
-bool isAmbiguous(type[Tree] grammar, str s) {
+bool isValid(type[Tree] gr, str s) {
+  //println("isValid(<gr>, \"<s>\")");
+  
   try {
-    parse((grammar), s);
-    return false;
-  }
-  catch Ambiguity(_,_,_) : 
+    parse(gr, s, allowAmbiguity=true);
     return true;
+  }
+  catch ParseError(_) :
+    return false;
+}
+
+bool isAmbiguous(type[Tree] gr, Tree t) 
+  = isAmbiguous(gr, "<t>");
+  
+bool isAmbiguous(type[Tree] gr, str s) {
+  try {
+    parse(gr, s);
+    return false;
+  } 
+  catch Ambiguity(_,_,_) : {
+    return true;
+  }
 }  
 
 bool hasAmb(Tree t) = /amb(_) := t;

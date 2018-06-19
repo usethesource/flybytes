@@ -78,13 +78,19 @@ function registerDagre(salix) {
 		var render = new dagreD3.render();
 		render(svgGroup, g);
 		
-		var initialScale = 1;
-		zoom
-		  .translate([(svg.attr("width") - g.graph().width * initialScale) / 2, 20])
-		  .scale(initialScale)
-		  .event(svg);
-		svg.attr('height', g.graph().height * initialScale + 40);
-		svg.attr('width', g.graph().width * initialScale + 40);
+		function position() {
+		  var initialScale = Math.min(_svg.getBoundingClientRect().width / g.graph().width, _svg.getBoundingClientRect().height / g.graph().height)
+		  
+		  zoom
+		    .translate([(_svg.getBoundingClientRect().width - g.graph().width * initialScale) / 2, (_svg.getBoundingClientRect().height - g.graph().height * initialScale) / 2])
+		    .scale(initialScale)
+		    .event(svg);
+		
+		  svg.attr('height', attrs.height ? _svg.getBoundingClientRect().height : g.graph().height * initialScale + 40);
+		  svg.attr('width', attrs.width ? _svg.getBoundingClientRect().width : g.graph().width * initialScale + 40);
+		}
+		
+		position();  	
 		
 		function patch(edits, attach) {
 			edits = edits || [];
@@ -136,11 +142,13 @@ function registerDagre(salix) {
 				nodes = newNodes;
 				edges = newEdges;
 				render(svgGroup, newG);
+				position();
 			}
 			else if (newNodes) {
 				var newG = dagreGraph(newNodes, edges, props);
 				nodes = newNodes;
 				render(svgGroup, newG);
+				position();
 			}
 			else if (newEdges) {
 				var newG = dagreGraph(nodes, newEdges, props);

@@ -1,18 +1,25 @@
 <!DOCTYPE html>
 <html>
-<link rel="stylesheet" href="/tmp/bootstrap.min.css" >
-<script src="/tmp/jquery-1.11.0.min.js"></script>
-<script src="/tmp/bootstrap.min.js" ></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<script src="/salix/lib/dagre-d3.js"></script>
 
-<script src="/tmp/d3.v3.min.js" charset="utf-8"></script>
-<script src="/dagre-d3.js"></script>
 
-<script src="/salix-dagre.js"></script>
-<script src="/salix.js"></script>
+<script src="/salix/salix.js"></script>
+
+<link rel="stylesheet" href="/salix/lib/codemirror.css">
+<script src="/salix/lib/codemirror.js"></script>
+<script src="/salix/lib/javascript.js"></script>
+<script src="/salix/lib/simple.js"></script>
+<script src="/salix/lib/salix-cm.js"></script>
+<script src="/salix/lib/salix-dagre.js"></script>
 
 <script>
   var salix = new Salix();
   registerDagre(salix);
+  registerCodeMirror(salix);
   $(document).ready(salix.start);  
 </script>
 <body>

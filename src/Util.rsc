@@ -15,3 +15,16 @@ default Symbol delabel(Symbol s) = unset(s);
     throw "cast exception <c> is not a
      <x>";
 }
+
+Symbol symbol(appl(prod(label(str _, Symbol s), _ , _), _)) = s;
+Symbol symbol(amb({Tree a, *Tree _})) = symbol(a);
+Symbol symbol(char(int i)) = \char-class([range(i, i)]);
+default Symbol symbol(appl(prod(Symbol s, _ , _), _)) = s;
+
+Tree reparse(type[Tree] grammar, Tree t) {
+  if (type[Tree] subgrammar := type(symbol(t), grammar.definitions)) {
+    return parse(subgrammar, "<t>", allowAmbiguity=true);
+  }
+  
+  throw "this should never happen";
+}

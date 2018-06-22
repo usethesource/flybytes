@@ -5,19 +5,35 @@ import salix::Core;
 import salix::HTML;
 import salix::SVG;
 import salix::App;
+extend salix::lib::CodeMirror;
 import lang::rascal::format::Grammar;
 import ParseTree;
 import IO;
 import List;
+import Set;
+import String;
 import Boolean;
 import util::Math;
-import Minimize;
+import Simplify;
+import GenerateTrees;
+import Detection;
+import util::Reflective;
+import Util;
+
+private loc www = |http://localhost:7005/index.html|;
+private loc root = getModuleLocation("Forest").parent;
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
-  = app(Model () { return model(completeLocs(parse(grammar, input)), grammar); }, view, update, |http://localhost:7005|, |project://drambiguity/src|);
+  = app(Model () { return model(completeLocs(parse(grammar, input)), grammar); }, view, update, www, root);
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar, str input) 
-  = app(Model () { return model(completeLocs(parse(grammar, input, |unknown:///|, allowAmbiguity=true)), grammar); }, view, update, |http://localhost:7005/index.html|, |project://drambiguity/src|);
+  = app(Model () { return model(completeLocs(parse(grammar, input, |unknown:///|, allowAmbiguity=true)), grammar); }, view, update, www, root);
+
+App[Model] drAmbiguity(type[&T <: Tree] grammar) 
+  = app(Model () { return model(completeLocs(freshSentence(grammar)), grammar); }, view, update, www, root);
+  
+App[Model] drAmbiguity(type[&T <: Tree] grammar, &T input) 
+  = app(Model () { return model(completeLocs(input), grammar); }, view, update, www, root);
 
 data Model 
   = model(Tree tree, type[Tree] grammar, 
@@ -36,7 +52,8 @@ data Msg
    | chars()
    | shared()
    | nextAmb()
-   | minimize()
+   | simplify()
+   | freshSentence()
    ;
 
 Tree again(type[Tree] grammar, Tree t) = parse(grammar, "<t>");
@@ -47,8 +64,36 @@ Model update(\layout(), Model m) = m[\layout = !m.\layout];
 Model update(chars(), Model m) = m[chars = !m.chars];
 Model update(shared(), Model m) = m[shared = !m.shared];
 Model update(nextAmb(), Model m) = m[current=selectNextAmb(m)]; 
-Model update(minimize(), Model m) = m[current=minimize(m.grammar, m.current)]; 
-  
+
+Model update(simplify(), Model m) {
+  m.tree=completeLocs(reparse(m.grammar, simplify(m.grammar, m.current)));
+  m.current = m.tree;
+  return m;
+}
+
+Model update(freshSentence(), Model m) {
+  m.tree = completeLocs(freshSentence(m.grammar));
+  m.current = m.tree;
+  return m;
+}
+
+Tree freshSentence(type[Tree] gr) {
+  if (options:{_,*_} := randomAmbiguousSubTrees(gr, 20)) {
+    example = sort(options, bool (Tree l, Tree r) { return size("<l>") < size("<r>"); })[0];
+    
+    try {
+        return reparse(gr, example);
+    }
+    catch ParseError(_) : {
+      println("no parse tree to show?!");
+      return char(32);
+    }
+  }
+  else {
+    return smallestTree(gr);
+  }
+}
+ 
 void view(Model m) {
    str id(Tree a:appl(_,_)) = "N<a@unique>";
    str id(Tree a:amb(_))    = "N<a@unique>";
@@ -69,9 +114,10 @@ void view(Model m) {
    
    t = !m.shared ? unique(m.current) : shared(unique(m.current));
 
+   div(class("container"), () {
    div(class("row"), () {
-     div(class("col-md-10"), style(<"border", "solid">,<"border-radius","5px">), () {
-       dagre("Forest",  style(<"overflow-x","scroll">,<"overflow-y","scroll">,<"height","600px">,<"width","100%">), rankdir("TD"), (N n, E e) {
+     div(class("col-md-10"), () {
+       dagre("Forest",  style(<"overflow-x","scroll">,<"overflow-y","scroll">,<"border", "solid">,<"border-radius","5px">,<"height","600px">,<"width","100%">), rankdir("TD"), (N n, E e) {
          done = {};
          
          void nodes(Tree a) {
@@ -118,47 +164,51 @@ void view(Model m) {
          done = {};
        }); 
        
-       div(style(<"position", "absolute">, <"top", "0">, <"right", "0">, <"z-index","1">), () {
-        ul(class("list-group list-group-flush"), style(<"list-style-type","none">), () {
-            li(class("list-group-item"), () { 
+        
+     });
+     
+     div(class("col-md-2"), () {
+        div(class("list-group"), style(<"list-style-type","none">), () {
+            div(class("list-group-item"), () { 
               input(\type("checkbox"), checked(m.labels), onClick(labels()));
               text("rules");
             });
-            li(class("list-group-item"), () { 
-              input(\type("checkbox"), checked(m.literals), onClick(literals()));
+            div(class("list-group-item "), () { 
+              input(id("literals"), \type("checkbox"), checked(m.literals), onClick(literals()));
               text("literals");
             });
-            li(class("list-group-item"), () { 
+            div(class("list-group-item"), () { 
               input(\type("checkbox"), checked(m.\layout), onClick(\layout()));
               text("layout");
             });
-            li(class("list-group-item"), () { 
+            div(class("list-group-item"), () { 
               input(\type("checkbox"), checked(m.chars), onClick(chars()));
               text("chars");
             });
-            li(class("list-group-item"), () { 
+            div(class("list-group-item"), () { 
               input(\type("checkbox"), checked(m.shared), onClick(shared()));
               text("shared");
             });
+            button(class("list-group-item"), onClick(nextAmb()), "Next ambiguity");
         });
-     });   
-     });
-     
-     
-     
-     div(class("col-md-2"), () {
-        ul(style(<"list-style-type","none">), () {
-            li(() { 
-              pre(() { text("<m.current>");}); 
-            });
-            li(() {
-              button(onClick(nextAmb()), "Focus on next ambiguity");
-            });
-            li(() {
-              button(onClick(minimize()), "Minimize sentence");
-            });
+     });  
+   });
+   
+   div(class("row"), () {
+        div(class("col-md-10"), () {
+          textarea(class("form-control"), style(<"width","100%">), rows(10), () { text("<m.tree>"); });
         });
-     });
+        
+        div(class("col-md-2"), () {
+            div(class("list-group list-group-flush"), style(<"list-style-type","none">), () {
+              div(class("list-group-item alert alert-<if (!hasAmb(m.tree)) {>info<} else {>warning<}>"), () {
+                text("Sentence is<if (!hasAmb(m.tree)) {> not<}> ambiguous.");
+              });
+              button(class("list-group-item"), onClick(simplify()), "Simplify sentence");
+              button(class("list-group-item"), onClick(freshSentence()), "Generate sentence");
+            });
+          });
+      });
    });
 }
 
@@ -176,9 +226,6 @@ Tree selectNextAmb(Model m) {
   }
 }
  
-
-
-
 str prodlabel(regular(Symbol s)) = symbol2rascal(s);
 str prodlabel(prod(label(str x,_),_,_)) = x;
 str prodlabel(prod(_, list[Symbol] args:[*_,lit(_),*_],_)) = "<for (lit(x) <- args) {><x> <}>";

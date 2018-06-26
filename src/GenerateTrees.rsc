@@ -47,7 +47,7 @@ set[Tree] randomTrees(type[Tree] gr, int max) {
     return {randomTree(gr) | _ <- [0..max]};
   }
   catch StackOverflow(): {
-    println("StackOverflow!?! The chance of overflow is one in a gazillion... Go buy a lottery ticket?"); 
+    println("StackOverflow!?! Probably the grammar is not \'productive\', some non-terminals lack a base case, or you forgot to define layout?"); 
     return {};
   }
 }
@@ -57,16 +57,6 @@ Tree randomTree(type[Tree] gr)
 
 Tree randomTree(\char-class(list[CharRange] ranges), int rec, map[Symbol, set[Production]] _)
   = randomChar(ranges[arbInt(size(ranges))]);
-
-Tree randomTree(Symbol sort:layouts(_), int rec, map[Symbol, set[Production]] gr) {
-  if (arbBool()) {
-    p = randomAlt(sort, gr[sort], rec);  
-    return appl(p, [randomTree(delabel(s), rec + 1, gr) | s <- p.symbols]);
-  }
-  else {
-    return smallestTree(sort, gr);
-  }
-}
 
 // this certainly runs out of stack on non-productive grammars and 
 // may (low chance) run out-of stack for "hard to terminate" recursion  
@@ -96,23 +86,6 @@ default Production randomAlt(Symbol sort, set[Production] alts, int rec) {
 Tree randomChar(range(int min, int max)) = char(arbInt(max + 1 - min) + min);
 
 data Production(int distance = 0);
-
-Tree smallestTree(type[Tree] gr) {
-  gr = completeGrammar(gr);
-  return smallestTree(gr.symbol, toMap({ <s, p> | s <- gr.definitions, /Production p:prod(_,_,_) <- gr.definitions[s]}));
-}
-
-Tree smallestTree(\char-class(list[CharRange] ranges), map[Symbol, set[Production]] _)
-  = randomChar(ranges[arbInt(size(ranges))]);
-
-default Tree smallestTree(Symbol sort, map[Symbol, set[Production]] gr) {
-   p = smallestAlt(sort, gr[sort]);  
-   return appl(p, [smallestTree(delabel(s), gr) | s <- p.symbols]);
-}
-
-Production smallestAlt(Symbol sort, set[Production] alts) {
-   return Set::sort(alts, bool (Production l, Production r) { return l.weight < r.weight; })[0];
-}
 
 type[Tree] completeGrammar(type[Tree] gr) {
   g = grammar({gr.symbol}, gr.definitions);

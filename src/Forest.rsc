@@ -289,8 +289,3 @@ Tree shared(Tree t) {
    }
 }
 
-Tree parseAgain(type[Tree] _, cycle(Symbol s, int c)) = cycle(s, c);
-Tree parseAgain(type[Tree] _, char(int ch)) = char(ch);
-Tree parseAgain(type[Tree] _, amb({Tree t, *Tree _})) = parseAgain(grammar, t);
-   
-default Tree parseAgain(type[Tree] gr, Tree t) = parse(type(delabel(t.prod.def), gr.definitions), "<t>", allowAmbiguity=true);

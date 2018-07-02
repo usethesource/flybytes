@@ -7,7 +7,7 @@ import Detection;
 import Util;
 import Set;
 
-Tree simplify(type[Tree] gr, Tree t, int effort=10) {
+Tree simplify(type[Tree] gr, Tree t, int effort=100) {
    work = effort;
    
    while (work > 0) {

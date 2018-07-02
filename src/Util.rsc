@@ -17,6 +17,7 @@ default Symbol delabel(Symbol s) = unset(s);
 }
 
 Symbol symbol(appl(prod(label(str _, Symbol s), _ , _), _)) = s;
+Symbol symbol(appl(regular(Symbol s), _)) = delabel(s);
 Symbol symbol(amb({Tree a, *Tree _})) = symbol(a);
 Symbol symbol(char(int i)) = \char-class([range(i, i)]);
 default Symbol symbol(appl(prod(Symbol s, _ , _), _)) = s;

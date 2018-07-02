@@ -55,6 +55,7 @@ set[Tree] randomTrees(type[Tree] gr, int max) {
 Tree randomTree(type[Tree] gr) 
   = randomTree(gr.symbol, 0, toMap({ <s, p> | s <- gr.definitions, /Production p:prod(_,_,_) <- gr.definitions[s]}));
 
+
 Tree randomTree(\char-class(list[CharRange] ranges), int rec, map[Symbol, set[Production]] _)
   = randomChar(ranges[arbInt(size(ranges))]);
 

@@ -23,8 +23,9 @@ import Util;
 import Grammar;
 import Diagnose;
 import Brackets;
+import GrammarEditor;
 
-private loc www = |http://localhost:7001/index.html|;
+private loc www = |http://localhost:7002/index.html|;
 private loc root = getModuleLocation("Forest").parent;
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
@@ -40,7 +41,11 @@ App[Model] drAmbiguity(type[&T <: Tree] grammar, &T input)
   = app(Model () { return model(completeLocs(input), grammar); }, view, update, www, root);
 
 data Model 
-  = model(Tree tree, type[Tree] grammar, 
+  = model(Tree tree, type[Tree] grammar,
+      str grammarText = trim(grammar2rascal(Grammar::grammar({}, grammar.definitions))),
+      list[Tree] examples = [],
+      int generateAmount = 5, 
+      str errors = "",
       bool sentence = "<tree>",
       bool labels = false, 
       bool literals = false,
@@ -59,6 +64,12 @@ data Msg
    | simplify()
    | freshSentence()
    | newInput(str x)
+   | selectExample(Tree ex)
+   | removeExample(int count)
+   | generateAmount(int count)
+   | storeInput()
+   | newGrammar(str x)
+   | refreshGrammar()
    ;
 
 Tree again(type[Tree] grammar, Tree t) = parse(grammar, "<t>");
@@ -69,12 +80,54 @@ Model update(\layout(), Model m) = m[\layout = !m.\layout];
 Model update(chars(), Model m) = m[chars = !m.chars];
 Model update(shared(), Model m) = m[shared = !m.shared];
 Model update(focus(), Model m) = focus(m); 
+Model update(selectExample(Tree ex), Model m) = m[tree = ex];
+Model update(removeExample(int count), Model m) = m[examples = m.examples[0..count-1] + m.examples[count..]];
+Model update(generateAmount(int count), Model m) = m[generateAmount = count > 0 && count < 100 ? count : m.generateAmount];
+Model update(newGrammar(str x), Model m) = m[grammarText=x];
+Model update(storeInput(), Model m) = m[examples= [m.tree] + m.examples];
+Model update(refreshGrammar(), Model m) {
+  println("refreshGrammar!");
+  try {
+    m.grammar = refreshGrammar(m.grammar, m.grammarText);
+    
+    println("new grammar received.");
+    
+    // then reparse the input
+    try {
+      m.tree = reparse(m.grammar, m.tree);
+      println("input reparsed.");
+    }
+    catch ParseError (l) :
+      m.errors = "parse error in input at <l>";
+    
+    println("reparsing <size(m.examples)> examples");
+    
+    // and reparse the examples
+    m.examples = for (Tree ex <- m.examples) {
+      try {
+        println("reparsing <ex>");
+        append(reparse(m.grammar, ex));
+      }
+      catch ParseError(e) :
+        m.errors += "parse error in example \'<ex>\' at <e>\n\n";
+    }
+    
+    m.errors = "";
+  }
+  catch value x: 
+    m.errors = "grammar could not be processed due to <x>";
+  
+  return m;
+}
+
 Model update(newInput(str new), Model m) {
   try {
     m.tree = completeLocs(parse(m.grammar, new, allowAmbiguity=true));
+    m.errors = "";
   }
-  catch ParseError(_) : {
-    m.tree = appl(regular(lit("parse error")), [char(i) | i <- chars(new)]);
+  catch ParseError(l) : {
+    //m.tree = appl(regular(lit("parse error")), [char(i) | i <- chars(new)]);
+    m.errors = "parse error in input at <l>";
   }
   
   return m;
@@ -86,26 +139,14 @@ Model update(simplify(), Model m) {
   return m;
 }
 
-Model update(freshSentence(), Model m) {
-  m.tree = completeLocs(freshSentence(m.grammar));
-  m.tree = m.tree;
-  return m;
-}
+Model update(freshSentence(), Model m) = freshSentences(m);
 
-Tree freshSentence(type[Tree] gr) {
-  if (options:{_,*_} := randomAmbiguousSubTrees(gr, 20)) {
-    example = sort(options, bool (Tree l, Tree r) { return size("<l>") < size("<r>"); })[0];
-    
-    try {
-        return reparse(gr, example);
-    }
-    catch ParseError(_) : {
-      return appl(regular(lit("parse error")), [char(i) | i <- chars(example)]);
-    }
+Model freshSentences(Model m) {
+  if (options:{_,*_} := randomAmbiguousSubTrees(m.grammar, m.generateAmount)) {
+    m.examples += sort(options, bool (Tree l, Tree r) { return size("<l>") < size("<r>"); });
   }
-  else {
-    return getOneFrom(randomTrees(gr, 1));
-  }
+  
+  return m;
 }
 
 str updateSrc(str src, int fromLine, int fromCol, int toLine, int toCol, str text, str removed) {
@@ -184,73 +225,171 @@ void graphic(Model m) {
        });
 }
  
+Msg onNewSentenceInput(str t) = newInput(t);
+ 
 void view(Model m) {
+   
+   
    container(true, () {
      ul(class("tabs nav nav-tabs"), id("tabs"), () {
        li(() {
-         a(attr("data-toggle","tab"), href("#input"), () { 
-           text("Input"); 
-         });
-       });
-       li(() {
-         a(attr("data-toggle","tab"), href("#brackets"), () {
-           text("Brackets");
-         });
+         a(tab(), href("#input"), "Input"); 
        });
        li(class("active"), () {
-         a(attr("data-toggle","tab"), href("#graphic"), () {
-           text("Graphic");
-         });
+         a(tab(), href("#graphic"), "Graphic");
        });
        li(() {
-         a(attr("data-toggle","tab"), href("#grammar"), () { 
-           text("Grammar"); 
-         });
+         a(tab(), href("#grammar"), "Grammar"); 
        });
        li(() {
-         a(attr("data-toggle","tab"), href("#diagnose"), () { 
-           text("Diagnosis"); 
-         });
+         a(tab(), href("#diagnose"), "Diagnosis"); 
        });
        li(() {
-         a(attr("data-toggle","tab"), href("#help"), () { 
-           text("Help"); 
-         });
+         a(tab(), href("#help"), "Help"); 
        });
     });
         
     div(id("main-tabs"), class("tab-content"), () {
       div(class("tab-pane fade in"), id("input"), () {
-        row(() {
-        column(10, md(), () {
-           textarea(class("form-control"), style(<"width","100%">), rows(10), onChange(Msg (str t) { return newInput(t); }), () { 
-              text("<m.sentence>"); 
-           });
-        });    
-        column(2, md(), () {
-            div(class("list-group list-group-flush"), style(<"list-style-type","none">), () {
-              div(class("list-group-item alert alert-<if (!hasAmb(m.tree)) {>info<} else {>warning<}>"), () {
-                text("Sentence is<if (!hasAmb(m.tree)) {> not<}> ambiguous.");
-              });
-              button(class("list-group-item"), onClick(simplify()), "Simplify sentence");
-              button(class("list-group-item"), onClick(freshSentence()), "Generate sentence");
-              if (amb({/amb(_), *_}) := m.tree) {
-                div(class("list-group-item alert alert-warning"), () {
-                  text("Sentence has nested ambiguity.");
-                });
-                button(class("list-group-item"), onClick(focus()), "Focus");
-              }
-            });
-        });
-        });
+        inputPane(m);
      });
+     
      div(class("tab-pane active"), id("graphic"), () {
-        row(() {
+        graphicPane(m);
+      });
+      div(class("tab-pane fade in"), id("grammar"), () {
+        grammarPane(m);
+      });
+      div(class("tab-pane fade in"), id("diagnose"), () {
+          diagnose(m.tree); 
+      });
+      div(class("tab-pane fade in"), id("help"), () {
+        h3("What is ambiguity?");
+      });
+    });
+    
+    if (m.errors != "") {
+      row(() {
+        column(10, md(), () {
+           div(class("alert"), class("alert-danger"), role("alert"), () {
+              paragraph(m.errors);
+           });
+        });
+      });
+    }
+  });
+}
+
+void grammarPane(Model m) {
+  row(() {
+          column(10, md(), () {
+            textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(Msg (str t) { return newGrammar(t); }), \value(m.grammarText), m.grammarText);
+          });
+          column(2, md(), () {
+            button(class("list-group-item"), onClick(refreshGrammar()), "Refresh");
+          });
+  });
+}
+
+void inputPane(Model m) {
+bool isAmb = amb(_) := m.tree;
+   bool nestedAmb = amb({/amb(_), *_}) := m.tree || appl(_,/amb(_)) := m.tree;
+   str  sentence = "<m.tree>";
+   
+row(() {
+          column(10, md(), () {
+             textarea(class("form-control"), style(<"width","100%">), rows(10), onInput(onNewSentenceInput), \value(sentence), sentence); 
+          });    
+          column(2, md(), () {
+            div(class("list-group list-group-flush"), style(<"list-style-type","none">), () {
+              span(class("list-group-item"), () {
+                paragraph("This sentence is <if (!isAmb) {>not<}> ambiguous, and it has<if (!nestedAmb) {> no<}> nested ambiguity.");
+              });
+              if (nestedAmb) {          
+                button(class("list-group-item"), onClick(focus()), "Focus on nested");
+              }
+              if (m.tree notin m.examples) {          
+                button(class("list-group-item"), onClick(storeInput()), "Stash");
+              }
+              button(class("list-group-item"), onClick(simplify()), "Simplify");
+              button(class("list-group-item"), onClick(freshSentence()), "Generate");
+              div(class("list-group-item"), class("dropdown"),  () {
+                button(class("btn"), class("btn-secondary"), class("dropdown-toggle"), \type("button"), id("dropdownMenuButton"), dropdown(), hasPopup(true), expanded(false), 
+                  "Amount: <m.generateAmount>");
+                div(class("dropdown-menu"), labeledBy("dropdownMenuButton"), () {
+                  for (int i <- [1..26]) {
+                    button(class("dropdown-item"), href("#"), onClick(generateAmount(i)),  "<i>");
+                  }
+                });
+              });
+            });
+          });
+        });
+        
+        if (m.examples != []) { 
+          ruleCount = (0 | it + 1 | /prod(_,_,_) := m.grammar.definitions);
+          
+          row(() {
+            column(10, md(), () {
+              table(class("table"), class("table-hover"), class("table-sm"), () {
+                colgroup(() {
+                  col(class("col-sm-1"));
+                  col(class("col-sm-1"));
+                  col(class("col-sm-7"));
+                  col(class("col-sm-1"));
+                });
+                thead(() {
+                  th(scope("col"), "#");
+                  th(scope("col"),"Syntax category");
+                  th(scope("col"),"Sentence");
+                  th(scope("col"),"Status");
+                  th(scope("col"),"Select");
+                  th(scope("col"),"Remove");
+                });
+                tbody(() {
+                  int count = 0;
+                  for (Tree ex <- m.examples) {
+                    exs = Util::symbol(ex);
+                    
+                    tr( () {
+                      count += 1;
+                      td("<count>");
+                      td("<symbol2rascal(exs)>");
+                      td(() {
+                        pre(class("pre-scrollable"), "<ex>");
+                      });
+                      td(/amb(_) := ex ? "amb." : "not amb.");
+                      td(() {
+                           button(class("button"), onClick(selectExample(ex)), "use");
+                      });
+                      td(() {
+                         button(class("button"), onClick(removeExample(count)), "rm");
+                      });
+                    });
+                  }
+                });
+              });
+            });
+          });
+        } 
+}
+
+void graphicPane(Model m) {
+bool isAmb = amb(_) := m.tree;
+   bool nestedAmb = amb({/amb(_), *_}) := m.tree || appl(_,/amb(_)) := m.tree;
+   
+row(() {
           column(10, md(), () {
             graphic(m);
           });
           column(2, md(), () {
-		     div(class("list-group"), style(<"list-style-type","none">), () {
+		        div(class("list-group"), style(<"list-style-type","none">), () {
+		          span(class("list-group-item"), () {
+                  paragraph("This tree is <if (!isAmb) {>not<}> ambiguous, and it has<if (!nestedAmb) {> no<}> nested ambiguity.");
+                });
+                if (nestedAmb) {          
+                  button(class("list-group-item"), onClick(focus()), "Focus on nested");
+                }
 		        div(class("list-group-item"), () { 
 		          input(\type("checkbox"), checked(m.labels), onClick(labels()));
 		          text("rules");
@@ -274,39 +413,9 @@ void view(Model m) {
 		    });
           });
         });
-      });
-      div(class("tab-pane fade in"), id("brackets"), () {
-        if (amb({t1, t2}) := m.tree) {
-	        row(() {
-	          column(6, md(), () {
-	             pre(() {
-	               text("<brackets(t1)>");
-	             });
-	          });
-	          column(6, md(), () {
-	             pre(() {
-	               text("<brackets(t2)>");
-	             });
-	          });
-	        });
-	    } else {
-	      text("No two trees to compare");
-	    } 
-      });
-      div(class("tab-pane fade in"), id("grammar"), () {
-        pre(() { 
-          text(grammar2rascal(grammar({}, m.grammar.definitions))); 
-        });
-      });
-      div(class("tab-pane fade in"), id("diagnose"), () {
-          diagnose(m.tree); 
-      });
-      div(class("tab-pane fade in"), id("help"), () {
-        h3("What is ambiguity?");
-      });
-    });
-  });
 }
+
+
 
 Model focus(Model m) {
   ambs = [a | /Tree a:amb(_) := m.tree];

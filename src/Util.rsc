@@ -23,8 +23,16 @@ Symbol symbol(char(int i)) = \char-class([range(i, i)]);
 default Symbol symbol(appl(prod(Symbol s, _ , _), _)) = s;
 
 Tree reparse(type[Tree] grammar, Tree t) {
+  s = symbol(t);
+  wrapped = (sort(_) !:= s) && (lex(_) !:= s);
+  
+  if (wrapped) {
+    grammar = type(grammar.symbol, grammar.definitions + (sort("$WRAP$") : prod(sort("$WRAP$"), [s], {})));
+  }
+  
   if (type[Tree] subgrammar := type(symbol(t), grammar.definitions)) {
-    return parse(subgrammar, "<t>", allowAmbiguity=true);
+    result = parse(subgrammar, "<t>", allowAmbiguity=true);
+    return wrapped ? result.args[0] : result;
   }
   
   throw "this should never happen";

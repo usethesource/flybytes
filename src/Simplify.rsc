@@ -9,15 +9,13 @@ import Set;
 
 Tree simplify(type[Tree] gr, Tree t, int effort=100) {
    work = effort;
-   
-   while (work > 0) {
+
+   for (int i <- [0..effort]) {
      new = simplify(t);
-     if (isAmbiguous(gr, new)) {
-       t = new;
-       work = effort; // start afresh if simplified 
+     if (new != t && isAmbiguous(gr, new)) {
+       return new;
      }
-     work -= 1;
-   }
+   }   
    
    return t;
 }
@@ -40,15 +38,15 @@ private Tree simplify(Tree t) {
      // removes elements from non-empty separated lists
      case Tree a:appl(Production r:regular(\iter-seps(_,list[Symbol] seps)),list[Tree] args:![_]) : {
        delta = size(seps) + 1;
-       rand = arbInt(size(args) mod s);
-       return appl(r, args[..rand*delta] + args[(rand+1)*delta])[@\loc=a@\loc];
+       rand = arbInt(size(args));
+       return appl(r, args[..rand*delta] + args[min(rand*(delta+1), size(args))..])[@\loc=a@\loc];
      }
    
      // remove elements from star separated lists
      case a:appl(r:regular(\iter-star-seps(_,seps)),args:![]) : {
        delta = size(seps) + 1;
-       rand = arbInt(size(args) mod s);
-       return appl(r, args[..rand*delta] + args[(rand+1)*delta])[@\loc=a@\loc];
+       rand = arbInt(size(args)) mod delta;
+       return appl(r, args[..rand*delta] + args[min(rand*(delta+1), size(args))..])[@\loc=a@\loc];
      }
      
      // removes elements from non-nullable lists

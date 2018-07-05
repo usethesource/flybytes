@@ -25,9 +25,10 @@ import Diagnose;
 import Brackets;
 import GrammarEditor;
 
-private loc www = |http://localhost:7002/index.html|;
+private loc www = |http://localhost:7006/index.html|;
 private loc root = getModuleLocation("Forest").parent;
 
+  
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
   = app(Model () { return model(completeLocs(parse(grammar, input)), grammar); }, view, update, www, root);
 
@@ -45,7 +46,7 @@ data Model
       str grammarText = trim(grammar2rascal(Grammar::grammar({}, grammar.definitions))),
       list[Tree] examples = [],
       int generateAmount = 5, 
-      str errors = "",
+      list[str] errors = [],
       bool sentence = "<tree>",
       bool labels = false, 
       bool literals = false,
@@ -70,10 +71,13 @@ data Msg
    | storeInput()
    | newGrammar(str x)
    | refreshGrammar()
+   | setStartNonterminal(Symbol s)
+   | clearErrors()
    ;
 
 Tree again(type[Tree] grammar, Tree t) = parse(grammar, "<t>");
 
+Model update(clearErrors(), Model m) = m[errors=[]];
 Model update(labels(), Model m) = m[labels = !m.labels];
 Model update(literals(), Model m) = m[literals = !m.literals];
 Model update(\layout(), Model m) = m[\layout = !m.\layout];
@@ -82,40 +86,57 @@ Model update(shared(), Model m) = m[shared = !m.shared];
 Model update(focus(), Model m) = focus(m); 
 Model update(selectExample(Tree ex), Model m) = m[tree = ex];
 Model update(removeExample(int count), Model m) = m[examples = m.examples[0..count-1] + m.examples[count..]];
-Model update(generateAmount(int count), Model m) = m[generateAmount = count > 0 && count < 100 ? count : m.generateAmount];
+Model update(generateAmount(int count), Model m) = m[generateAmount = count > 0 && count < 101 ? count : m.generateAmount];
 Model update(newGrammar(str x), Model m) = m[grammarText=x];
 Model update(storeInput(), Model m) = m[examples= [m.tree] + m.examples];
+Model update(setStartNonterminal(Symbol s), Model m) {
+  if (type[Tree] new := type(s, m.grammar.definitions)) {
+    m.grammar = new;
+    
+    try {
+      m.tree = reparse(m.grammar, m.tree);
+      m.errors = [];
+    }
+    catch ParseError (l) :
+      m.errors += ["parse error in input at <l>"];
+    catch value v:
+      m.errors += ["unexpected error: <v>"];
+  }
+  
+  return m;
+}
+
 Model update(refreshGrammar(), Model m) {
-  println("refreshGrammar!");
   try {
-    m.grammar = refreshGrammar(m.grammar, m.grammarText);
-    
-    println("new grammar received.");
-    
+    str newGrammar = m.grammarText;
+    m.grammar = refreshGrammar(m.grammar.symbol, newGrammar);
+    m.grammarText = newGrammar;
+        
     // then reparse the input
     try {
       m.tree = reparse(m.grammar, m.tree);
       println("input reparsed.");
     }
     catch ParseError (l) :
-      m.errors = "parse error in input at <l>";
-    
-    println("reparsing <size(m.examples)> examples");
+      m.errors += ["parse error in input at <l>"];
+    catch value v:
+      m.error += ["unexpected error: <v>"];
     
     // and reparse the examples
     m.examples = for (Tree ex <- m.examples) {
       try {
-        println("reparsing <ex>");
         append(reparse(m.grammar, ex));
       }
       catch ParseError(e) :
-        m.errors += "parse error in example \'<ex>\' at <e>\n\n";
+        m.errors += ["parse error in example \'<ex>\' at <e>\n\n"];
+      catch value v:
+        m.errors += ["unexpected error: <v>"];  
     }
     
-    m.errors = "";
+    m.errors = [];
   }
   catch value x: 
-    m.errors = "grammar could not be processed due to <x>";
+    m.errors += ["grammar could not be processed due to <x>"];
   
   return m;
 }
@@ -123,11 +144,10 @@ Model update(refreshGrammar(), Model m) {
 Model update(newInput(str new), Model m) {
   try {
     m.tree = completeLocs(parse(m.grammar, new, allowAmbiguity=true));
-    m.errors = "";
+    m.errors = [];
   }
   catch ParseError(l) : {
-    //m.tree = appl(regular(lit("parse error")), [char(i) | i <- chars(new)]);
-    m.errors = "parse error in input at <l>";
+    m.errors += ["parse error in input at <l>"];
   }
   
   return m;
@@ -143,9 +163,19 @@ Model update(freshSentence(), Model m) = freshSentences(m);
 
 Model freshSentences(Model m) {
   if (options:{_,*_} := randomAmbiguousSubTrees(m.grammar, m.generateAmount)) {
-    m.examples += sort(options, bool (Tree l, Tree r) { return size("<l>") < size("<r>"); });
+    new = [op | op <- options, op notin m.examples];
+    if (new != []) {
+      m.examples += new;
+      m.errors = [];
+    }
+    else {
+      m.errors += ["no new ambiguous sentences found; only <size(options)> existing examples."];
+    }
+    
+    return m;
   }
   
+  m.errors += ["no ambiguous sentences found\n"];
   return m;
 }
 
@@ -161,19 +191,31 @@ void graphic(Model m) {
    str id(Tree a:appl(_,_)) = "N<a@unique>";
    str id(Tree a:amb(_))    = "N<a@unique>";
    str id(Tree a:char(_))   = "N<a@unique>";
+   str id(Tree a:cycle(_,_))   = "N<a@unique>";
    
    str lbl(appl(p,_)) = m.labels ? "<symbol2rascal(delabel(p.def))> = <prod2rascal(p)>" : prodlabel(p);
    str lbl(amb({appl(p,_), *_})) = m.labels ? "<symbol2rascal(delabel(p.def))>" : "amb";
-   str lbl(c:char(int ch))       = "<c>";
+   str lbl(char(9)) = "⇥"; // tab
+   str lbl(char(10)) = "␤"; // newline
+   str lbl(char(11)) = "⤓"; // vt
+   str lbl(char(12)) = "⇟"; // ff
+   str lbl(char(13)) = "⏎"; // carriage return
+   str lbl(char(32)) = "␠"; //space
+   str lbl(char(int i)) = "␠␠" when i in {133,160,5760,6158,8232,8239,8233,8287,12288} || (i >= 8192 && i <= 8202);
+   // [\u0009-\u000D \u0020 \u0085 \u00A0 \u1680 \u180E \u2000-\u200A \u2028 \u2029 \u202F \u205F \u3000
+   default str lbl(c:char(int ch))       = "<c>";
+   str lbl(cycle(s, i))          = "<s> (<i>)";
    
    str shp(appl(prod(_,_,_),_)) = "rect";
    str shp(appl(regular(_),_)) = "ellipse";
    str shp(amb(_))    = "diamond";
    str shp(char(_))   = "circle";
+   str shp(cycle(_,_))   = "circle";
    
    list[Tree] args(appl(_,a)) = a;
    list[Tree] args(amb(alts)) = [*alts];
    list[Tree] args(char(_))   = [];
+   list[Tree] args(cycle(_,_))   = [];
    
    t = !m.shared ? unique(m.tree) : shared(unique(m.tree));
 
@@ -191,6 +233,10 @@ void graphic(Model m) {
            });
            
            done += {id(a)};
+           
+           if (a@unique > 500) {
+             return;
+           }
            
            for (b <- args(a)) {
              nodes(b);
@@ -213,6 +259,10 @@ void graphic(Model m) {
            
            done += {id(a)};
            
+           if (a@unique > 500) {
+             return;
+           }
+           
            for (b <- args(a)) {
              edges(b);
            }
@@ -226,10 +276,9 @@ void graphic(Model m) {
 }
  
 Msg onNewSentenceInput(str t) = newInput(t);
+Msg onNewGrammarInput(str t) = newGrammar(t); 
  
 void view(Model m) {
-   
-   
    container(true, () {
      ul(class("tabs nav nav-tabs"), id("tabs"), () {
        li(() {
@@ -252,28 +301,38 @@ void view(Model m) {
     div(id("main-tabs"), class("tab-content"), () {
       div(class("tab-pane fade in"), id("input"), () {
         inputPane(m);
-     });
+      });
      
-     div(class("tab-pane active"), id("graphic"), () {
+      div(class("tab-pane active"), id("graphic"), () {
         graphicPane(m);
       });
+      
       div(class("tab-pane fade in"), id("grammar"), () {
         grammarPane(m);
       });
+      
       div(class("tab-pane fade in"), id("diagnose"), () {
           diagnose(m.tree); 
       });
+      
       div(class("tab-pane fade in"), id("help"), () {
         h3("What is ambiguity?");
       });
     });
     
-    if (m.errors != "") {
+    if (m.errors != []) {
       row(() {
         column(10, md(), () {
-           div(class("alert"), class("alert-danger"), role("alert"), () {
-              paragraph(m.errors);
-           });
+           for (e <- m.errors) {
+             div(class("alert"), class("alert-danger"), role("alert"), () {
+                paragraph(e);
+             });
+           }
+        });
+        column(2, md(), () {
+          div(class("list-group list-group-flush"), style(<"list-style-type","none">), () {
+            button(class("list-group-item"), onClick(clearErrors()), "Clear");
+          });
         });
       });
     }
@@ -282,21 +341,25 @@ void view(Model m) {
 
 void grammarPane(Model m) {
   row(() {
-          column(10, md(), () {
-            textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(Msg (str t) { return newGrammar(t); }), \value(m.grammarText), m.grammarText);
-          });
-          column(2, md(), () {
-            button(class("list-group-item"), onClick(refreshGrammar()), "Refresh");
-          });
+    column(10, md(), () {
+      textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), \value(m.grammarText), m.grammarText);
+    });
+    column(2, md(), () {
+      button(class("list-group-item"), onClick(refreshGrammar()), "Commit");
+    });
   });
 }
 
+Msg newAmountInput(int i) {
+  return generateAmount(i);
+}
+
 void inputPane(Model m) {
-bool isAmb = amb(_) := m.tree;
+   bool isAmb = amb(_) := m.tree;
    bool nestedAmb = amb({/amb(_), *_}) := m.tree || appl(_,/amb(_)) := m.tree;
    str  sentence = "<m.tree>";
    
-row(() {
+   row(() {
           column(10, md(), () {
              textarea(class("form-control"), style(<"width","100%">), rows(10), onInput(onNewSentenceInput), \value(sentence), sentence); 
           });    
@@ -311,15 +374,18 @@ row(() {
               if (m.tree notin m.examples) {          
                 button(class("list-group-item"), onClick(storeInput()), "Stash");
               }
-              button(class("list-group-item"), onClick(simplify()), "Simplify");
+              if (isAmb || nestedAmb) {
+                button(class("list-group-item"), onClick(simplify()), "Simplify");
+              }
               button(class("list-group-item"), onClick(freshSentence()), "Generate");
+              input(class("list-group-item"), \type("range"), \value("5"), min("1"), max("100"), onInput(newAmountInput));
               div(class("list-group-item"), class("dropdown"),  () {
-                button(class("btn"), class("btn-secondary"), class("dropdown-toggle"), \type("button"), id("dropdownMenuButton"), dropdown(), hasPopup(true), expanded(false), 
-                  "Amount: <m.generateAmount>");
-                div(class("dropdown-menu"), labeledBy("dropdownMenuButton"), () {
-                  for (int i <- [1..26]) {
-                    button(class("dropdown-item"), href("#"), onClick(generateAmount(i)),  "<i>");
-                  }
+                button(class("btn"), class("btn-secondary"), class("dropdown-toggle"), \type("button"), id("nonterminalChoice"), dropdown(), hasPopup(true), expanded(false), 
+                  "Start: <symbol2rascal(m.grammar.symbol)>");
+                div(class("dropdown-menu"), labeledBy("nonterminalChoice"), () {
+                    for (Symbol x <- m.grammar.definitions, layouts(_) !:= x, empty() !:= x) {
+                        button(class("list-group-item"), href("#"), onClick(setStartNonterminal(x)),  "<symbol2rascal(x)>");
+                    }
                 });
               });
             });
@@ -375,10 +441,10 @@ row(() {
 }
 
 void graphicPane(Model m) {
-bool isAmb = amb(_) := m.tree;
-   bool nestedAmb = amb({/amb(_), *_}) := m.tree || appl(_,/amb(_)) := m.tree;
+  bool isAmb = amb(_) := m.tree;
+  bool nestedAmb = amb({/amb(_), *_}) := m.tree || appl(_,/amb(_)) := m.tree;
    
-row(() {
+  row(() {
           column(10, md(), () {
             graphic(m);
           });
@@ -412,10 +478,8 @@ row(() {
 		        });
 		    });
           });
-        });
+  });
 }
-
-
 
 Model focus(Model m) {
   ambs = [a | /Tree a:amb(_) := m.tree];
@@ -430,61 +494,5 @@ str prodlabel(prod(label(str x,_),_,_)) = x;
 str prodlabel(prod(_, list[Symbol] args:[*_,lit(_),*_],_)) = "<for (lit(x) <- args) {><x> <}>";
 default str prodlabel(prod(Symbol s, _,_ )) = symbol2rascal(s);
 
-bool isChar(char(_)) = true;
-default bool isChar(Tree _) = false;
 
-bool isLayout(appl(prod(layouts(_),_,_),_)) = true;
-bool isLayout(appl(prod(label(layouts(_),_),_,_),_)) = true;
-default bool isLayout(Tree _) = false;
-
-bool isLiteral(appl(prod(lit(_),_,_),_)) = true;
-default bool isLiteral(Tree _) = false;
-
-anno int Tree@unique;
-Tree unique(Tree t) {
-   int secret = 0;
-   int unique() { secret += 1; return secret; };
-   return visit(t) { 
-     case Tree x => x[@unique=unique()] 
-   };
-}  
-
-Tree completeLocs(Tree t) = nt when <nt, _> := completeLocs(t, t@\loc.top, 0);
-
-tuple[Tree, int] completeLocs(Tree t, loc parent, int offset) {
-  int s = offset;
-  
-  switch (t) {
-    case char(_) : return <t[@\loc=parent(offset, 1)], offset + 1>;
-    case amb(_)  : {
-      newAlts = for (Tree a <- t.alternatives) {
-        <a, s> = completeLocs(a, parent, offset);
-        append a;
-      }
-      return <amb({*newAlts})[@\loc=parent(offset, s - offset)], s>;
-    }
-    case appl(p,_) : {
-      newArgs = for (Tree a <- t.args) {
-        <a, s> = completeLocs(a, parent, s);
-        append a;
-      }
-      return <appl(p,newArgs)[@\loc=t@\loc?parent(offset, s - offset)], s>;
-    }
-  } 
-}
-
-Tree shared(Tree t) {
-   done = {};
-   
-   return visit(t) {
-     case Tree a : {
-        if (<a, l, u> <- done, l == a@\loc) {
-          insert a[@unique=u];
-        }
-        else {
-          done += <a, a@\loc, a@unique>;
-        }
-      }
-   }
-}
 

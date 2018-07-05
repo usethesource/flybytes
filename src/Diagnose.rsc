@@ -174,7 +174,7 @@ void tokens(Tree x, Tree y) {
           for (<pos, cat, word> <- sort(ws, bool (Word a, Word b) { return a.pos < b.pos; })) {
             tr(() {
               th(attr("scope", "row"), () {
-                text("<pos.offset>");
+                text("<pos.offset?0>");
               });
               td(() {
                 text("<type(cat, ())>");

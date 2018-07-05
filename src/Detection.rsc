@@ -26,7 +26,6 @@ bool isAmbiguous(type[Tree] gr, str s) {
      return amb(_) := firstAmbiguity(gr, s);
    }
    catch ParseError(_): {
-     println("error! <s>\n\n\n");
      return false;
    }
 }

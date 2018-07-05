@@ -141,7 +141,7 @@ alias Words = set[Word];
 void tokens(Tree x, Tree y) {
   bool isWord(Tree t)  = s is \lex || s is \lit || s is \cilit || s is \layout when s := symbol(t);
    
-  Words collect(Tree t) = {<n@\loc?|unknown:///|, symbol(n), "<n>"> | /n:appl(_,_) := t, isWord(n)};
+  Words collect(Tree t) = {<n@\loc, symbol(n), "<n>"> | /n:appl(_,_) := t, isWord(n)};
   
   Words wordsX = collect(x);
   Words wordsY = collect(y);
@@ -171,7 +171,7 @@ void tokens(Tree x, Tree y) {
           });
         });
         tbody(() {
-          for (<pos, cat, word> <- sort(ws, bool (Word a, Word b) { return a.pos < b.pos; })) {
+          for (<pos, cat, word> <- sort(ws, bool (Word a, Word b) { return (a.pos.offset?0) < (b.pos.offset?0); })) {
             tr(() {
               th(attr("scope", "row"), () {
                 text("<pos.offset?0>");
@@ -206,14 +206,37 @@ void tokens(Tree x, Tree y) {
  Words lexX = {t | t <- wordsX, lex(_) := t.cat};
  Words lexY = {t | t <- wordsY, lex(_) := t.cat};
  
- unreserved = litX<word> & lexY<word> + litY<word> & lexX<word>;
+ litParentsX = {<p,l> | /t:appl(p,[_*,l:appl(prod(l,_,_),_),_*]) := x, lit(_) := l || cilit(_) := l};
+ litParentsY = {<p,l> | /t:appl(p,[_*,l:appl(prod(l,_,_),_),_*]) := y, lit(_) := l || cilit(_) := l};
+ 
+ unreserved
+    = { <posX.offset, lc, c> | <posX, lc, _> <- litX - litY, <posY, c, _>  <- lexY - lexX, posX.offset == posY.offset, posX.length == posY.length}
+    + { <posY.offset, lc, c> | <posX, c, _>  <- lexX - lexY, <posY, lc, _> <- litY - litX, posX.offset == posY.offset, posY.length == posX.length};
+    
  if (unreserved != {}) {
    h3("Unreserved keywords");
    paragraph("Literal keywords in the one alternative have been re-interpreted as other lexical categories (i.e. identifiers) in the other alternative."); 
    
+   table(class("table"), class("table-hover"), class("table-sm"), () {
+       thead(() {
+         th(scope("col"), "Offset");
+         th(scope("col"), "Literal");
+         th(scope("col"), "Lexical");
+       });
+       tbody(() {
+         for (<p, lc, c> <- sort(unreserved, bool (<int of1, _, _>, <int of2, _, _>) { return of1 < of2; })) {
+           tr(() {
+             th(scope("row"), "<p>");
+             td("<symbol2rascal(lc)>");
+             td("<symbol2rascal(c)>");
+           });
+         }
+       });
+     });
+     
    paragraph("Suggested disambiguations:");
    ul(() {
-     for (<cLit, cLex> <- (litX<cat, word> o lexY<word, cat> + litY<cat, word> o lexX<word, cat>)) {
+     for (<_, cLit, cLex> <- unreserved) {
        li(() {
          text(symbol2rascal(conditional(cLex, {delete(cLit)})));
        });
@@ -221,8 +244,7 @@ void tokens(Tree x, Tree y) {
    });
  }
  
- litParentsX = {<p,l> | /t:appl(p,[_*,l:appl(prod(l,_,_),_),_*]) := x, lit(_) := l || cilit(_) := l};
- litParentsY = {<p,l> | /t:appl(p,[_*,l:appl(prod(l,_,_),_),_*]) := y, lit(_) := l || cilit(_) := l};
+ 
  
  if (litParentsX != litParentsY) {
    h3("Overloaded literals");
@@ -250,7 +272,7 @@ void tokens(Tree x, Tree y) {
  if (lexX != lexY) {
  //   // tuple[loc pos, Symbol cat, str word]
    samePosDifferentLength
-     = { <posX.offset, c, w1, w2> | <posX, c, w1> <- lexX, <posY, c, w2> <- lexY, posX.offset == posY.offset, posX != posY};
+     = { <posX.offset, c, w1, w2> | <posX, c, w1> <- lexX, <posY, c, w2> <- lexY, posX.offset == posY.offset, posX.length != posY.length};
      
    if (samePosDifferentLength != {}) {
      h3("Longest match");
@@ -299,6 +321,52 @@ void tokens(Tree x, Tree y) {
        paragraph("Suggested follow restrictions:");
        ul(() {
          for (f <- follows) {
+           li(() {
+              text(topProd2rascal(f));
+           });
+         }
+       });
+     }
+  }   
+     
+  shorterLitPrefixLex
+    = { <posX.offset, c, lc, w1, w2> | <posX, lc, w1> <- litX - litY, <posY, c, w2>  <- lexY - lexX, posX.offset == posY.offset, posX.length < posY.length}
+    + { <posY.offset, c, lc, w1, w2> | <posX, c, w1>  <- lexX - lexY, <posY, lc, w2> <- litY - litX, posX.offset == posY.offset, posY.length < posX.length};
+   
+   // TODO: remove if literal is used in the definition of the lexical!
+    
+  if (shorterLitPrefixLex != {}) {
+     h3("First match");
+     
+     paragraph("The following literals overlap with the starts of other lexical categories:");
+     table(class("table"), class("table-hover"), class("table-sm"), () {
+       thead(() {
+         th(scope("col"), "Offset");
+         th(scope("col"), "Literal");
+         th(scope("col"), "Lexical");
+         th(scope("col"), "Words");
+       });
+       tbody(() {
+         for (<p, lc, c, w1, w2> <- sort(shorterLitPrefixLex, bool (<int of1, _, _, _, _>, <int of2, _, _, _, _>) { return of1 < of2; })) {
+           tr(() {
+             th(scope("row"), "<p>");
+             td("<symbol2rascal(c)>");
+             td("<symbol2rascal(lc)>");
+             td("\'<w1>\' vs. \'<w2>\'");
+           });
+         }
+       });
+     });
+     
+     preceeds = {prod(c, [conditional(cc, {\not-precede(cc)}), *yy], aa) 
+                | <_, c, _, _, _> <- shorterLitPrefixLex, 
+                /Production p:prod(c, [cc:\char-class(_), *yy],aa) := amb({x, y})
+                };
+               
+     if (preceeds != {} ) {
+       paragraph("Suggested preceed restrictions:");
+       ul(() {
+         for (f <- preceeds) {
            li(() {
               text(topProd2rascal(f));
            });

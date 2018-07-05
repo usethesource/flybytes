@@ -84,7 +84,7 @@ Model update(\layout(), Model m) = m[\layout = !m.\layout];
 Model update(chars(), Model m) = m[chars = !m.chars];
 Model update(shared(), Model m) = m[shared = !m.shared];
 Model update(focus(), Model m) = focus(m); 
-Model update(selectExample(Tree ex), Model m) = m[tree = ex];
+Model update(selectExample(Tree ex), Model m) = m[tree = completeLocs(ex)];
 Model update(removeExample(int count), Model m) = m[examples = m.examples[0..count-1] + m.examples[count..]];
 Model update(generateAmount(int count), Model m) = m[generateAmount = count > 0 && count < 101 ? count : m.generateAmount];
 Model update(newGrammar(str x), Model m) = m[grammarText=x];

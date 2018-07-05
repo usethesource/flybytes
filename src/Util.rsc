@@ -42,7 +42,7 @@ Tree reparse(type[Tree] grammar, Tree t) {
   
   if (type[Tree] subgrammar := type(wrapped ? sort("$WRAP$") : s , grammar.definitions)) {
     result = parse(subgrammar, "<t>", allowAmbiguity=true);
-    return wrapped ? result.args[0] : result;
+    return wrapped ? completeLocs(result.args[0]) : completeLocs(result);
   }
   
   throw "this should never happen";
@@ -67,7 +67,8 @@ Tree unique(Tree t) {
    };
 }  
 
-Tree completeLocs(Tree t) = nt when <nt, _> := completeLocs(t, t@\loc.top, 0);
+Tree completeLocs(Tree t:amb({Tree u,*_})) = nt when <nt, _> := completeLocs(t, u@\loc.top, 0);
+default Tree completeLocs(Tree t) = nt when <nt, _> := completeLocs(t, t@\loc.top, 0);
 
 tuple[Tree, int] completeLocs(Tree t, loc parent, int offset) {
   int s = offset;

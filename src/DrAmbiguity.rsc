@@ -94,7 +94,7 @@ Model update(setStartNonterminal(Symbol s), Model m) {
     m.grammar = new;
     
     try {
-      m.tree = reparse(m.grammar, m.tree);
+      m.tree = reparse(m.grammar, "<m.tree>");
       m.errors = [];
     }
     catch ParseError (l) :

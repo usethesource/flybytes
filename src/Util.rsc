@@ -49,6 +49,31 @@ Tree reparse(type[Tree] grammar, Tree t) {
   throw "this should never happen";
 }
 
+Tree reparse(type[Tree] grammar, str x) {
+  s = grammar.symbol;
+    
+  if (s notin grammar.definitions<0>) {
+    if (x:\start(_) <- grammar.definitions) {
+      s = x;
+    }
+    else if (x <- grammar.definitions) {
+      s = x;      
+    }
+  } 
+  wrapped = (sort(_) !:= s) && (lex(_) !:= s);
+  
+  if (wrapped) {
+    grammar = type(grammar.symbol, grammar.definitions + (sort("$WRAP$") : prod(sort("$WRAP$"), [s], {})));
+  }
+  
+  if (type[Tree] subgrammar := type(wrapped ? sort("$WRAP$") : s , grammar.definitions)) {
+    result = parse(subgrammar, x, allowAmbiguity=true);
+    return wrapped ? completeLocs(result.args[0]) : completeLocs(result);
+  }
+  
+  throw "this should never happen";
+}
+
 bool isChar(char(_)) = true;
 default bool isChar(Tree _) = false;
 

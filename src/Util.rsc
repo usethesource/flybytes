@@ -4,6 +4,7 @@ import ParseTree;
 import Grammar;
 import Node;
 import IO;
+import lang::rascal::grammar::definition::Regular;
 
 Symbol delabel(label(str _, Symbol s)) = delabel(s);
 Symbol delabel(conditional(Symbol s, set[Condition] _)) = delabel(s);
@@ -89,12 +90,15 @@ tuple[Tree, int] completeLocs(Tree t, loc parent, int offset) {
       }
       return <appl(p,newArgs)[@\loc=t@\loc?parent(offset, s - offset)], s>;
     }
-    case cycle(s, i) : {
-      return <cycle(s, i)[@\loc=t@\loc?parent], offset>;
+    case cycle(_, _) : {
+      return <t[@\loc=t@\loc?parent], offset>;
     }
   } 
 }
 
+set[Symbol] sorts(type[&T <: Tree] grammar)
+  = { delabel(s) | /Symbol s := grammar.definitions, isRegular(s) || s is lex || s is sort, !(s is empty)};
+   
 Tree shared(Tree t) {
    done = {};
    

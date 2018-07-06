@@ -52,6 +52,10 @@ void report(Tree x, Tree y) {
 
 void paragraph(str x) = p(() { text(x); });    
     
+list[tuple[&T,&T]] zipFill(list[&T] x, list[&T] y, &T fill)
+  = [<i < sX ? elementAt(x,i) : fill, i < sY ? elementAt(y,i) : fill> | i <- (sX > sY ? index(x) : index(y)) ]
+  when sX := size(x), sY := size(y);
+      
 void ruleDifferences(Tree x, Tree y) {
   h3("Rule differences");
   
@@ -62,21 +66,29 @@ void ruleDifferences(Tree x, Tree y) {
     paragraph("The alternatives use the same rules.");
   }
   else {
-    row(() {
-      column(5, md(), () {
-        text("Rules unique to tree one");
-      });
-      column(5, md(), () {
-        text("Rules unique to tree two");
-      });
-    });
-    row(() {
-      column(5, md(), () {
-        rules(pX - pY);
-      });
-      column(5, md(), () {
-        rules(pY - pX);
-      });
+    table(class("table"), class("table-hover"), class("table-sm"), () {
+      thead(() {
+          th(attr("scope", "col"), () {
+            text("Rules unique to tree one");
+          });
+          th(attr("scope", "col"), () {
+            text("Rules unique to tree two");
+          });
+        });
+        tbody(() {
+          for (<p,q> <- zipFill([topProd2rascal(e) | e <- sort(pX - pY)], [topProd2rascal(e) | e <- sort(pY - pX)], "")) {
+            tr(() {
+              td(() {
+                if (p != "")
+                  pre(() { code(p); });
+              });
+              td(() {
+                if (q != "")
+                  pre(() { code(q); });
+              });
+            });
+          }        
+        });
     });
   }
   
@@ -87,7 +99,26 @@ void ruleDifferences(Tree x, Tree y) {
     } 
     else {
       paragraph("The alternatives have different rules at the top:");
-      rules([prodX, prodY]);
+      table(class("table"), class("table-hover"), class("table-sm"), () {
+        thead(() {
+          th(attr("scope", "col"), () {
+            text("Top rule of tree one");
+          });
+          th(attr("scope", "col"), () {
+            text("Top rule of tree two");
+          });
+        });
+        tbody(() {
+          tr(() {
+            td(() {
+              pre(() { code(topProd2rascal(prodX)); });
+            });
+            td(() {
+              pre(() { code(topProd2rascal(prodY)); });
+            });
+          });       
+        }); 
+      });
     }
   }
 }
@@ -101,9 +132,7 @@ void operatorPrecedence(Tree x, Tree y) {
         paragraph("Parentheses (...) indicate the precedence for the left and the right tree. Appropriate disambiguations for each alternative are shown below.");
       });
       column(6, md(), () {
-        pre(() {
-           text("<appl(p, [*np, wrap(xq)])>");
-        });
+        pre(() { code("<appl(p, [*np, wrap(xq)])>"); });
         if (p != q) {
           rules([
             priority(p.def, [q, p]),
@@ -116,9 +145,7 @@ void operatorPrecedence(Tree x, Tree y) {
         }
       });
       column(6, md(), () {
-        pre(() {
-           text("<appl(q, [wrap(yp), *yr])>");
-        });
+        pre(() { code("<appl(q, [wrap(yp), *yr])>"); });
         if (p != q) {
           rules([
             priority(p.def, [p, q]),
@@ -235,10 +262,10 @@ void tokens(Tree x, Tree y) {
      });
      
    paragraph("Suggested disambiguations:");
-   ul(() {
+   ul(class("list-unstyled"), () {
      for (<_, cLit, cLex> <- unreserved) {
        li(() {
-         text(symbol2rascal(conditional(cLex, {delete(cLit)})));
+         pre(() { code(symbol2rascal(conditional(cLex, {delete(cLit)}))); });
        });
      }  
    });
@@ -319,10 +346,10 @@ void tokens(Tree x, Tree y) {
                
      if (follows != {} ) {
        paragraph("Suggested follow restrictions:");
-       ul(() {
+       ul(class("list-unstyled"), () {
          for (f <- follows) {
            li(() {
-              text(topProd2rascal(f));
+              pre(() { code(topProd2rascal(f)); } );
            });
          }
        });
@@ -365,10 +392,10 @@ void tokens(Tree x, Tree y) {
                
      if (preceeds != {} ) {
        paragraph("Suggested preceed restrictions:");
-       ul(() {
+       ul(class("list-unstyled"), () {
          for (f <- preceeds) {
            li(() {
-              text(topProd2rascal(f));
+              pre(() { code(topProd2rascal(f)); });
            });
          }
        });
@@ -437,10 +464,10 @@ str danglingFollowSolutions(Tree x, Tree y) {
 }
 
 void rules(list[Production] rs) {
-  ul(() {
+  ul(class("list-unstyled"), () {
     for (r <- rs) {
       li(() {
-        text(topProd2rascal(r));
+        pre(() { code(topProd2rascal(r)); });
       });
     }
   });

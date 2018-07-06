@@ -1,4 +1,4 @@
-module Forest
+module DrAmbiguity
 
 import salix::lib::Dagre;
 import salix::Core;
@@ -26,7 +26,7 @@ import Brackets;
 import GrammarEditor;
 
 private loc www = |http://localhost:7006/index.html|;
-private loc root = getModuleLocation("Forest").parent;
+private loc root = getModuleLocation("DrAmbiguity").parent;
 
   
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
@@ -383,7 +383,7 @@ void inputPane(Model m) {
                 button(class("btn"), class("btn-secondary"), class("dropdown-toggle"), \type("button"), id("nonterminalChoice"), dropdown(), hasPopup(true), expanded(false), 
                   "Start: <symbol2rascal(m.grammar.symbol)>");
                 div(class("dropdown-menu"), labeledBy("nonterminalChoice"), () {
-                    for (Symbol x <- m.grammar.definitions, layouts(_) !:= x, empty() !:= x) {
+                    for (Symbol x <- sorts(m.grammar)) {
                         button(class("list-group-item"), href("#"), onClick(setStartNonterminal(x)),  "<symbol2rascal(x)>");
                     }
                 });
@@ -422,7 +422,7 @@ void inputPane(Model m) {
                       td("<count>");
                       td("<symbol2rascal(exs)>");
                       td(() {
-                        pre(class("pre-scrollable"), "<ex>");
+                        pre(() { code("<ex>"); });
                       });
                       td(/amb(_) := ex ? "amb." : "not amb.");
                       td(() {

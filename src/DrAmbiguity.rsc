@@ -24,30 +24,34 @@ import Grammar;
 import Diagnose;
 import Brackets;
 import GrammarEditor;
+import util::Maybe;
 
 private loc www = |http://localhost:7006/index.html|;
 private loc root = getModuleLocation("DrAmbiguity").parent;
 
   
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
-  = app(Model () { return model(completeLocs(parse(grammar, input)), grammar); }, view, update, www, root);
+  = app(Model () { return model(grammar, input=readFile(input)); }, view, update, www, root);
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar, str input) 
-  = app(Model () { return model(completeLocs(parse(grammar, input, |unknown:///|, allowAmbiguity=true)), grammar); }, view, update, www, root);
+  = app(Model () { return model(grammar, input=input); }, view, update, www, root);
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar) 
-  = app(Model () { return model(completeLocs(freshSentence(grammar)), grammar); }, view, update, www, root);
+  = app(Model () { return model(grammar); }, view, update, www, root);
   
 App[Model] drAmbiguity(type[&T <: Tree] grammar, &T input) 
   = app(Model () { return model(completeLocs(input), grammar); }, view, update, www, root);
 
 data Model 
-  = model(Tree tree, type[Tree] grammar,
+  = model(type[Tree] grammar,
+      str input = "",
+      Maybe[Tree] tree = saveParse(grammar, input),
+      bool inputDirty = false,
       str grammarText = trim(grammar2rascal(Grammar::grammar({}, grammar.definitions))),
+      bool grammarDirty = false,
       list[Tree] examples = [],
       int generateAmount = 5, 
       list[str] errors = [],
-      bool sentence = "<tree>",
       bool labels = false, 
       bool literals = false,
       bool \layout = false,
@@ -75,32 +79,54 @@ data Msg
    | clearErrors()
    ;
 
-Tree again(type[Tree] grammar, Tree t) = parse(grammar, "<t>");
-
+Maybe[Tree] saveParse(type[Tree] grammar, str input) {
+        try {
+           return just(completeLocs(parse(grammar, input, allowAmbiguity=true)));        
+        }
+        catch ParseError(l) : {
+           return nothing();
+        }
+        catch value x : {
+           return nothing();
+        }
+}
+      
 Model update(clearErrors(), Model m) = m[errors=[]];
 Model update(labels(), Model m) = m[labels = !m.labels];
 Model update(literals(), Model m) = m[literals = !m.literals];
 Model update(\layout(), Model m) = m[\layout = !m.\layout];
 Model update(chars(), Model m) = m[chars = !m.chars];
 Model update(shared(), Model m) = m[shared = !m.shared];
-Model update(focus(), Model m) = focus(m); 
-Model update(selectExample(Tree ex), Model m) = m[tree = completeLocs(ex)];
+Model update(focus(), Model m) = focus(m);
+ 
+Model update(selectExample(Tree ex), Model m) {
+  m.tree = just(completeLocs(ex));
+  m.input = "<ex>";
+  m.inputDirty = true;
+  return m;
+}
+
 Model update(removeExample(int count), Model m) = m[examples = m.examples[0..count-1] + m.examples[count..]];
 Model update(generateAmount(int count), Model m) = m[generateAmount = count > 0 && count < 101 ? count : m.generateAmount];
 Model update(newGrammar(str x), Model m) = m[grammarText=x];
-Model update(storeInput(), Model m) = m[examples= [m.tree] + m.examples];
+Model update(storeInput(), Model m) = m[examples= [m.tree.val] + m.examples];
 Model update(setStartNonterminal(Symbol s), Model m) {
   if (type[Tree] new := type(s, m.grammar.definitions)) {
     m.grammar = new;
     
     try {
-      m.tree = reparse(m.grammar, "<m.tree>");
+      m.tree = just(reparse(m.grammar, m.input));
+      m.inputDirty = false;
       m.errors = [];
     }
-    catch ParseError (l) :
+    catch ParseError (l) : {
       m.errors += ["parse error in input at <l>"];
-    catch value v:
+      m.tree = nothing();
+    }
+    catch value v: {
       m.errors += ["unexpected error: <v>"];
+      m.tree = nothing();
+    }
   }
   
   return m;
@@ -114,13 +140,16 @@ Model update(refreshGrammar(), Model m) {
         
     // then reparse the input
     try {
-      m.tree = reparse(m.grammar, m.tree);
-      println("input reparsed.");
+      m.tree = just(reparse(m.grammar, m.input));
     }
-    catch ParseError (l) :
+    catch ParseError (l) : {
+      m.tree = nothing();
       m.errors += ["parse error in input at <l>"];
-    catch value v:
+    }
+    catch value v: {
       m.error += ["unexpected error: <v>"];
+      m.tree = nothing();
+    }
     
     // and reparse the examples
     m.examples = for (Tree ex <- m.examples) {
@@ -143,19 +172,25 @@ Model update(refreshGrammar(), Model m) {
 
 Model update(newInput(str new), Model m) {
   try {
-    m.tree = completeLocs(parse(m.grammar, new, allowAmbiguity=true));
+    m.input = new;
+    m.tree = just(completeLocs(parse(m.grammar, new, allowAmbiguity=true)));
     m.errors = [];
+    m.inputDirty = false;
   }
   catch ParseError(l) : {
     m.errors += ["parse error in input at <l>"];
+    m.tree = nothing();
+    m.inputDirty = false;
   }
   
   return m;
 }
 
 Model update(simplify(), Model m) {
-  m.tree=completeLocs(reparse(m.grammar, simplify(m.grammar, m.tree)));
+  m.tree=just(completeLocs(reparse(m.grammar, simplify(m.grammar, m.tree))));
   m.tree = m.tree;
+  m.input = "<m.tree.val>";
+  m.inputDirty = true;
   return m;
 }
 
@@ -177,14 +212,6 @@ Model freshSentences(Model m) {
   
   m.errors += ["no ambiguous sentences found\n"];
   return m;
-}
-
-str updateSrc(str src, int fromLine, int fromCol, int toLine, int toCol, str text, str removed) {
-  list[str] lines = mySplit("\n", src);
-  int from = ( 0 | it + size(l) + 1 | str l <- lines[..fromLine] ) + fromCol;
-  int to = from + size(removed);
-  str newSrc = src[..from] + text + src[to..];
-  return newSrc;  
 }
 
 void graphic(Model m) {
@@ -217,7 +244,7 @@ void graphic(Model m) {
    list[Tree] args(char(_))   = [];
    list[Tree] args(cycle(_,_))   = [];
    
-   t = !m.shared ? unique(m.tree) : shared(unique(m.tree));
+   t = !m.shared ? unique(m.tree.val) : shared(unique(m.tree.val));
 
    dagre("Forest",  style(<"overflow-x","scroll">,<"overflow-y","scroll">,<"border", "solid">,<"border-radius","5px">,<"height","600px">,<"width","100%">), rankdir("TD"), (N n, E e) {
          done = {};
@@ -312,7 +339,12 @@ void view(Model m) {
       });
       
       div(class("tab-pane fade in"), id("diagnose"), () {
-          diagnose(m.tree); 
+          if (m.tree is just) {
+            diagnose(m.tree.val);
+          }
+          else {
+            paragraph("Diagnosis of ambiguity is unavailable while the input sentence has a parse error.");
+          } 
       });
       
       div(class("tab-pane fade in"), id("help"), () {
@@ -342,7 +374,7 @@ void view(Model m) {
 void grammarPane(Model m) {
   row(() {
     column(10, md(), () {
-      textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), \value(m.grammarText), m.grammarText);
+      textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), m.grammarText);
     });
     column(2, md(), () {
       button(class("list-group-item"), onClick(refreshGrammar()), "Commit");
@@ -355,13 +387,18 @@ Msg newAmountInput(int i) {
 }
 
 void inputPane(Model m) {
-   bool isAmb = amb(_) := m.tree;
-   bool nestedAmb = amb({/amb(_), *_}) := m.tree || appl(_,/amb(_)) := m.tree;
-   str  sentence = "<m.tree>";
+   bool isAmb = m.tree != nothing() && amb(_) := m.tree.val ;
+   bool nestedAmb = m.tree != nothing() && (amb({/amb(_), *_}) := m.tree.val || appl(_,/amb(_)) := m.tree.val);
+   str  sentence = m.input;
    
    row(() {
           column(10, md(), () {
-             textarea(class("form-control"), style(<"width","100%">), rows(10), onInput(onNewSentenceInput), \value(sentence), sentence); 
+             if (m.inputDirty) {
+               textarea(class("form-control"), style(<"width","100%">), rows(10), onInput(onNewSentenceInput), \value(sentence), sentence);
+             }
+             else {
+               textarea(class("form-control"), style(<"width","100%">), rows(10), onInput(onNewSentenceInput), sentence);
+             } 
           });    
           column(2, md(), () {
             div(class("list-group list-group-flush"), style(<"list-style-type","none">), () {
@@ -371,7 +408,7 @@ void inputPane(Model m) {
               if (nestedAmb) {          
                 button(class("list-group-item"), onClick(focus()), "Focus on nested");
               }
-              if (m.tree notin m.examples) {          
+              if (m.tree is just && m.tree.val notin m.examples) {          
                 button(class("list-group-item"), onClick(storeInput()), "Stash");
               }
               if (isAmb || nestedAmb) {
@@ -441,8 +478,13 @@ void inputPane(Model m) {
 }
 
 void graphicPane(Model m) {
-  bool isAmb = amb(_) := m.tree;
-  bool nestedAmb = amb({/amb(_), *_}) := m.tree || appl(_,/amb(_)) := m.tree;
+  if (m.tree is nothing) {
+    paragraph("Graphical parse tree representation unavailable due to parse error in input sentence.");
+    return;
+  }
+  
+  bool isAmb = amb(_) := m.tree.val;
+  bool nestedAmb = amb({/amb(_), *_}) := m.tree.val || appl(_,/amb(_)) := m.tree.val;
    
   row(() {
           column(10, md(), () {
@@ -482,9 +524,11 @@ void graphicPane(Model m) {
 }
 
 Model focus(Model m) {
-  ambs = [a | /Tree a:amb(_) := m.tree];
+  ambs = [a | /Tree a:amb(_) := m.tree.val];
   
-  m.tree = ambs[arbInt(size(ambs))];
+  m.tree.val = ambs[arbInt(size(ambs))];
+  m.input = "<m.tree.val>";
+  m.inputDirty = true;
   
   return m;
 }

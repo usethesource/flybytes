@@ -25,6 +25,7 @@ import Diagnose;
 import Brackets;
 import GrammarEditor;
 import util::Maybe;
+import ValueIO;
 
 private loc www = |http://localhost:7006/index.html|;
 private loc root = getModuleLocation("DrAmbiguity").parent;
@@ -46,6 +47,7 @@ data Model
   = model(type[Tree] grammar,
       str input = "",
       Maybe[Tree] tree = saveParse(grammar, input),
+      Maybe[loc] file = just(|home:///myproject.dra|),
       bool inputDirty = false,
       str grammarText = trim(grammar2rascal(Grammar::grammar({}, grammar.definitions))),
       bool grammarDirty = false,
@@ -77,6 +79,10 @@ data Msg
    | refreshGrammar()
    | setStartNonterminal(Symbol s)
    | clearErrors()
+   | saveProject(loc file)
+   | loadProject(loc file)
+   | filename(loc file)
+   | nofilename()
    ;
 
 Maybe[Tree] saveParse(type[Tree] grammar, str input) {
@@ -98,6 +104,28 @@ Model update(\layout(), Model m) = m[\layout = !m.\layout];
 Model update(chars(), Model m) = m[chars = !m.chars];
 Model update(shared(), Model m) = m[shared = !m.shared];
 Model update(focus(), Model m) = focus(m);
+Model update(filename(loc f), Model m) = m[file=just(f)];
+Model update(nofilename(), Model m) = m[file=nothing()];
+
+Model update(loadProject(loc f), Model m) {
+  try {
+    println("loading from <f>");
+    m = readBinaryValueFile(#Model, f);
+    m.errors = [];
+    return m;
+  } 
+  catch value x: {
+    println("load from <f> FAILED");
+    m.errors += ["IO exception: <x>"];
+    return m;
+  }
+}
+
+Model update(saveProject(loc f), Model m) {
+  println("save project to <f>");
+  writeBinaryValueFile(f, m);
+  return m;
+}
  
 Model update(selectExample(Tree ex), Model m) {
   m.tree = just(completeLocs(ex));
@@ -187,7 +215,7 @@ Model update(newInput(str new), Model m) {
 }
 
 Model update(simplify(), Model m) {
-  m.tree=just(completeLocs(reparse(m.grammar, simplify(m.grammar, m.tree))));
+  m.tree=just(completeLocs(reparse(m.grammar, simplify(m.grammar, m.tree.val))));
   m.tree = m.tree;
   m.input = "<m.tree.val>";
   m.inputDirty = true;
@@ -309,6 +337,9 @@ void view(Model m) {
    container(true, () {
      ul(class("tabs nav nav-tabs"), id("tabs"), () {
        li(() {
+         fileUI(m);
+       });
+       li(() {
          a(tab(), href("#input"), "Input"); 
        });
        li(class("active"), () {
@@ -386,6 +417,39 @@ Msg newAmountInput(int i) {
   return generateAmount(i);
 }
 
+Msg loadProjectInput(str file) {
+ if (/C:\\fakepath\\<name:.*>/ := file) { 
+   return loadProject(|home:///| + name);
+ }
+ else {
+   return loadProject(|home:///| + file);
+ }
+}
+
+Msg onProjectNameInput(str f) {
+  println("new project name given: <f>");
+  if (trim(f) != "") {
+    return filename((|home:///| + f)[extension="dra"]);
+  }
+  else {
+    return nofilename();
+  }
+}
+
+void fileUI(Model m) {
+  div(class("list-group-item"), class("dropdown"),  () {
+                a(class("dropdown-toggle"), \type("button"), id("projectMenu"), dropdown(), hasPopup(true), expanded(false), "File");
+                div(class("dropdown-menu"), labeledBy("nonterminalChoice"), () {
+                    input(class("list-group-item"), \type("text"), onInput(onProjectNameInput), \value(m.file != nothing() ? (m.file.val[extension=""].path[1..]) : ""));
+                    if (m.file != nothing()) {
+                      button(class("list-group-item"), onClick(saveProject(m.file.val)), "Save");
+                    }
+                    button(class("list-group-item"), attr("onclick", "document.getElementById(\'loadProjectButton\').click();"), "Load…");
+                    input(\type("file"), attr("accept",".dra"), style(<"display", "none">), id("loadProjectButton"), onInput(loadProjectInput));
+                });
+   });
+ }
+ 
 void inputPane(Model m) {
    bool isAmb = m.tree != nothing() && amb(_) := m.tree.val ;
    bool nestedAmb = m.tree != nothing() && (amb({/amb(_), *_}) := m.tree.val || appl(_,/amb(_)) := m.tree.val);

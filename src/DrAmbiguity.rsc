@@ -122,20 +122,17 @@ Model update(removeGrammar(int count), Model m) = m[grammarHistory = m.grammarHi
 
 Model update(loadProject(loc f), Model m) {
   try {
-    println("loading from <f>");
     m = readBinaryValueFile(#Model, f);
     m.errors = [];
     return m;
   } 
   catch value x: {
-    println("load from <f> FAILED");
     m.errors += ["IO exception: <x>"];
     return m;
   }
 }
 
 Model update(saveProject(loc f), Model m) {
-  println("save project to <f>");
   writeBinaryValueFile(f, m);
   return m;
 }
@@ -446,7 +443,7 @@ void grammarPane(Model m) {
       }
     });
     column(2, md(), () {
-      input(class("list-group-item"), \type("text"), onInput(onCommitMessageInput), m.commitMessage);
+      input(class("list-group-item"), style(<"width","100%">), \type("text"), onInput(onCommitMessageInput), m.commitMessage);
       button(class("list-group-item"), onClick(commitGrammar(-1)), "Commit");
     });
   });
@@ -503,7 +500,6 @@ Msg loadProjectInput(str file) {
 }
 
 Msg onProjectNameInput(str f) {
-  println("new project name given: <f>");
   if (trim(f) != "") {
     return filename((|home:///| + f)[extension="dra"]);
   }

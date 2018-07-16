@@ -6,7 +6,7 @@ import lang::rascal::\syntax::Rascal;
 import Grammar;
 import IO;
 
-type[Tree] refreshGrammar(Symbol s, str newText) {
+type[Tree] commitGrammar(Symbol s, str newText) {
    Module m = parse(#start[Module], "module Dummy
                                     '
                                     '<newText>").top;

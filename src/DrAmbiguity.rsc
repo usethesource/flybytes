@@ -1,5 +1,6 @@
 module DrAmbiguity
 
+import DateTime;
 import salix::lib::Dagre;
 import salix::Core;
 import salix::HTML;
@@ -33,6 +34,12 @@ private loc root = getModuleLocation("DrAmbiguity").parent;
   
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
   = app(Model () { return model(grammar, input=readFile(input)); }, view, update, www, root);
+  
+App[Model] drAmbiguity() = drAmbiguity(|home:///myproject.dra|);
+
+App[Model] drAmbiguity(loc project) 
+  = app(Model () { return readBinaryValueFile(#Model, project); }, view, update, www, root);
+
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar, str input) 
   = app(Model () { return model(grammar, input=input); }, view, update, www, root);
@@ -51,6 +58,8 @@ data Model
       bool inputDirty = false,
       str grammarText = trim(grammar2rascal(Grammar::grammar({}, grammar.definitions))),
       bool grammarDirty = false,
+      str commitMessage = "",
+      lrel[datetime stamp, str msg, str grammar] grammarHistory = [<now(), "original", trim(grammar2rascal(Grammar::grammar({}, grammar.definitions)))>],
       list[Tree] examples = [],
       int generateAmount = 5, 
       list[str] errors = [],
@@ -76,13 +85,15 @@ data Msg
    | generateAmount(int count)
    | storeInput()
    | newGrammar(str x)
-   | refreshGrammar()
+   | commitGrammar(int selector)
    | setStartNonterminal(Symbol s)
    | clearErrors()
+   | removeGrammar(int count)
    | saveProject(loc file)
    | loadProject(loc file)
    | filename(loc file)
    | nofilename()
+   | commitMessage(str msg)
    ;
 
 Maybe[Tree] saveParse(type[Tree] grammar, str input) {
@@ -106,6 +117,8 @@ Model update(shared(), Model m) = m[shared = !m.shared];
 Model update(focus(), Model m) = focus(m);
 Model update(filename(loc f), Model m) = m[file=just(f)];
 Model update(nofilename(), Model m) = m[file=nothing()];
+Model update(commitMessage(str msg), Model m) = m[commitMessage=msg];
+Model update(removeGrammar(int count), Model m) = m[grammarHistory = m.grammarHistory[0..count-1] + m.grammarHistory[count..]];
 
 Model update(loadProject(loc f), Model m) {
   try {
@@ -136,7 +149,12 @@ Model update(selectExample(Tree ex), Model m) {
 
 Model update(removeExample(int count), Model m) = m[examples = m.examples[0..count-1] + m.examples[count..]];
 Model update(generateAmount(int count), Model m) = m[generateAmount = count > 0 && count < 101 ? count : m.generateAmount];
-Model update(newGrammar(str x), Model m) = m[grammarText=x];
+Model update(newGrammar(str x), Model m) {
+  m.grammarText=x;
+  m.grammarDirty=false;
+  return m;
+}
+
 Model update(storeInput(), Model m) = m[examples= [m.tree.val] + m.examples];
 Model update(setStartNonterminal(Symbol s), Model m) {
   if (type[Tree] new := type(s, m.grammar.definitions)) {
@@ -160,11 +178,22 @@ Model update(setStartNonterminal(Symbol s), Model m) {
   return m;
 }
 
-Model update(refreshGrammar(), Model m) {
+Model update(commitGrammar(int selector), Model m) {
   try {
-    str newGrammar = m.grammarText;
-    m.grammar = refreshGrammar(m.grammar.symbol, newGrammar);
-    m.grammarText = newGrammar;
+    str newGrammar = "";
+    
+    if (selector == -1) {
+      m.grammarHistory = [<now(), m.commitMessage, m.grammarText>] + m.grammarHistory;
+      newGrammar = m.grammarText;
+      m.grammarDirty = false;
+    }
+    else {
+      newGrammar = m.grammarHistory[selector-1].grammar;
+      m.grammarText = m.grammarHistory[selector-1].grammar;
+      m.grammarDirty = true;
+    }
+    
+    m.grammar = commitGrammar(m.grammar.symbol, newGrammar);
         
     // then reparse the input
     try {
@@ -402,15 +431,62 @@ void view(Model m) {
   });
 }
 
+Msg onCommitMessageInput(str m) {
+  return commitMessage(m);
+}
+
 void grammarPane(Model m) {
   row(() {
     column(10, md(), () {
-      textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), m.grammarText);
+      if (m.grammarDirty) {
+        textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), \value(m.grammarText), m.grammarText);
+      }
+      else {
+        textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), m.grammarText);
+      }
     });
     column(2, md(), () {
-      button(class("list-group-item"), onClick(refreshGrammar()), "Commit");
+      input(class("list-group-item"), \type("text"), onInput(onCommitMessageInput), m.commitMessage);
+      button(class("list-group-item"), onClick(commitGrammar(-1)), "Commit");
     });
   });
+  
+  if (m.grammarHistory != []) { 
+          row(() {
+            column(10, md(), () {
+              table(class("table"), class("table-hover"), class("table-sm"), () {
+                colgroup(() {
+                  col(class("col-sm-1"));
+                  col(class("col-sm-5"));
+                  col(class("col-sm-1"));
+                  col(class("col-sm-1"));
+                });
+                thead(() {
+                  th(scope("col"), "Version");
+                  th(scope("col"),"Message");
+                  th(scope("col"),"Revert");
+                  th(scope("col"),"Remove");
+                });
+                tbody(() {
+                  int count = 1;
+                  for (<datetime stamp, str msg, str grammar> <- m.grammarHistory) {
+                    tr( () {
+                      td("<stamp>"[1..-1]);
+                      td(msg);
+                      td(() {
+                           button(class("button"), onClick(commitGrammar(count)), "revert");
+                      });
+                      td(() {
+                         button(class("button"), onClick(removeGrammar(count)), "rm");
+                      });
+                    });
+                    count += 1;
+                  }
+                });
+              });
+            });
+          });
+        } 
 }
 
 Msg newAmountInput(int i) {

@@ -8,7 +8,7 @@ Production bo() = prod(lit("("),[\char-class([range(40,40)])], {});
 Production bc() = prod(lit(")"),[\char-class([range(41,41)])], {});
 Production la() = prod(layouts("*default*"), [], {});
 
-Tree wrap(Tree x) = appl(rule(symbol(x)), [appl(bo(), [char(40)]), appl(la(), []), x, appl(la(), []), appl(bc(), [char(41)])]);
+Tree wrap(Tree x) = appl(rule(Util::symbol(x)), [appl(bo(), [char(40)]), appl(la(), []), x, appl(la(), []), appl(bc(), [char(41)])]);
 
 list[Tree] wrap(Symbol s, list[Tree] args) = [ delabel(symbol(a)) == s ? wrap(a) : a | a <- args];
  

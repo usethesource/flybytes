@@ -28,7 +28,7 @@ import GrammarEditor;
 import util::Maybe;
 import ValueIO;
 
-private loc www = |http://localhost:7006/index.html|;
+private loc www = |http://localhost:7000/index.html|;
 private loc root = getModuleLocation("DrAmbiguity").parent;
 
   
@@ -96,18 +96,6 @@ data Msg
    | commitMessage(str msg)
    ;
 
-Maybe[Tree] saveParse(type[Tree] grammar, str input) {
-        try {
-           return just(completeLocs(parse(grammar, input, allowAmbiguity=true)));        
-        }
-        catch ParseError(l) : {
-           return nothing();
-        }
-        catch value x : {
-           return nothing();
-        }
-}
-      
 Model update(clearErrors(), Model m) = m[errors=[]];
 Model update(labels(), Model m) = m[labels = !m.labels];
 Model update(literals(), Model m) = m[literals = !m.literals];
@@ -263,7 +251,7 @@ Model update(freshSentence(), Model m) = freshSentences(m);
 
 Model freshSentences(Model m) {
   if (options:{_,*_} := randomAmbiguousSubTrees(m.grammar, m.generateAmount)) {
-    new = [op | op <- options, m.examples == [] || !any(e <- m.examples, just(op) := e.tree)];
+    new = m.examples == [] ? [*options] : [op | op <- options, !any(e <- m.examples, just(op) := e.tree)];
     if (new != []) {
       m.examples += [<"<n>", Util::symbol(n), just(completeLocs(n)), status(just(n))> | n <- new];
       m.errors = [];
@@ -484,7 +472,7 @@ void grammarPane(Model m) {
                   int count = 1;
                   for (<datetime stamp, str msg, str grammar> <- m.grammarHistory) {
                     tr( () {
-                      td("<stamp>"[1..-1]);
+                      td(printDateTime(stamp, "dd-MM-yyyy HH:mm:ss"));
                       td(msg);
                       td(() {
                            button(class("button"), onClick(commitGrammar(count)), "revert");

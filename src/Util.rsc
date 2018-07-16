@@ -5,6 +5,7 @@ import Grammar;
 import Node;
 import IO;
 import lang::rascal::grammar::definition::Regular;
+import util::Maybe;
 
 Symbol delabel(label(str _, Symbol s)) = delabel(s);
 Symbol delabel(conditional(Symbol s, set[Condition] _)) = delabel(s);
@@ -46,6 +47,17 @@ Tree reparse(type[Tree] grammar, Symbol s, str x) {
   throw "this should never happen";
 }
 
+Maybe[Tree] saveParse(type[Tree] grammar, str input) {
+        try {
+           return just(completeLocs(parse(grammar, input, allowAmbiguity=true)));        
+        }
+        catch ParseError(l) : {
+           return nothing();
+        }
+        catch value x : {
+           return nothing();
+        }
+}
 
 bool isChar(char(_)) = true;
 default bool isChar(Tree _) = false;

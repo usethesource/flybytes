@@ -60,7 +60,7 @@ data Model
       bool grammarDirty = false,
       str commitMessage = "",
       lrel[datetime stamp, str msg, str grammar] grammarHistory = [<now(), "original", trim(grammar2rascal(Grammar::grammar({}, grammar.definitions)))>],
-      list[Tree] examples = [],
+      lrel[str input, Symbol nt, Maybe[Tree] tree, str status]  examples = [],
       int generateAmount = 5, 
       list[str] errors = [],
       bool labels = false, 
@@ -80,7 +80,7 @@ data Msg
    | simplify()
    | freshSentence()
    | newInput(str x)
-   | selectExample(Tree ex)
+   | selectExample(int count)
    | removeExample(int count)
    | generateAmount(int count)
    | storeInput()
@@ -137,10 +137,13 @@ Model update(saveProject(loc f), Model m) {
   return m;
 }
  
-Model update(selectExample(Tree ex), Model m) {
-  m.tree = just(completeLocs(ex));
-  m.input = "<ex>";
+Model update(selectExample(int count), Model m) {
+  m.tree = m.examples[count-1].tree;
+  m.input = m.examples[count-1].input;
   m.inputDirty = true;
+  if (m.tree == nothing()) {
+    m.errors += ["input sentence has parse error"];
+  }
   return m;
 }
 
@@ -152,7 +155,12 @@ Model update(newGrammar(str x), Model m) {
   return m;
 }
 
-Model update(storeInput(), Model m) = m[examples= [m.tree.val] + m.examples];
+str status(nothing()) = "error";
+str status(just(Tree x)) = "no amb." when /amb(_) !:= x;
+default str status(just(Tree x)) = "amb";
+
+Model update(storeInput(), Model m) = m[examples= [<m.input, Util::symbol(m.tree.val), m.tree, status(m.tree)>] + m.examples];
+
 Model update(setStartNonterminal(Symbol s), Model m) {
   if (type[Tree] new := type(s, m.grammar.definitions)) {
     m.grammar = new;
@@ -190,6 +198,8 @@ Model update(commitGrammar(int selector), Model m) {
       m.grammarDirty = true;
     }
     
+    m.commitMessage = "";
+    m.errors = [];
     m.grammar = commitGrammar(m.grammar.symbol, newGrammar);
         
     // then reparse the input
@@ -206,17 +216,18 @@ Model update(commitGrammar(int selector), Model m) {
     }
     
     // and reparse the examples
-    m.examples = for (Tree ex <- m.examples) {
+    m.examples = for (<str ex, Symbol s, Maybe[Tree] t, str st> <- m.examples) {
       try {
-        append(reparse(m.grammar, ex));
+        t = reparse(m.grammar, s, ex);
+        append <ex, s, just(t), status(just(t))>;
       }
       catch ParseError(e) :
-        m.errors += ["parse error in example \'<ex>\' at <e>\n\n"];
-      catch value v:
-        m.errors += ["unexpected error: <v>"];  
+        append <ex, s, nothing(), status(nothing())>;
+      catch value v: {
+        append <ex, s, nothing(), status(nothing())>;
+        m.errors += ["unexpected error: <v>"];
+      }  
     }
-    
-    m.errors = [];
   }
   catch value x: 
     m.errors += ["grammar could not be processed due to <x>"];
@@ -252,9 +263,9 @@ Model update(freshSentence(), Model m) = freshSentences(m);
 
 Model freshSentences(Model m) {
   if (options:{_,*_} := randomAmbiguousSubTrees(m.grammar, m.generateAmount)) {
-    new = [op | op <- options, op notin m.examples];
+    new = [op | op <- options, m.examples == [] || !any(e <- m.examples, just(op) := e.tree)];
     if (new != []) {
-      m.examples += new;
+      m.examples += [<"<n>", Util::symbol(n), just(completeLocs(n)), status(just(n))> | n <- new];
       m.errors = [];
     }
     else {
@@ -444,7 +455,12 @@ void grammarPane(Model m) {
     });
     column(2, md(), () {
       input(class("list-group-item"), style(<"width","100%">), \type("text"), onInput(onCommitMessageInput), m.commitMessage);
-      button(class("list-group-item"), onClick(commitGrammar(-1)), "Commit");
+      if (trim(m.commitMessage) != "") {
+        button(class("list-group-item"), onClick(commitGrammar(-1)), "Commit");
+      }
+      else {
+        button(class("list-group-item"), disabled(), "Commit");
+      }
     });
   });
   
@@ -544,7 +560,7 @@ void inputPane(Model m) {
               if (nestedAmb) {          
                 button(class("list-group-item"), onClick(focus()), "Focus on nested");
               }
-              if (m.tree is just && m.tree.val notin m.examples) {          
+              if (m.tree is just) {          
                 button(class("list-group-item"), onClick(storeInput()), "Stash");
               }
               if (isAmb || nestedAmb) {
@@ -587,19 +603,18 @@ void inputPane(Model m) {
                 });
                 tbody(() {
                   int count = 0;
-                  for (Tree ex <- m.examples) {
-                    exs = Util::symbol(ex);
+                  for (<inp, exs, t, st> <- m.examples) {
                     
                     tr( () {
                       count += 1;
                       td("<count>");
                       td("<symbol2rascal(exs)>");
                       td(() {
-                        pre(() { code("<ex>"); });
+                        pre(() { code(inp); });
                       });
-                      td(/amb(_) := ex ? "amb." : "not amb.");
+                      td(st);
                       td(() {
-                           button(class("button"), onClick(selectExample(ex)), "use");
+                           button(class("button"), onClick(selectExample(count)), "use");
                       });
                       td(() {
                          button(class("button"), onClick(removeExample(count)), "rm");

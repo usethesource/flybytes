@@ -24,42 +24,14 @@ Symbol symbol(amb({Tree a, *Tree _})) = symbol(a);
 Symbol symbol(char(int i)) = \char-class([range(i, i)]);
 default Symbol symbol(appl(prod(Symbol s, _ , _), _)) = s;
 
-Tree reparse(type[Tree] grammar, Tree t) {
-  s = symbol(t);
-  
-  if (s notin grammar.definitions<0>) {
-    if (x:\start(_) <- grammar.definitions) {
-      s = x;
-    }
-    else if (x <- grammar.definitions) {
-      s = x;      
-    }
-  } 
-  wrapped = (sort(_) !:= s) && (lex(_) !:= s);
-  
-  if (wrapped) {
-    grammar = type(grammar.symbol, grammar.definitions + (sort("$WRAP$") : prod(sort("$WRAP$"), [s], {})));
-  }
-  
-  if (type[Tree] subgrammar := type(wrapped ? sort("$WRAP$") : s , grammar.definitions)) {
-    result = parse(subgrammar, "<t>", allowAmbiguity=true);
-    return wrapped ? completeLocs(result.args[0]) : completeLocs(result);
-  }
-  
-  throw "this should never happen";
-}
+Tree reparse(type[Tree] grammar, Tree t) = reparse(grammar, symbol(t), "<t>");
+Tree reparse(type[Tree] grammar, str x) = reparse(grammar, grammar.symbol, x);
 
-Tree reparse(type[Tree] grammar, str x) {
-  s = grammar.symbol;
-    
+Tree reparse(type[Tree] grammar, Symbol s, str x) {
   if (s notin grammar.definitions<0>) {
-    if (x:\start(_) <- grammar.definitions) {
-      s = x;
-    }
-    else if (x <- grammar.definitions) {
-      s = x;      
-    }
-  } 
+    throw "<s> is not in this grammar";
+  }
+   
   wrapped = (sort(_) !:= s) && (lex(_) !:= s);
   
   if (wrapped) {
@@ -73,6 +45,7 @@ Tree reparse(type[Tree] grammar, str x) {
   
   throw "this should never happen";
 }
+
 
 bool isChar(char(_)) = true;
 default bool isChar(Tree _) = false;

@@ -1,5 +1,8 @@
 @doc{
-muJava is an intermediate language just above the abstraction level of the JVM bytecode language.
+
+.Synopsis muJava is an intermediate language just above the abstraction level of the JVM bytecode language.
+
+.Description
 
 Its design goal is to serve as a code generation back-end:
 
@@ -18,6 +21,11 @@ muJava does not offer, by design:
 * name analysis (all names must be fully qualified, all names must be unique)
 * type analysis or type checking 
 * overloading of operators or overloading of method names (type signatures must be provided, and specific expressions for specific types)
+
+The design is informed by the JVM VM spec, the ASM library code and documentation and the Jitescript API:
+* https://docs.oracle.com/javase/specs/jvms/se8/jvms8.pdf
+* https://asm.ow2.io/
+* https://github.com/qmx/jitescript
 }
 @author{Jurgen J. Vinju}
 module lang::mujava::Syntax

@@ -23,9 +23,10 @@ muJava does not offer, by design:
 * overloading of operators or overloading of method names (type signatures must be provided, and specific expressions for specific types)
 
 The design is informed by the JVM VM spec, the ASM library code and documentation and the Jitescript API:
-* https://docs.oracle.com/javase/specs/jvms/se8/jvms8.pdf
-* https://asm.ow2.io/
-* https://github.com/qmx/jitescript
+
+* <https://docs.oracle.com/javase/specs/jvms/se8/jvms8.pdf>
+* <https://asm.ow2.io/>
+* <https://github.com/qmx/jitescript>
 }
 @author{Jurgen J. Vinju}
 module lang::mujava::Syntax

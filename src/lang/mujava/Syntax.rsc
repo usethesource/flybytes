@@ -70,7 +70,7 @@ data Type
   | float()
   | double()
   | long()
-  | class(str name)
+  | classType(str name)
   | array(Type arg)
   ;
 

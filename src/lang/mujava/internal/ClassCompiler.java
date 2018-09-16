@@ -1,6 +1,7 @@
 package lang.mujava.internal;
 
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -10,11 +11,11 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.rascalmpl.uri.URIResolverRegistry;
 
 import io.usethesource.vallang.IBool;
 import io.usethesource.vallang.IConstructor;
-import io.usethesource.vallang.IInteger;
 import io.usethesource.vallang.IList;
 import io.usethesource.vallang.ISet;
 import io.usethesource.vallang.ISourceLocation;
@@ -27,19 +28,22 @@ import io.usethesource.vallang.visitors.NullVisitor;
 
 public class ClassCompiler {
 	private final IValueFactory vf;
+	private PrintWriter out;
 
 	public ClassCompiler(IValueFactory vf) {
 		this.vf = vf;
 	}
 
-	public void compile(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version) {
+	public void compile(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
+		this.out = ctx.getStdOut();
+		
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
-			cls.accept(new Visitor(cw, versionCode(version)));
+			cls.accept(new Visitor(cw, versionCode(version), out));
 			output.write(cw.toByteArray());
 		} catch (Throwable e) {
 			// TODO better error handling
-			e.printStackTrace();
+			e.printStackTrace(out);
 		}
 	}
 	
@@ -55,42 +59,40 @@ public class ClassCompiler {
 
 	private static class Visitor extends NullVisitor<IValue, Throwable> {
 		private final ClassWriter cw;
-		private int version;
+		private final int version;
+		private final PrintWriter out;
 
-		public Visitor(ClassWriter cw, int version) {
+		public Visitor(ClassWriter cw, int version, PrintWriter out) {
 			this.cw = cw;
 			this.version = version;
+			this.out = out;
 		}
 		
 		@Override
 		public IValue visitConstructor(IConstructor o) throws Throwable {
+			out.println(o);
 			Type cons = o.getConstructorType();
 			switch (cons.getName()) {
-			case "class": compileClass(o);
+			case "class": compileClass(o); return null;
 			default:
 				throw new IllegalArgumentException(cons.getName());
 			}
 		}
 
 		private void compileClass(IConstructor o) {
-//			data Class
-//			  = class(str name, 
-//			      set[Modifier] modifiers = {\public()},
-//			      str super = "java.lang.Object",
-//			      list[str] interfaces = [],
-//			      list[Field] fields = [], 
-//			      list[Method] methods = [],
-//			      list[Annotation] annotations = [],
-//			      list[Class] children = [],
-//			      loc source = |unknown:///|
-//			    );
 			ClassNode classNode = new ClassNode();
 			IWithKeywordParameters<? extends IConstructor> kws = o.asWithKeywordParameters();
 			
 			classNode.version = version;
-			classNode.access = accessCode((ISet) o.get("modifiers")); 
 			classNode.name = ((IString) o.get("name")).getValue();
-			classNode.signature = null; // meta-data about Java generics
+			classNode.signature = null; // optional meta-data about Java generics
+			
+			if (kws.hasParameter("modifiers")) {
+				classNode.access = accessCode((ISet) o.get("modifiers"));
+			}
+			else {
+				classNode.access = Opcodes.ACC_PUBLIC;
+			}
 			
 			if (kws.hasParameter("super")) {
 				classNode.superName = ((IString) kws.getParameter("super")).getValue();

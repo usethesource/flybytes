@@ -35,11 +35,11 @@ data Class
   = class(str name, 
       set[Modifier] modifiers = {\public()},
       str super = "java.lang.Object",
-      set[str] interfaces = [],
-      set[Field] fields = [], 
-      set[Method] methods = [],
-      set[Annotation] annotations = [],
-      set[Class] children = [],
+      list[str] interfaces = [],
+      list[Field] fields = [], 
+      list[Method] methods = [],
+      list[Annotation] annotations = [],
+      list[Class] children = [],
       loc source = |unknown:///|
     );
     
@@ -99,7 +99,7 @@ data Statement(loc src = |unknown:///|)
   | \try(list[Statement] tryBlock, list[Catch] \catchBlock, list[Statement] \finallyBlock)
   | label(str label)
   | \goto(str label)
-  | \switch(Expression label, list[Case] caseBlocks, list[Statement] defaultBlock)
+  | \switch(Expression \value, list[Case] caseBlocks, list[Statement] defaultBlock)
   | \throw(Expression exception)
   | monitor(Expression lock, list[Statement] block)
   ;
@@ -123,7 +123,7 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | \true()
   | \false()
   | load(Type \type, str name)
-  | \const(Type \type, value \value)
+  | \const(Type \type, value constant)
   | block(list[Statement] block, Expression result)
   | invokeStatic(str class, Signature desc, list[Expression] args)
   | invokeSpecial(Expression receiver, Signature desc, list[Expression] args)

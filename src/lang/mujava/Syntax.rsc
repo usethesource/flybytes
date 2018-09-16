@@ -82,10 +82,11 @@ data Block
  
 data Variable = var(Type \type, str name); 
 
-@doc{Structured programming, JVM monitor blocks and breakpoints}
+@doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Statement(loc src = |unknown:///|)
-  = \store(str var, Expression \value)
-  | \fieldAssign(str class, str var, Expression \value)
+  = \store(Type \type, str var, Expression \value)
+  | \putfield(Expression receiver, str fieldName, Expression \value)
+  | \putstatic(str class, str fieldName, Expression \value)
   | \if(Expression condition, list[Statement] block)
   | \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
   | \while(Expression condition, list[Statement] block)
@@ -117,11 +118,11 @@ data Case = \case(int label, list[Statement] block);
   
 data Catch = \catch(Type \type, str var, list[Statement] block);
 
-data Expression(loc src = |unknown:///|)
-  = load(str name)
-  | null()
+data Expression(loc src = |unknown:///|, bool wide = \false())
+  = null()
   | \true()
   | \false()
+  | load(Type \type, str name)
   | \const(Type \type, value \value)
   | block(list[Statement] block, Expression result)
   | invokeStatic(str class, Signature desc, list[Expression] args)
@@ -129,7 +130,7 @@ data Expression(loc src = |unknown:///|)
   | invokeVirtual(Expression receiver, Signature desc, list[Expression] args)
   | invokeInterface(Signature desc, Expression receiver, list[Expression] args)
   | newInstance(str class, Signature desc, list[Expression] arguments)
-  | field(Expression object, str name)
+  | getfield(Expression object, str name)
   | instanceof(Expression arg, Type \type)
   | eq(Expression lhs, Expression rhs)
   | newarray(Type \type, Expression size)

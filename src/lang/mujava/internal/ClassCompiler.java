@@ -23,8 +23,6 @@ import io.usethesource.vallang.IString;
 import io.usethesource.vallang.IValue;
 import io.usethesource.vallang.IValueFactory;
 import io.usethesource.vallang.IWithKeywordParameters;
-import io.usethesource.vallang.type.Type;
-import io.usethesource.vallang.visitors.NullVisitor;
 
 public class ClassCompiler {
 	private final IValueFactory vf;
@@ -39,7 +37,7 @@ public class ClassCompiler {
 		
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
-			cls.accept(new Visitor(cw, versionCode(version), out));
+			new SingleClassCompiler(cw, versionCode(version), out).compileClass(cls);
 			output.write(cw.toByteArray());
 		} catch (Throwable e) {
 			// TODO better error handling
@@ -57,29 +55,18 @@ public class ClassCompiler {
 		}
 	}
 
-	private static class Visitor extends NullVisitor<IValue, Throwable> {
+	private static class SingleClassCompiler {
 		private final ClassWriter cw;
 		private final int version;
 		private final PrintWriter out;
 
-		public Visitor(ClassWriter cw, int version, PrintWriter out) {
+		public SingleClassCompiler(ClassWriter cw, int version, PrintWriter out) {
 			this.cw = cw;
 			this.version = version;
 			this.out = out;
 		}
 		
-		@Override
-		public IValue visitConstructor(IConstructor o) throws Throwable {
-			out.println(o);
-			Type cons = o.getConstructorType();
-			switch (cons.getName()) {
-			case "class": compileClass(o); return null;
-			default:
-				throw new IllegalArgumentException(cons.getName());
-			}
-		}
-
-		private void compileClass(IConstructor o) {
+		public void compileClass(IConstructor o) {
 			ClassNode classNode = new ClassNode();
 			IWithKeywordParameters<? extends IConstructor> kws = o.asWithKeywordParameters();
 			

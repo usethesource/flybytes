@@ -14,4 +14,11 @@ java void runMain(loc classfile, list[str] args=[], list[loc] classpath=[]);
 @javaClass{lang.mujava.internal.ClassTestRunner}
 java void runTests(loc classfile, list[loc] classpath=[]);
 
+void main() {
+  compile(class("HelloWorld", 
+    fields=[field(integer(),"age", \default=42, modifiers={\public()})], 
+    methods=[method(methodDesc(integer(), "getAge", []), block([],[]), modifiers={\public()})]
+  ), |home:///HelloWorld.class|);
+}
+
 

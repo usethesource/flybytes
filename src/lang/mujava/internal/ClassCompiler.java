@@ -3,7 +3,6 @@ package lang.mujava.internal;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.objectweb.asm.ClassWriter;
@@ -18,9 +17,9 @@ import io.usethesource.vallang.IBool;
 import io.usethesource.vallang.IConstructor;
 import io.usethesource.vallang.IInteger;
 import io.usethesource.vallang.IList;
+import io.usethesource.vallang.INumber;
 import io.usethesource.vallang.IRational;
 import io.usethesource.vallang.IReal;
-import io.usethesource.vallang.INumber;
 import io.usethesource.vallang.ISet;
 import io.usethesource.vallang.ISourceLocation;
 import io.usethesource.vallang.IString;
@@ -116,44 +115,83 @@ public class ClassCompiler {
 			}
 			
 			if (kws.hasParameter("fields")) {
-				classNode.methods = compileMethods((IList) kws.getParameter("methods"));
+				compileMethods(classNode, (IList) kws.getParameter("methods"));
 			}
 			
+			// now stream the entire class to a (hidden) bytearray
 			classNode.accept(cw);
-		}
-
-		private List<MethodNode> compileMethods(IList methods) {
-			// TODO Auto-generated method stub
-			return Collections.emptyList();
 		}
 
 		private void compileFields(ClassNode classNode, IList fields) {
 			for (IValue field : fields) {
 				IConstructor cons = (IConstructor) field;
-				IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
-				//  = field(Type \type, 
-				//         str name, 
-				//         Expression \default = \null(), 
-				//         set[Modifier] modifiers = {\private()});
-				int access;
-				if (kws.hasParameter("modifiers")) {
-					access = accessCode((ISet) kws.getParameter("modifiers"));
-				}
-				else {
-					access = Opcodes.ACC_PRIVATE;
-				}
-				
-				String name = ((IString) cons.get("name")).getValue();
-				
-				String signature = signature((IConstructor) cons.get("type"));
-				
-				Object value = null;
-				if (kws.hasParameter("default")) {
-					value = value(kws.getParameter("default"));
-				}
-				
-				classNode.fields.add(new FieldNode(access, name, signature, null, value));
+				compileField(classNode, cons);
 			}
+		}
+		
+		private void compileMethods(ClassNode classNode, IList methods) {
+			for (IValue field : methods) {
+				IConstructor cons = (IConstructor) field;
+				compileMethod(classNode, cons);
+			}
+		}
+
+		private void compileMethod(ClassNode classNode, IConstructor cons) {
+			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
+			
+//			data Method
+//			  = method(Signature desc, Block block, set[Modifier] modifiers = {\public()})
+//			  ;
+
+			int modifiers = Opcodes.ACC_PUBLIC;
+			if (kws.hasParameter("modifiers")) {
+				modifiers = modifiers((ISet) kws.getParameter("modifiers"));
+			}
+			
+			IConstructor sig = (IConstructor) cons.get("desc");
+			String name = ((IString) sig.get("name")).getValue();
+			
+			MethodNode mn = new MethodNode(modifiers, name, methodSignature(sig), null, null);
+			
+			// TODO: add instructions, try catch, variables
+			classNode.methods.add(mn);
+		}
+
+		private String methodSignature(IConstructor sig) {
+			StringBuilder val = new StringBuilder();
+			val.append("(");
+			for (IValue formal : (IList) sig.get("formals")) {
+				val.append(signature((IConstructor) formal));
+			}
+			val.append(")");
+			val.append(signature((IConstructor) sig.get("return")));
+			return val.toString();
+		}
+
+		private void compileField(ClassNode classNode, IConstructor cons) {
+			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
+			//  = field(Type \type, 
+			//         str name, 
+			//         Expression \default = \null(), 
+			//         set[Modifier] modifiers = {\private()});
+			int access;
+			if (kws.hasParameter("modifiers")) {
+				access = accessCode((ISet) kws.getParameter("modifiers"));
+			}
+			else {
+				access = Opcodes.ACC_PRIVATE;
+			}
+			
+			String name = ((IString) cons.get("name")).getValue();
+			
+			String signature = signature((IConstructor) cons.get("type"));
+			
+			Object value = null;
+			if (kws.hasParameter("default")) {
+				value = value(kws.getParameter("default"));
+			}
+			
+			classNode.fields.add(new FieldNode(access, name, signature, null, value));
 		}
 
 		private Object value(IValue parameter) {
@@ -295,6 +333,23 @@ public class ClassCompiler {
 			}
 
 			return 0;
+		}
+		
+		private int modifiers(ISet modifiers) {
+			int res = 0;
+			for (IValue cons : modifiers) {
+				switch (((IConstructor) cons).getName()) {
+				case "public": res += Opcodes.ACC_PUBLIC; break;
+				case "private": res +=  Opcodes.ACC_PUBLIC; break;
+				case "protected": res += Opcodes.ACC_PUBLIC; break;
+				case "static": res += Opcodes.ACC_STATIC; break;
+				case "final": res += Opcodes.ACC_FINAL; break;
+				case "abstract": res += Opcodes.ACC_ABSTRACT; break;
+				case "interface": res += Opcodes.ACC_INTERFACE; break;
+				}
+			}
+
+			return res;
 		}
 	}
 }

@@ -53,7 +53,7 @@ data Class
    ;
 
 data Field
-  = field(Type \type, str name, Expression \default = \null(), set[Modifier] modifiers = {\private()});
+  = field(Type \type, str name, value \default = \null(), set[Modifier] modifiers = {\private()});
          
 data Method
   = method(Signature desc, Block block, set[Modifier] modifiers = {\public()})
@@ -72,6 +72,7 @@ data Type
   | long()
   | classType(str name)
   | array(Type arg)
+  | \void()
   ;
 
 data Annotation; // TODO

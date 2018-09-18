@@ -15,6 +15,7 @@ The main utility of the language above the JVM language is:
 * symbolic types and method descriptors (as opposed to mangled strings)
 * nested expression language (as opposed to stack operations)
 * structured statement language (as opposed to a flat list of bytecodes)
+* untyped method parameter names, untyped local variable names and typed field names
 
 muJava does not offer, by design:
 
@@ -27,12 +28,22 @@ The design is informed by the JVM VM spec, the ASM library code and documentatio
 * <https://docs.oracle.com/javase/specs/jvms/se8/jvms8.pdf>
 * <https://asm.ow2.io/>
 * <https://github.com/qmx/jitescript>
+
+MuJava is verbose because its compiler does not know anything about types and names,
+other than what is provided literally in a muJava program. The muJava compiler avoids 
+desugaring since that would require AST construction as compile time, and it avoids allocating
+any other kind of objects as much as possible. 
+
+It is recommended to write Rascal functions which can 
+serve as desugaring macros to facilitate repetitive tasks in a muJava generator. A library
+of such convenience macros is present at the end of this module for general purpose JVM code
+generation. 
 }
 @author{Jurgen J. Vinju}
 module lang::mujava::Syntax
 
 data Class
-  = class(str name, 
+  = class(Type \type /* classType(str name) */, 
       set[Modifier] modifiers = {\public()},
       str super = "java.lang.Object",
       list[str] interfaces = [],
@@ -61,10 +72,11 @@ data Method
 
 Method method(Modifier access, Type ret, str name, list[Variable] formals, Block block)
   = method(methodDesc(ret, name, [ var.\type | var <- formals]), formals, block, modifiers={access});
-  
 
-data Signature = methodDesc(Type \return, str name, list[Type] formals);
- 
+data Signature 
+  = methodDesc(Type \return, str name, list[Type] formals)
+  ;
+
 data Type
   = byte()
   | boolean()
@@ -79,8 +91,6 @@ data Type
   | \void()
   ;
 
-
-
 data Annotation; // TODO
 
 data Block
@@ -91,10 +101,10 @@ data Variable = var(Type \type, str name);
 
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Statement(loc src = |unknown:///|)
-  = \store(Type \type, str var, Expression \value)
+  = \store(str name, Expression \value)
   | \do(bool isVoid, Expression exp)
-  | \putfield(Expression receiver, str fieldName, Expression \value)
-  | \putstatic(str class, str fieldName, Expression \value)
+  | \putField(Expression receiver, str fieldName, Expression \value)
+  | \putStatic(str class, str fieldName, Expression \value)
   | \if(Expression condition, list[Statement] block)
   | \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
   | \while(Expression condition, list[Statement] block)
@@ -102,8 +112,6 @@ data Statement(loc src = |unknown:///|)
   | \for(list[Statement] init, Expression condition, list[Statement] next, list[Statement] block)
   | \return()
   | \return(Type \type, Expression arg)
-  | \invokeSuper(Signature desc, list[Expression] args)
-  | \invokeThis(Signature desc, list[Expression] args)
   | \try(list[Statement] tryBlock, list[Catch] \catchBlock, list[Statement] \finallyBlock)
   | label(str label)
   | \goto(str label)
@@ -134,7 +142,7 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | invokeSpecial(str class, Expression receiver, Signature desc, list[Expression] args)
   | invokeVirtual(str class, Expression receiver, Signature desc, list[Expression] args)
   | invokeInterface(str class, Expression receiver, Signature desc, list[Expression] args)
-  | newInstance(str class, Signature desc, list[Expression] arguments)
+  | newInstance(str class, Signature desc, list[Expression] args)
   | getField(Expression object, str name)
   | getStatic(str class, Type \type, str name)
   | instanceof(Expression arg, Type \type)
@@ -174,11 +182,41 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
  // below some typical macros for the sake of convenience:
  
 Type string() = classType("java.lang.String");
+
 Type object() = classType("java.lang.Object");
 
 Method main(str args, Block block) 
   = method(methodDesc(\void(), "main", [array(string())]), [var(array(string()), args)], block, modifiers={\public(), \static(), \final()});
-   
+  
+Method defaultConstructor(Modifier access)
+  = method(constructorDesc([]), [], block([], [
+      do(true, invokeSuper("java.lang.Object")),
+      \return()
+  ]));   
+ 
+Method defaultConstructor(Modifier access, str super)
+  = method(constructorDesc([]), [], block([], [
+      do(true, invokeSuper(super)),
+      \return()
+  ])); 
+  
+Signature constructorDesc(list[Type] formals) 
+  = methodDesc(\void(), "\<init\>", formals);   
+    
+Expression invokeSuper(str super) = invokeSuper(super, [], []);
+  
+Expression invokeSuper(str super, list[Type] formals, list[Expression] args)
+  = invokeSpecial(super, this(), constructorDesc(formals), args);  
+    
+Method constructor(Modifier access, str class, list[Variable] formals, Block block)
+  = method(constructorDesc([ var.\type | var <- formals]), formals, block);
+      
+Expression new(str class, list[Type] argTypes, list[Expression] args)
+  = newInstance(class, constructorDesc(argTypes), args);
+  
+Expression new(str class)
+  = new(class, [], []);
+      
 Expression toString(Expression object) 
    = invokeVirtual(object, methodDesc(string(), "toString", []), []);
 
@@ -203,4 +241,5 @@ Statement stderr(Expression arg)
 Expression println(str stream, Expression arg)
    = invokeVirtual("java.io.PrintStream", getStatic("java.lang.System", classType("java.io.PrintStream"), stream), 
          methodDesc(\void(), "println", [object()]), [arg]);         
-   
+ 
+Expression this() = load("this");

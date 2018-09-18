@@ -15,18 +15,27 @@ java void runMain(loc classfile, list[str] args=[], list[loc] classpath=[]);
 java void runTests(loc classfile, list[loc] classpath=[]);
 
 void main() {
-  compile(class("HelloWorld", 
+  compile(class(classType("HelloWorld"), 
     fields =[
       field( classType("java.lang.Integer"),"age", modifiers={\public()})
     ], 
     methods=[
+     defaultConstructor(\public()),
      main("args", 
-        block([],[
+        block([var(classType("HelloWorld"), "hw")],[
           stderr(index("args", 0)),
-          stderr(index("args", 1)),
+          store("hw", new("HelloWorld")),
+          // invokeVirtual(str class, Expression receiver, Signature desc, list[Expression] args)
+          do(true, invokeVirtual("HelloWorld", load("hw"), methodDesc(\void(),"f",[string()]), [index("args", 0)])),
           \return()
         ])
-      )
+      ),
+     
+     method(\public(), \void(), "f", [var(string(), "s")], block([],[
+       stdout(load("s")),
+       stdout(this()),
+       \return()
+     ]))
     ]
   ), |home:///HelloWorld.class|);
 }

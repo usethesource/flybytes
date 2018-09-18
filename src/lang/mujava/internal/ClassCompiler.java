@@ -98,7 +98,7 @@ public class ClassCompiler {
 			if (kws.hasParameter("interfaces")) {
 				ArrayList<String> interfaces = new ArrayList<String>();
 				for (IValue v : AST.$getInterfaces(kws)) {
-					interfaces.add(AST.$string(v));
+					interfaces.add(AST.$string(v).replaceAll("\\.","/"));
 				}
 				classNode.interfaces = interfaces;
 			}
@@ -154,7 +154,6 @@ public class ClassCompiler {
 				throw new IllegalArgumentException("type signature of " + name + " has different number of types (" + sigFormals.length() + ") from formal parameters (" + varFormals.length() + "), see: " + sigFormals + " versus " + varFormals);
 			}
 			
-			
 			method = new MethodNode(modifiers, name, Signature.method(sig), null, null);
 			variableCounter = 0;
 			variableTypes = new String[sigFormals.length() + varFormals.length()];
@@ -163,8 +162,10 @@ public class ClassCompiler {
 			scopeEnd = new Label();
 			
 			method.visitCode(); 
+			method.visitLabel(scopeStart);
 			compileVariables(varFormals);
 			compileBlock(AST.$getBlock(cons));
+			method.visitLabel(scopeEnd);
 			method.visitEnd();
 			
 			classNode.methods.add(method);
@@ -352,8 +353,8 @@ public class ClassCompiler {
 			for (IValue cons : modifiers) {
 				switch (((IConstructor) cons).getName()) {
 				case "public": return Opcodes.ACC_PUBLIC;
-				case "private": return Opcodes.ACC_PUBLIC;
-				case "protected": return Opcodes.ACC_PUBLIC;
+				case "private": return Opcodes.ACC_PRIVATE;
+				case "protected": return Opcodes.ACC_PROTECTED;
 				}
 			}
 
@@ -365,8 +366,8 @@ public class ClassCompiler {
 			for (IValue cons : modifiers) {
 				switch (((IConstructor) cons).getName()) {
 				case "public": res += Opcodes.ACC_PUBLIC; break;
-				case "private": res +=  Opcodes.ACC_PUBLIC; break;
-				case "protected": res += Opcodes.ACC_PUBLIC; break;
+				case "private": res +=  Opcodes.ACC_PRIVATE; break;
+				case "protected": res += Opcodes.ACC_PROTECTED; break;
 				case "static": res += Opcodes.ACC_STATIC; break;
 				case "final": res += Opcodes.ACC_FINAL; break;
 				case "abstract": res += Opcodes.ACC_ABSTRACT; break;
@@ -636,7 +637,7 @@ public class ClassCompiler {
 		}
 
 		public static String $getSuper(IWithKeywordParameters<? extends IConstructor> kws) {
-			return ((IString) kws.getParameter("super")).getValue();
+			return ((IString) kws.getParameter("super")).getValue().replaceAll("\\.","/");
 		}
 
 		public static String $string(IValue v) {

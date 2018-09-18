@@ -192,7 +192,7 @@ Method defaultConstructor(Modifier access)
   = method(constructorDesc([]), [], block([], [
       do(true, invokeSuper("java.lang.Object")),
       \return()
-  ]));   
+  ]), modifiers={access});   
  
 Method defaultConstructor(Modifier access, str super)
   = method(constructorDesc([]), [], block([], [

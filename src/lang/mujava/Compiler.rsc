@@ -21,7 +21,7 @@ void main() {
       field( classType("java.lang.Integer"),"age", modifiers={\public()})
     ], 
     methods=[
-     defaultConstructor(\public()),
+     defaultConstructor(\private()),
      main("args", 
         block([var(classType("HelloWorld"), "hw")],[
           stderr(index("args", 0)),
@@ -38,7 +38,6 @@ void main() {
      ]))
     ]
   );
-  iprintln(cl);
   
   compile(cl, |home:///HelloWorld.class|);
 }

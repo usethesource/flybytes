@@ -284,7 +284,6 @@ public class ClassCompiler {
 		}
 
 		private void compileExpression(IConstructor exp) {
-			out.println(exp);
 			switch (exp.getConstructorType().getName()) {
 			case "const" : 
 				compileExpression_Const(AST.$getType(exp), AST.$getConstant(exp)); 

@@ -141,7 +141,7 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | eq(Expression lhs, Expression rhs)
   | newarray(Type \type, Expression size)
   | alength(Expression array)
-  | index(Expression array, Expression index)
+  | aaload(Expression array, Expression index)
   | astore(Type \type, Expression array, Expression index, Expression \value)
   | cmple(Type \type, Expression lhs, Expression rhs)
   | cmpgt(Type \type, Expression lhs, Expression rhs)
@@ -176,23 +176,31 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
 Type string() = classType("java.lang.String");
 Type object() = classType("java.lang.Object");
 
- Method main(str args, Block block) 
+Method main(str args, Block block) 
   = method(methodDesc(\void(), "main", [array(string())]), [var(array(string()), args)], block, modifiers={\public(), \static(), \final()});
    
- Expression toString(Expression object) 
+Expression toString(Expression object) 
    = invokeVirtual(object, methodDesc(string(), "toString", []), []);
 
- Expression hashCode(Expression object) 
+Expression hashCode(Expression object) 
    = invokeVirtual(object, methodDesc(integer(), "hashCode", []), []);
    
- Expression equals(Expression object, Expression compared) 
+Expression equals(Expression object, Expression compared) 
    = invokeVirtual(object, methodDesc(boolean(), "equals", [object()]), [compared]);
   
- Statement stdout(Expression arg)
-   = \do(true, invokeVirtual("java.io.PrintStream", getStatic("java.lang.System", classType("java.io.PrintStream"), "out"), 
-         methodDesc(\void(), "println", [object()]), [arg]));
+Expression index(str array, int index)
+   = aaload(load(array), const(integer(), index));
+   
+Expression index(str array, Expression index)
+   = aaload(load(array), index);  
+    
+Statement stdout(Expression arg)
+   = \do(true, println("out", arg));
 
- Statement stderr(Expression arg)
-   = \do(true, invokeVirtual("java.io.PrintStream", getStatic("java.lang.System", classType("java.io.PrintStream"), "err"), 
-         methodDesc(\void(), "println", [object()]), [arg]));
+Statement stderr(Expression arg)
+   = \do(true, println("err", arg));
+         
+Expression println(str stream, Expression arg)
+   = invokeVirtual("java.io.PrintStream", getStatic("java.lang.System", classType("java.io.PrintStream"), stream), 
+         methodDesc(\void(), "println", [object()]), [arg]);         
    

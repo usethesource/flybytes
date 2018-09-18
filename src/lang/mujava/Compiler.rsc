@@ -21,11 +21,12 @@ void main() {
     ], 
     methods=[
      main("args", 
-        block([],[stderr(index(load("args"), const(integer(), 0))), \return()])
+        block([],[
+          stderr(index("args", 0)),
+          stderr(index("args", 0)),
+          \return()
+        ])
       )
-    // main("args", 
-    //    block([],[stderr(load("args")), \return()])
-    //  )
     ]
   ), |home:///HelloWorld.class|);
 }

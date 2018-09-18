@@ -220,7 +220,7 @@ public class ClassCompiler {
 			case "load" : 
 				compileExpression_Load(AST.$getName(exp)); 
 				break;
-			case "index" :
+			case "aaload" :
 				compileExpression_Index(AST.$getArray(exp), AST.$getIndex(exp));
 				break;
 			case "getStatic":

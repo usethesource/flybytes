@@ -149,6 +149,8 @@ public class ClassCompiler {
 			
 			IList sigFormals = AST.$getFormals(sig);
 			IList varFormals = AST.$getFormals(cons);
+			IConstructor block = AST.$getBlock(cons);
+			IList locals = AST.$getVariables(block);
 			
 			if (sigFormals.length() != varFormals.length()) {
 				throw new IllegalArgumentException("type signature of " + name + " has different number of types (" + sigFormals.length() + ") from formal parameters (" + varFormals.length() + "), see: " + sigFormals + " versus " + varFormals);
@@ -156,15 +158,15 @@ public class ClassCompiler {
 			
 			method = new MethodNode(modifiers, name, Signature.method(sig), null, null);
 			variableCounter = 0;
-			variableTypes = new String[sigFormals.length() + varFormals.length()];
-			variableNames = new String[sigFormals.length() + varFormals.length()];
+			variableTypes = new String[varFormals.length() + locals.length()];
+			variableNames = new String[varFormals.length() + locals.length()];
 			scopeStart = new Label();
 			scopeEnd = new Label();
 			
 			method.visitCode(); 
 			method.visitLabel(scopeStart);
 			compileVariables(varFormals);
-			compileBlock(AST.$getBlock(cons));
+			compileBlock(block);
 			method.visitLabel(scopeEnd);
 			method.visitEnd();
 			
@@ -194,8 +196,12 @@ public class ClassCompiler {
 
 		private void compileStatement(IConstructor stat) {
 			switch (stat.getConstructorType().getName()) {
-			case "do" : compileDo(AST.$getIsVoid(stat), (IConstructor) stat.get("exp"));
-			case "return" : method.visitInsn(Opcodes.RETURN);
+			case "do" : 
+				compileDo(AST.$getIsVoid(stat), (IConstructor) stat.get("exp")); 
+				break;
+			case "return" : 
+				method.visitInsn(Opcodes.RETURN);
+				break;
 			}
 		}
 

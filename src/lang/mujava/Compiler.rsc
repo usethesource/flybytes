@@ -16,8 +16,14 @@ java void runTests(loc classfile, list[loc] classpath=[]);
 
 void main() {
   compile(class("HelloWorld", 
-    fields=[field(integer(),"age", \default=42, modifiers={\public()})], 
-    methods=[method(methodDesc(integer(), "getAge", []), block([],[]), modifiers={\public()})]
+    fields =[
+      field( classType("java.lang.Integer"),"age", modifiers={\public()})
+    ], 
+    methods=[
+     main("args", 
+        block([],[stdout(loadParameter(array(string()), "args")), \return()])
+      )
+    ]
   ), |home:///HelloWorld.class|);
 }
 

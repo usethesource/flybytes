@@ -56,8 +56,12 @@ data Field
   = field(Type \type, str name, value \default = \null(), set[Modifier] modifiers = {\private()});
          
 data Method
-  = method(Signature desc, Block block, set[Modifier] modifiers = {\public()})
+  = method(Signature desc, list[Variable] formals, Block block, set[Modifier] modifiers = {\public()})
   ;
+
+Method method(Modifier access, Type ret, str name, list[Variable] formals, Block block)
+  = method(methodDesc(ret, name, [ var.\type | var <- formals]), formals, block, modifiers={access});
+  
 
 data Signature = methodDesc(Type \return, str name, list[Type] formals);
  
@@ -74,6 +78,8 @@ data Type
   | array(Type arg)
   | \void()
   ;
+
+
 
 data Annotation; // TODO
 
@@ -123,7 +129,8 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   = null()
   | \true()
   | \false()
-  | load(Type \type, str name)
+  | loadVariable(Type \type, str name)
+  | loadParameter(Type \type, str name)
   | \const(Type \type, value constant)
   | block(list[Statement] block, Expression result)
   | invokeStatic(str class, Signature desc, list[Expression] args)
@@ -164,4 +171,22 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | neg(Type \type, Expression arg)
   | inc(Expression arg, Expression inc)
   ;
-  
+ 
+ 
+ // below some typical macros for the sake of convenience:
+ 
+Type string() = classType("java.lang.String");
+Type object() = classType("java.lang.Object");
+
+ Method main(str args, Block block) 
+  = method(methodDesc(\void(), "main", [array(string())]), [var(array(string()), args)], block, modifiers={\public(), \static(), \final()});
+   
+ Expression toString(Expression object) 
+   = invokeVirtual(object, methodDesc(string(), "toString", []), []);
+
+ Expression hashCode(Expression object) 
+   = invokeVirtual(object, methodDesc(integer(), "hashCode", []), []);
+   
+ Expression equals(Expression object, Expression compared) 
+   = invokeVirtual(object, methodDesc(boolean(), "equals", [object()]), [compared]);
+   

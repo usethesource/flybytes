@@ -92,6 +92,7 @@ data Variable = var(Type \type, str name);
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Statement(loc src = |unknown:///|)
   = \store(Type \type, str var, Expression \value)
+  | \do(bool isVoid, Expression exp)
   | \putfield(Expression receiver, str fieldName, Expression \value)
   | \putstatic(str class, str fieldName, Expression \value)
   | \if(Expression condition, list[Statement] block)
@@ -111,11 +112,8 @@ data Statement(loc src = |unknown:///|)
   | monitor(Expression lock, list[Statement] block)
   ;
 
-@doc{Some basic macros for the convenience of the code generator}  
 data Statement(loc src = |unknown:///|)  
-  = stdout(Expression e) // short hand for debug println to stdout
-  | stderr(Expression e) // short hand for debug println to stderr
-  | assertEquals(Expression lhs, Expression rhs)
+  = assertEquals(Expression lhs, Expression rhs)
   | assertNotEquals(Expression lhs, Expression rhs)
   | assertTrue(Expression e)
   | assertFalse(Expression e)
@@ -129,16 +127,16 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   = null()
   | \true()
   | \false()
-  | loadVariable(Type \type, str name)
-  | loadParameter(Type \type, str name)
+  | load(str name)
   | \const(Type \type, value constant)
   | block(list[Statement] block, Expression result)
   | invokeStatic(str class, Signature desc, list[Expression] args)
-  | invokeSpecial(Expression receiver, Signature desc, list[Expression] args)
-  | invokeVirtual(Expression receiver, Signature desc, list[Expression] args)
-  | invokeInterface(Signature desc, Expression receiver, list[Expression] args)
+  | invokeSpecial(str class, Expression receiver, Signature desc, list[Expression] args)
+  | invokeVirtual(str class, Expression receiver, Signature desc, list[Expression] args)
+  | invokeInterface(str class, Expression receiver, Signature desc, list[Expression] args)
   | newInstance(str class, Signature desc, list[Expression] arguments)
-  | getfield(Expression object, str name)
+  | getField(Expression object, str name)
+  | getStatic(str class, Type \type, str name)
   | instanceof(Expression arg, Type \type)
   | eq(Expression lhs, Expression rhs)
   | newarray(Type \type, Expression size)
@@ -189,4 +187,12 @@ Type object() = classType("java.lang.Object");
    
  Expression equals(Expression object, Expression compared) 
    = invokeVirtual(object, methodDesc(boolean(), "equals", [object()]), [compared]);
+  
+ Statement stdout(Expression arg)
+   = \do(true, invokeVirtual("java.io.PrintStream", getStatic("java.lang.System", classType("java.io.PrintStream"), "out"), 
+         methodDesc(\void(), "println", [object()]), [arg]));
+
+ Statement stderr(Expression arg)
+   = \do(true, invokeVirtual("java.io.PrintStream", getStatic("java.lang.System", classType("java.io.PrintStream"), "err"), 
+         methodDesc(\void(), "println", [object()]), [arg]));
    

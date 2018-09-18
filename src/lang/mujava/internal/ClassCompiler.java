@@ -6,6 +6,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
@@ -28,6 +29,10 @@ import io.usethesource.vallang.IWithKeywordParameters;
 import io.usethesource.vallang.type.ITypeVisitor;
 import io.usethesource.vallang.type.Type;
 
+/**
+ * Translates muJava ASTs (see lang::mujava::Syntax.rsc) directly down to JVM bytecode,
+ * using the ASM library.
+ */
 public class ClassCompiler {
 	private PrintWriter out;
 
@@ -48,12 +53,21 @@ public class ClassCompiler {
 		}
 	}
 	
+	/**
+	 * The Compile class encapsulates a single run of the muJava -> JVM bytecode compiler
+	 * for a single Class definition.
+	 */
 	private static class Compile {
 		private final ClassWriter cw;
 		private final int version;
 		@SuppressWarnings("unused") // needed for debug prints
 		private final PrintWriter out;
-		private IList varFormals;
+		private String[] variableTypes;
+		private String[] variableNames;
+		private int variableCounter;
+		private Label scopeStart;
+		private Label scopeEnd;
+		private MethodNode method;
 
 		public Compile(ClassWriter cw, int version, PrintWriter out) {
 			this.cw = cw;
@@ -80,7 +94,7 @@ public class ClassCompiler {
 				classNode.superName = AST.$getSuper(kws);
 			}
 			else {
-				classNode.superName = "java.lang.Object";
+				classNode.superName = "java/lang/Object";
 			}
 	
 			if (kws.hasParameter("interfaces")) {
@@ -136,140 +150,169 @@ public class ClassCompiler {
 			String name = AST.$getName(sig);
 			
 			IList sigFormals = AST.$getFormals(sig);
-			varFormals = AST.$getFormals(cons);
+			IList varFormals = AST.$getFormals(cons);
 			
 			if (sigFormals.length() != varFormals.length()) {
 				throw new IllegalArgumentException("type signature of " + name + " has different number of types (" + sigFormals.length() + ") from formal parameters (" + varFormals.length() + "), see: " + sigFormals + " versus " + varFormals);
 			}
 			
-			MethodNode mn = new MethodNode(modifiers, name, Signature.method(sig), null, null);
-			compileBlock(mn, AST.$getBlock(cons));
 			
-			// TODO: add instructions, try catch, variables
-			classNode.methods.add(mn);
+			method = new MethodNode(modifiers, name, Signature.method(sig), null, null);
+			variableCounter = 0;
+			variableTypes = new String[sigFormals.length() + varFormals.length()];
+			variableNames = new String[sigFormals.length() + varFormals.length()];
+			scopeStart = new Label();
+			scopeEnd = new Label();
+			
+			method.visitCode(); 
+			compileVariables(varFormals);
+			compileBlock(AST.$getBlock(cons));
+			method.visitEnd();
+			
+			classNode.methods.add(method);
 		}
 
-		private void compileBlock(MethodNode mn, IConstructor block) {
-			mn.visitCode();
-			compileVariables(mn, AST.$getVariables(block));
-			compileStatements(mn, AST.$getStatements(block));
-			mn.visitEnd();
+		private void compileVariables(IList formals) {
+			for (IValue elem : formals) {
+				IConstructor var = (IConstructor) elem;
+				variableTypes[variableCounter] = Signature.type(AST.$getType(var));
+				variableNames[variableCounter] = AST.$getName(var);
+				method.visitLocalVariable(variableNames[variableCounter], variableTypes[variableCounter], null, scopeStart, scopeEnd, 0);
+				variableCounter++;
+			}
 		}
 
-		private void compileStatements(MethodNode mn, IList statements) {
+		private void compileBlock(IConstructor block) {
+			compileVariables(AST.$getVariables(block));
+			compileStatements(AST.$getStatements(block));
+		}
+
+		private void compileStatements(IList statements) {
 			for (IValue elem : statements) {
-				IConstructor stat = (IConstructor) elem;
-				compileStatement(mn, stat);
+				compileStatement((IConstructor) elem);
 			}
 		}
 
-		private void compileStatement(MethodNode mn, IConstructor stat) {
+		private void compileStatement(IConstructor stat) {
 			switch (stat.getConstructorType().getName()) {
-			case "stdout" : compileStdout(mn, (IConstructor) stat.get("e"));
-			case "return" : mn.visitInsn(Opcodes.RETURN);
+			case "do" : compileDo(AST.$getIsVoid(stat), (IConstructor) stat.get("exp"));
+			case "return" : method.visitInsn(Opcodes.RETURN);
 			}
 		}
 
-		private void compileStdout(MethodNode mn, IConstructor arg) {
-			getStatic(mn, System.class, "out", PrintStream.class);
-			compileExpression(mn, arg);
-			invokeVirtual(mn, PrintStream.class, "println", null, Object.class);
+		private void compileDo(boolean isVoid, IConstructor exp) {
+			compileExpression(exp);
+			if (!isVoid) {
+				pop();
+			}
 		}
-		
-		private void compileExpression(MethodNode mn, IConstructor exp) {
+
+		private void pop() {
+			method.visitInsn(Opcodes.POP);
+		}
+
+		private void compileExpression(IConstructor exp) {
 			switch (exp.getConstructorType().getName()) {
-			case "const" : compileExpression_Const(mn, AST.$getType(exp), AST.$getConstant(exp));
-			case "loadParameter" : compileExpression_Parameter(mn, AST.$getType(exp), AST.$getName(exp));
+			case "const" : 
+				compileExpression_Const(AST.$getType(exp), AST.$getConstant(exp)); 
+				break;
+			case "load" : 
+				compileExpression_Load(AST.$getName(exp)); 
+				break;
+			case "getStatic":
+				compileGetStatic(AST.$getClass(exp), AST.$getType(exp), AST.$getName(exp));
+				break;
+			case "invokeVirtual" : 
+				compileInvokeVirtual(AST.$getClass(exp), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
+				break;
+			case "invokeStatic" : 
+				compileInvokeStatic(AST.$getClass(exp), AST.$getDesc(exp), AST.$getArgs(exp));
+				break;
 			default: 
 				System.err.println("ignoring unknown expression kind " + exp);                                     
 			}
 		}
 
-		private void compileExpression_Parameter(MethodNode mn, IConstructor type, String name) {
-			int pos = positionOf(varFormals, name);
+		private void compileGetStatic(String cls, IConstructor type, String name) {
+			method.visitFieldInsn(Opcodes.GETSTATIC, cls, name, Signature.type(type));
+		}
+		
+		private void compileInvokeVirtual(String cls, IConstructor sig, IConstructor receiver, IList args) {
+			compileExpression(receiver);
 			
-			switch (type.getConstructorType().getName()) {
+			for (IValue elem : args) {
+				compileExpression((IConstructor) elem);
+			}
+			
+			method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, cls, AST.$getName(sig), Signature.method(sig), false);
+		}
+		
+		private void compileInvokeStatic(String cls, IConstructor sig, IList args) {
+			for (IValue elem :args) {
+				compileExpression((IConstructor) elem);
+			}
+			
+			method.visitMethodInsn(Opcodes.INVOKESTATIC, cls, AST.$getName(sig), Signature.method(sig), false);
+		}
+		
+		private void compileExpression_Load(String name) {
+			int pos = positionOf(name);
+			
+			switch (variableTypes[pos]) {
 			case "integer": 
 			case "byte":
 			case "character":
-				intConstant(mn, pos);
-				mn.visitInsn(Opcodes.ILOAD);
+				intConstant(pos);
+				method.visitInsn(Opcodes.ILOAD);
 				break;
 			case "float":
-				intConstant(mn, pos);
-				mn.visitInsn(Opcodes.FLOAD);
+				intConstant(pos);
+				method.visitInsn(Opcodes.FLOAD);
 				break;
 			case "long":
-				intConstant(mn, pos);
-				mn.visitInsn(Opcodes.LLOAD);
+				intConstant(pos);
+				method.visitInsn(Opcodes.LLOAD);
 				break;
 			default:
-				mn.visitVarInsn(Opcodes.ALOAD, pos);
+				method.visitVarInsn(Opcodes.ALOAD, pos);
 			}
 		}
 
-		private void intConstant(MethodNode mn, int constant) {
+		private void intConstant(int constant) {
 			switch (constant) {
-			case 0: mn.visitInsn(Opcodes.ICONST_0); break;
-			case 1: mn.visitInsn(Opcodes.ICONST_1); break;
-			case 2: mn.visitInsn(Opcodes.ICONST_2); break;
-			case 3: mn.visitInsn(Opcodes.ICONST_3); break;
-			case 4: mn.visitInsn(Opcodes.ICONST_4); break;
-			case 5: mn.visitInsn(Opcodes.ICONST_5); break;
-			default: mn.visitIntInsn(Opcodes.BIPUSH, constant);
+			case 0: method.visitInsn(Opcodes.ICONST_0); break;
+			case 1: method.visitInsn(Opcodes.ICONST_1); break;
+			case 2: method.visitInsn(Opcodes.ICONST_2); break;
+			case 3: method.visitInsn(Opcodes.ICONST_3); break;
+			case 4: method.visitInsn(Opcodes.ICONST_4); break;
+			case 5: method.visitInsn(Opcodes.ICONST_5); break;
+			default: method.visitIntInsn(Opcodes.BIPUSH, constant);
 			}
 		}
 
-		private int positionOf(IList varFormals, String name) {
-			int pos = 0;
-			
-			for (IValue elem : varFormals) {
-				IConstructor var = (IConstructor) elem;
-				if (AST.$getName(var).equals(name)) {
+		private int positionOf(String name) {
+			for (int pos = 0; pos < variableNames.length; pos++) {
+				if (variableNames[pos].equals(name)) {
 					return pos;
 				}
-				
-				pos++;
 			}
 			
 			throw new IllegalArgumentException("name not found: " + name);
 		}
 
-		private void compileExpression_Const(MethodNode mn, IConstructor type, IValue constant) {
-			mn.visitInsn(Opcodes.ICONST_0); // TODO
-		}
-
-		private void getStatic(MethodNode mn, Class<?> cls, String name, Class<?> type) {
-			mn.visitFieldInsn(Opcodes.GETSTATIC, cls.getCanonicalName().replaceAll("\\.","/"), "out", Signature.type(type));
-		}
-		
-		private void invokeVirtual(MethodNode mn, Class<?> cls, String name, Class<?> ret, Class<?>... formals) {
-			mn.visitMethodInsn(Opcodes.INVOKEVIRTUAL, cls.getCanonicalName().replaceAll("\\.","/"), name, Signature.method(ret, formals), false);
+		private void compileExpression_Const(IConstructor type, IValue constant) {
+			method.visitInsn(Opcodes.ICONST_0); // TODO
 		}
 
 		@SuppressWarnings("unused")
-		private void swap(MethodNode mn) {
-			mn.visitInsn(Opcodes.SWAP);
+		private void swap() {
+			method.visitInsn(Opcodes.SWAP);
 		}
 
 		@SuppressWarnings("unused")
-		private void dup(MethodNode mn) {
-			mn.visitInsn(Opcodes.DUP);
+		private void dup() {
+			method.visitInsn(Opcodes.DUP);
 		}
-
-		private void compileVariables(MethodNode mn, IList variables) {
-			for (IValue elem : variables) {
-				IConstructor var = (IConstructor) elem;
-				compileVariable(mn, var);
-			}
-			
-		}
-
-		private void compileVariable(MethodNode mn, IConstructor var) {
-			// TODO Auto-generated method stub
-		}
-
-		
 
 		private void compileField(ClassNode classNode, IConstructor cons) {
 			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
@@ -502,8 +545,24 @@ public class ClassCompiler {
 			return exp.get("constant");
 		}
 		
+		public static boolean $getIsVoid(IConstructor exp) {
+			return ((IBool) exp.get("isVoid")).getValue();
+		}
+		
+		public static IConstructor $getReceiver(IConstructor exp) {
+			return (IConstructor) exp.get("receiver");
+		}
+		
 		public static IConstructor $getReturn(IConstructor sig) {
 			return (IConstructor) sig.get("return");
+		}
+		
+		public static IList $getArgs(IConstructor sig) {
+			return (IList) sig.get("args");
+		}
+		
+		public static String $getClass(IValue parameter) {
+			return ((IString) ((IConstructor) parameter).get("class")).getValue().replaceAll("\\.", "/");
 		}
 		
 		public static String $getConstructorName(IValue parameter) {

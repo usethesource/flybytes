@@ -21,7 +21,7 @@ void main() {
     ], 
     methods=[
      main("args", 
-        block([],[stdout(loadParameter(array(string()), "args")), \return()])
+        block([],[stderr(load("args")), \return()])
       )
     ]
   ), |home:///HelloWorld.class|);

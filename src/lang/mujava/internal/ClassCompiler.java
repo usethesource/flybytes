@@ -1,7 +1,6 @@
 package lang.mujava.internal;
 
 import java.io.OutputStream;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 
@@ -60,7 +59,6 @@ public class ClassCompiler {
 	private static class Compile {
 		private final ClassWriter cw;
 		private final int version;
-		@SuppressWarnings("unused") // needed for debug prints
 		private final PrintWriter out;
 		private String[] variableTypes;
 		private String[] variableNames;
@@ -311,7 +309,13 @@ public class ClassCompiler {
 		}
 
 		private void compileExpression_Const(IConstructor type, IValue constant) {
-			method.visitInsn(Opcodes.ICONST_0); // TODO
+			switch(AST.$getConstructorName(type)) {
+			case "integer":
+				intConstant(AST.$getInteger(constant));
+				break;
+			default:
+				throw new IllegalArgumentException("not supported: " + constant.toString());
+			}
 		}
 
 		@SuppressWarnings("unused")
@@ -510,18 +514,6 @@ public class ClassCompiler {
 			return val.toString();
 		}
 
-		
-		private static String method(Class<?> ret, Class<?>... formals) {
-			StringBuilder val = new StringBuilder();
-			val.append("(");
-			for (Class<?> formal : formals) {
-				val.append(type(formal));
-			}
-			val.append(")");
-			val.append(ret == null ? "V" : type(ret));
-			return val.toString();
-		}
-
 		private static String type(IConstructor t) {
 			IConstructor type = (IConstructor) t;
 			
@@ -539,10 +531,6 @@ public class ClassCompiler {
 			default:
 				throw new IllegalArgumentException(type.toString());
 			}
-		}
-		
-		private static String type(Class<?> type) {
-			return "L" + type.getCanonicalName().replaceAll("\\.", "/") + ";";
 		}
 	}
 	

@@ -23,7 +23,7 @@ void main() {
      main("args", 
         block([],[
           stderr(index("args", 0)),
-          stderr(index("args", 0)),
+          stderr(index("args", 1)),
           \return()
         ])
       )

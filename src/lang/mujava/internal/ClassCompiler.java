@@ -200,8 +200,33 @@ public class ClassCompiler {
 				compileDo(AST.$getIsVoid(stat), (IConstructor) stat.get("exp")); 
 				break;
 			case "return" : 
-				method.visitInsn(Opcodes.RETURN);
+				compileReturn(stat);
 				break;
+			}
+		}
+
+		private void compileReturn(IConstructor stat) {
+			if (stat.getConstructorType().getArity() == 0) {
+				method.visitInsn(Opcodes.RETURN);
+			}
+			else {
+				 compileExpression(AST.$getArg(stat));
+				 
+				 switch (AST.$getConstructorName(AST.$getType(stat))) {
+					case "integer": 
+					case "byte":
+					case "character":
+						method.visitInsn(Opcodes.IRETURN);
+						break;
+					case "float":
+						method.visitInsn(Opcodes.FRETURN);
+						break;
+					case "long":
+						method.visitInsn(Opcodes.DRETURN);
+						break;
+					default:
+						method.visitInsn(Opcodes.ARETURN);
+					}
 			}
 		}
 

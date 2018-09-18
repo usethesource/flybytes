@@ -1,6 +1,7 @@
 module lang::mujava::Compiler
 
 import lang::mujava::Syntax;
+import IO;
 
 data JDKVersion = v1_6() | v1_7() | v1_8();
 
@@ -15,7 +16,7 @@ java void runMain(loc classfile, list[str] args=[], list[loc] classpath=[]);
 java void runTests(loc classfile, list[loc] classpath=[]);
 
 void main() {
-  compile(class(classType("HelloWorld"), 
+  cl = class(classType("HelloWorld"), 
     fields =[
       field( classType("java.lang.Integer"),"age", modifiers={\public()})
     ], 
@@ -25,7 +26,6 @@ void main() {
         block([var(classType("HelloWorld"), "hw")],[
           stderr(index("args", 0)),
           store("hw", new("HelloWorld")),
-          // invokeVirtual(str class, Expression receiver, Signature desc, list[Expression] args)
           do(true, invokeVirtual("HelloWorld", load("hw"), methodDesc(\void(),"f",[string()]), [index("args", 0)])),
           \return()
         ])
@@ -37,7 +37,10 @@ void main() {
        \return()
      ]))
     ]
-  ), |home:///HelloWorld.class|);
+  );
+  iprintln(cl);
+  
+  compile(cl, |home:///HelloWorld.class|);
 }
 
 

@@ -212,12 +212,16 @@ public class ClassCompiler {
 		}
 
 		private void compileExpression(IConstructor exp) {
+			out.println(exp);
 			switch (exp.getConstructorType().getName()) {
 			case "const" : 
 				compileExpression_Const(AST.$getType(exp), AST.$getConstant(exp)); 
 				break;
 			case "load" : 
 				compileExpression_Load(AST.$getName(exp)); 
+				break;
+			case "index" :
+				compileExpression_Index(AST.$getArray(exp), AST.$getIndex(exp));
 				break;
 			case "getStatic":
 				compileGetStatic(AST.$getClass(exp), AST.$getType(exp), AST.$getName(exp));
@@ -231,6 +235,12 @@ public class ClassCompiler {
 			default: 
 				System.err.println("ignoring unknown expression kind " + exp);                                     
 			}
+		}
+
+		private void compileExpression_Index(IConstructor array, IConstructor index) {
+			compileExpression(array);
+			compileExpression(index);
+			method.visitInsn(Opcodes.AALOAD);
 		}
 
 		private void compileGetStatic(String cls, IConstructor type, String name) {
@@ -545,6 +555,14 @@ public class ClassCompiler {
 			return exp.get("constant");
 		}
 		
+		public static IConstructor $getIndex(IConstructor exp) {
+			return (IConstructor) exp.get("index");
+		}
+
+		public static IConstructor $getArray(IConstructor exp) {
+			return (IConstructor) exp.get("array");
+		}
+
 		public static boolean $getIsVoid(IConstructor exp) {
 			return ((IBool) exp.get("isVoid")).getValue();
 		}

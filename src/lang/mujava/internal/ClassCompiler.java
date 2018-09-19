@@ -328,7 +328,15 @@ public class ClassCompiler {
 				compileBlock(AST.$getStatements(exp), AST.$getArg(exp));
 				break;
 			case "null":
-				compileNull(); 
+				if (exp.getConstructorType().getArity() == 0) {
+					compileNull();  // null constant
+				}
+				else { 
+					compileNull(AST.$getArg(exp)); // null check 
+				}
+				break;
+			case "nonnull":
+				compileNonNull(AST.$getArg(exp)); // null check 
 				break;
 			case "true":
 				compileTrue();
@@ -337,12 +345,171 @@ public class ClassCompiler {
 				compileFalse();
 				break;
 			case "coerce":
-				// coerce(Type from, Type to, Expression arg)
 				compileCoerce(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
+				break;
+			case "eq":
+				compileEq(AST.$getLhs(exp), AST.$getRhs(exp));
+				break;
+			case "neq":
+				compileNeq(AST.$getLhs(exp), AST.$getRhs(exp));
+				break;
+			case "le":
+				compileLe(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
+				break;
+			case "gt":
+				compileGt(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
+				break;
+			case "ge":
+				compileGe(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
+				break;
+			case "lt":
+				compileLt(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
 				break;
 			default: 
 				throw new IllegalArgumentException("unknown expression: " + exp);                                     
 			}
+		}
+
+		private void compileLt(IConstructor type, IConstructor lhs, IConstructor rhs) {
+			compileExpression(lhs);
+			compileExpression(rhs);
+			Label jump = new Label();
+			Switch.type(type, 
+					(Consumer<IConstructor>) (z) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump),
+					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
+					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
+					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
+					(c) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
+					(f) -> { method.visitInsn(Opcodes.FCMPG); method.visitJumpInsn(Opcodes.IFGE, jump); }, 
+					(d) -> { method.visitInsn(Opcodes.DCMPG); method.visitJumpInsn(Opcodes.IFGE, jump); }, 
+					(l) -> { method.visitInsn(Opcodes.LCMP); method.visitJumpInsn(Opcodes.IFGE, jump); }, 
+					(v) -> { throw new IllegalArgumentException("< on void"); }, 
+					(c) -> { throw new IllegalArgumentException("< on class"); }, 
+					(a) -> { throw new IllegalArgumentException("< on array"); }
+					);
+			method.visitInsn(Opcodes.ICONST_1);
+			method.visitInsn(Opcodes.IRETURN);
+			method.visitLabel(jump);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+			method.visitInsn(Opcodes.ICONST_0);
+		}
+		
+		private void compileLe(IConstructor type, IConstructor lhs, IConstructor rhs) {
+			compileExpression(lhs);
+			compileExpression(rhs);
+			Label jump = new Label();
+			Switch.type(type, 
+					(Consumer<IConstructor>) (z) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump),
+					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
+					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
+					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
+					(c) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
+					(f) -> { method.visitInsn(Opcodes.FCMPG); method.visitJumpInsn(Opcodes.IFGT, jump); }, 
+					(d) -> { method.visitInsn(Opcodes.DCMPG); method.visitJumpInsn(Opcodes.IFGT, jump); }, 
+					(l) -> { method.visitInsn(Opcodes.LCMP); method.visitJumpInsn(Opcodes.IFGT, jump); }, 
+					(v) -> { throw new IllegalArgumentException("< on void"); }, 
+					(c) -> { throw new IllegalArgumentException("< on class"); }, 
+					(a) -> { throw new IllegalArgumentException("< on array"); }
+					);
+			method.visitInsn(Opcodes.ICONST_1);
+			method.visitInsn(Opcodes.IRETURN);
+			method.visitLabel(jump);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+			method.visitInsn(Opcodes.ICONST_0);
+		}
+		
+		private void compileGt(IConstructor type, IConstructor lhs, IConstructor rhs) {
+			compileExpression(lhs);
+			compileExpression(rhs);
+			Label jump = new Label();
+			Switch.type(type, 
+					(Consumer<IConstructor>) (z) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump),
+					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
+					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
+					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
+					(c) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
+					(f) -> { method.visitInsn(Opcodes.FCMPG); method.visitJumpInsn(Opcodes.IFLE, jump); }, 
+					(d) -> { method.visitInsn(Opcodes.DCMPG); method.visitJumpInsn(Opcodes.IFLE, jump); }, 
+					(l) -> { method.visitInsn(Opcodes.LCMP); method.visitJumpInsn(Opcodes.IFLE, jump); }, 
+					(v) -> { throw new IllegalArgumentException("< on void"); }, 
+					(c) -> { throw new IllegalArgumentException("< on class"); }, 
+					(a) -> { throw new IllegalArgumentException("< on array"); }
+					);
+			method.visitInsn(Opcodes.ICONST_1);
+			method.visitInsn(Opcodes.IRETURN);
+			method.visitLabel(jump);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+			method.visitInsn(Opcodes.ICONST_0);
+		}
+		
+		private void compileGe(IConstructor type, IConstructor lhs, IConstructor rhs) {
+			compileExpression(lhs);
+			compileExpression(rhs);
+			Label jump = new Label();
+			Switch.type(type, 
+					(Consumer<IConstructor>) (z) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump),
+					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
+					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
+					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
+					(c) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
+					(f) -> { method.visitInsn(Opcodes.FCMPG); method.visitJumpInsn(Opcodes.IFLT, jump); }, 
+					(d) -> { method.visitInsn(Opcodes.DCMPG); method.visitJumpInsn(Opcodes.IFLT, jump); }, 
+					(l) -> { method.visitInsn(Opcodes.LCMP); method.visitJumpInsn(Opcodes.IFLT, jump); }, 
+					(v) -> { throw new IllegalArgumentException("< on void"); }, 
+					(c) -> { throw new IllegalArgumentException("< on class"); }, 
+					(a) -> { throw new IllegalArgumentException("< on array"); }
+					);
+			method.visitInsn(Opcodes.ICONST_1);
+			method.visitInsn(Opcodes.IRETURN);
+			method.visitLabel(jump);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+			method.visitInsn(Opcodes.ICONST_0);
+		}
+
+		private void compileEq(IConstructor lhs, IConstructor rhs) {
+			compileExpression(lhs);
+			compileExpression(rhs);
+			Label jump = new Label();
+			method.visitJumpInsn(Opcodes.IF_ICMPNE, jump);
+			method.visitInsn(Opcodes.ICONST_1);
+			method.visitInsn(Opcodes.IRETURN);
+			method.visitLabel(jump);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+			method.visitInsn(Opcodes.ICONST_0);
+		}
+		
+		private void compileNull(IConstructor arg) {
+			compileExpression(arg);
+			Label jump = new Label();
+			method.visitJumpInsn(Opcodes.IFNONNULL, jump);
+			method.visitInsn(Opcodes.ICONST_1);
+			method.visitInsn(Opcodes.IRETURN);
+			method.visitLabel(jump);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+			method.visitInsn(Opcodes.ICONST_0);
+		}
+		
+		private void compileNonNull(IConstructor arg) {
+			compileExpression(arg);
+			Label jump = new Label();
+			method.visitJumpInsn(Opcodes.IFNULL, jump);
+			method.visitInsn(Opcodes.ICONST_1);
+			method.visitInsn(Opcodes.IRETURN);
+			method.visitLabel(jump);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+			method.visitInsn(Opcodes.ICONST_0);
+		}
+		
+		private void compileNeq(IConstructor lhs, IConstructor rhs) {
+			compileExpression(lhs);
+			compileExpression(rhs);
+			Label jump = new Label();
+			method.visitJumpInsn(Opcodes.IF_ICMPEQ, jump);
+			method.visitInsn(Opcodes.ICONST_1);
+			method.visitInsn(Opcodes.IRETURN);
+			method.visitLabel(jump);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+			method.visitInsn(Opcodes.ICONST_0);
 		}
 
 		private void compileCoerce(IConstructor from, IConstructor to, IConstructor arg) {
@@ -970,6 +1137,14 @@ public class ClassCompiler {
 			return exp.get("constant");
 		}
 		
+		public static IConstructor $getLhs(IConstructor exp) {
+			return (IConstructor) exp.get("lhs");
+		}
+		
+		public static IConstructor $getRhs(IConstructor exp) {
+			return (IConstructor) exp.get("rhs");
+		}
+
 		public static IConstructor $getFrom(IConstructor exp) {
 			return (IConstructor) exp.get("from");
 		}

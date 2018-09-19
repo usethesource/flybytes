@@ -308,6 +308,9 @@ public class ClassCompiler {
 			case "invokeVirtual" : 
 				compileInvokeVirtual(AST.$getClass(exp), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 				break;
+			case "invokeInterface" : 
+				compileInvokeInterface(AST.$getClass(exp), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
+				break;
 			case "invokeSpecial" : 
 				compileInvokeSpecial(AST.$getClass(exp), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 				break;
@@ -629,6 +632,13 @@ public class ClassCompiler {
 			compileExpressionList(args);
 			
 			method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, cls, AST.$getName(sig), Signature.method(sig), false);
+		}
+		
+		private void compileInvokeInterface(String interf, IConstructor sig, IConstructor receiver, IList args) {
+			compileExpression(receiver);
+			compileExpressionList(args);
+			
+			method.visitMethodInsn(Opcodes.INVOKEINTERFACE, interf, AST.$getName(sig), Signature.method(sig), false);
 		}
 
 		private void compileExpressionList(IList args) {

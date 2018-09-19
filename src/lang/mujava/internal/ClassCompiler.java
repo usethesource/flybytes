@@ -237,6 +237,7 @@ public class ClassCompiler {
 			compileExpression(AST.$getValue(stat));
 			
 			Switch.type(variableTypes[pos],
+					(z) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
 					(i) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
 					(s) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
 					(b) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
@@ -258,6 +259,7 @@ public class ClassCompiler {
 				 compileExpression(AST.$getArg(stat));
 				 
 				 Switch.type(AST.$getType(stat),
+						 (z) -> { method.visitInsn(Opcodes.IRETURN); },
 						 (i) -> { method.visitInsn(Opcodes.IRETURN); },
 						 (s) -> { method.visitInsn(Opcodes.IRETURN); },
 						 (b) -> { method.visitInsn(Opcodes.IRETURN); },
@@ -312,9 +314,288 @@ public class ClassCompiler {
 			case "invokeStatic" : 
 				compileInvokeStatic(AST.$getClass(exp), AST.$getDesc(exp), AST.$getArgs(exp));
 				break;
+			case "getField":
+				compileGetField(AST.$getReceiver(exp), AST.$getClass(exp), AST.$getType(exp), AST.$getName(exp));
+				break;
+			case "instanceof":
+				compileInstanceof(AST.$getArg(exp), AST.$getClass(exp));
+				break;
+				// block(list[Statement] block, Expression result)
+			case "block":
+				compileBlock(AST.$getStatements(exp), AST.$getArg(exp));
+				break;
+			case "null":
+				compileNull(); 
+				break;
+			case "true":
+				compileTrue();
+				break;
+			case "false":
+				compileFalse();
+				break;
+			case "coerce":
+				// coerce(Type from, Type to, Expression arg)
+				compileCoerce(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
+				break;
 			default: 
 				throw new IllegalArgumentException("unknown expression: " + exp);                                     
 			}
+		}
+
+		private void compileCoerce(IConstructor from, IConstructor to, IConstructor arg) {
+			Switch.type(from,
+					(Consumer<IConstructor>) (z) -> coerceFromBool(to, arg),
+					(i) -> coerceFromInt(to, arg),
+					(s) -> coerceFromShort(to, arg),
+					(b) -> coerceFromByte(to, arg),
+					(c) -> coerceFromChar(to, arg),
+					(f) -> coerceFromFloat(to, arg),
+					(d) -> coerceFromDouble(to, arg),
+					(l) -> coerceFromLong(to, arg),
+					(v) -> failedCoercion("void", to),
+					(c) -> coerceFromClass(from, to, arg),
+					(a) -> coerceFromArray(from, to, arg) 
+					);
+		}
+
+		private void coerceFromBool(IConstructor to, IConstructor arg) {
+		}
+
+		private void failedCoercion(String from, IConstructor to) {
+			throw new IllegalArgumentException("Can not coerce " + from + " to " + to.getConstructorType().getName());
+		}
+
+		private void coerceFromArray(IConstructor from, IConstructor to, IConstructor arg) {
+			Switch.type(to,
+					(Consumer<IConstructor>) (z) -> failedCoercion("int", to),
+					(i) -> failedCoercion("int", to),
+					(s) -> failedCoercion("short", to),
+					(b) -> failedCoercion("boolean", to),
+					(c) -> failedCoercion("char", to),
+					(f) -> failedCoercion("float", to),
+					(d) -> failedCoercion("double", to),
+					(l) -> failedCoercion("long", to),
+					(v) -> failedCoercion("void", to),
+					(c) -> failedCoercion("class", to),
+					(a) -> coerceArrayToArray(from, to, arg) 
+					);
+		}
+
+		private void coerceArrayToArray(IConstructor from, IConstructor to, IConstructor arg) {
+			
+		}
+
+		private void coerceFromLong(IConstructor to, IConstructor arg) {
+			Switch.type(to,
+					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+					(i) -> { method.visitInsn(Opcodes.L2I); },
+					(s) -> { method.visitInsn(Opcodes.L2I); },
+					(b) -> { method.visitInsn(Opcodes.L2I); },
+					(c) -> { method.visitInsn(Opcodes.L2I); },
+					(f) -> { method.visitInsn(Opcodes.L2F); },
+					(d) -> { method.visitInsn(Opcodes.L2D); },
+					(l) -> { /* do nothing */ },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to)
+					);
+		}
+
+		private void coerceFromClass(IConstructor from, IConstructor to, IConstructor arg) {
+			String cls = AST.$getName(from);
+			
+			Switch.type(to,
+					(Consumer<IConstructor>) (z) -> {
+						if (cls.equals("java/lang/Boolean")) {
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "booleanValue", "()Z", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(i) -> {
+						if (cls.equals("java/lang/Integer")) {
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "intValue", "()I", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(s) -> {
+						if (cls.equals("java/lang/Integer")) {
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "shortValue", "()S", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(b) -> {
+						if (cls.equals("java/lang/Integer")) {
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "byteValue", "()B", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(c) -> failedCoercion(cls, arg),
+					(f) -> {
+						if (cls.equals("java/lang/Float")) {
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Float", "floatValue", "()F", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(d) -> {
+						if (cls.equals("java/lang/Double")) {
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Double", "doubleValue", "()D", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(l) -> {
+						if (cls.equals("java/lang/Long")) {
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Long", "longValue", "()L", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(v) -> { pop(); compileNull(); },
+					(c) -> {
+						if (cls.equals(AST.$getName(to))) {
+							/* do nothing */
+						}
+						else {
+							failedCoercion("class", to);
+						}
+					},
+					(a) -> failedCoercion("array", to)
+					);
+		}
+
+		private void coerceFromDouble(IConstructor to, IConstructor arg) {
+			Switch.type(to,
+					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+					(i) -> { method.visitInsn(Opcodes.D2I); },
+					(s) -> { method.visitInsn(Opcodes.D2I); },
+					(b) -> { method.visitInsn(Opcodes.D2I); },
+					(c) -> { method.visitInsn(Opcodes.D2I); },
+					(f) -> { method.visitInsn(Opcodes.D2F); },
+					(d) -> { /* do nothing */ },
+					(l) -> { method.visitInsn(Opcodes.D2L); } ,
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to)
+					);
+		}
+
+		private void coerceFromFloat(IConstructor to, IConstructor arg) {
+			Switch.type(to,
+					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+					(i) -> { method.visitInsn(Opcodes.F2I); },
+					(s) -> { method.visitInsn(Opcodes.F2I); },
+					(b) -> { method.visitInsn(Opcodes.F2I); },
+					(c) -> { method.visitInsn(Opcodes.F2I); },
+					(f) -> { /* do nothing */ },
+					(d) -> { method.visitInsn(Opcodes.F2D); },
+					(l) -> { method.visitInsn(Opcodes.F2L); },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to)
+					);
+		}
+
+		private void coerceFromChar(IConstructor to, IConstructor arg) {
+			Switch.type(to,
+					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+					(i) -> { /* do nothing */ },
+					(s) -> { /* do nothing */ },
+					(b) -> { /* do nothing */ },
+					(c) -> { /* do nothing */ },
+					(f) -> { method.visitInsn(Opcodes.I2F); },
+					(d) -> { method.visitInsn(Opcodes.I2D); },
+					(l) -> { method.visitInsn(Opcodes.I2L); },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to)
+					);
+		}
+
+		private void coerceFromByte(IConstructor to, IConstructor arg) {
+			Switch.type(to,
+					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+					(i) -> { /* do nothing */ },
+					(s) -> { /* do nothing */ },
+					(b) -> { /* do nothing */ },
+					(c) -> { /* do nothing */ },
+					(f) -> { method.visitInsn(Opcodes.I2F); },
+					(d) -> { method.visitInsn(Opcodes.I2D); },
+					(l) -> { method.visitInsn(Opcodes.I2L); },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to)
+					);
+		}
+
+		private void coerceFromShort(IConstructor to, IConstructor arg) {
+			Switch.type(to,
+					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+					(i) -> { /* do nothing */ },
+					(s) -> { /* do nothing */ },
+					(b) -> { /* do nothing */ },
+					(c) -> { /* do nothing */ },
+					(f) -> { method.visitInsn(Opcodes.I2F); },
+					(d) -> { method.visitInsn(Opcodes.I2D); },
+					(l) -> { method.visitInsn(Opcodes.I2L); },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to)
+					);
+		}
+
+		private void coerceFromInt(IConstructor to, IConstructor arg) {
+			Switch.type(to,
+					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+					(i) -> { /* do nothing */ },
+					(s) -> { /* do nothing */ },
+					(b) -> { /* do nothing */ },
+					(c) -> { /* do nothing */ },
+					(f) -> { method.visitInsn(Opcodes.I2F); },
+					(d) -> { method.visitInsn(Opcodes.I2D); },
+					(l) -> { method.visitInsn(Opcodes.I2L); },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to)
+					);
+		}
+
+		private void compileFalse() {
+			method.visitInsn(Opcodes.ICONST_0);
+		}
+
+		private void compileTrue() {
+			method.visitInsn(Opcodes.ICONST_1);
+		}
+
+		private void compileNull() {
+			method.visitInsn(Opcodes.ACONST_NULL);
+		}
+
+		private void compileBlock(IList block, IConstructor arg) {
+			compileStatements(block);
+			compileExpression(arg);
+		}
+
+		private void compileInstanceof(IConstructor arg, String cls) {
+			compileExpression(arg);
+			method.visitTypeInsn(Opcodes.INSTANCEOF, cls);
+		}
+
+		private void compileGetField(IConstructor receiver, String cls, IConstructor type, String name) {
+			compileExpression(receiver);
+			method.visitFieldInsn(Opcodes.GETFIELD, cls, name, Signature.type(type));
 		}
 
 		private void compileExpression_NewInstance(IConstructor exp) {
@@ -366,6 +647,10 @@ public class ClassCompiler {
 			int pos = positionOf(name);
 			
 			Switch.type(variableTypes[pos], pos,
+					(z,p) -> { 
+						intConstant(p);
+						method.visitInsn(Opcodes.ILOAD);
+					},
 					(i,p) -> { 
 						intConstant(p);
 						method.visitInsn(Opcodes.ILOAD);
@@ -443,7 +728,6 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.SWAP);
 		}
 
-		@SuppressWarnings("unused")
 		private void dup() {
 			method.visitInsn(Opcodes.DUP);
 		}
@@ -651,7 +935,8 @@ public class ClassCompiler {
 		private static String type(IConstructor t) {
 			IConstructor type = (IConstructor) t;
 			
-			return Switch.type(type, 
+			return Switch.type(type,
+					(z) -> { return "Z";},
 					(i) -> { return "I";},
 					(s) -> { return "S";},
 					(b) -> { return "B";},
@@ -675,6 +960,14 @@ public class ClassCompiler {
 			return exp.get("constant");
 		}
 		
+		public static IConstructor $getFrom(IConstructor exp) {
+			return (IConstructor) exp.get("from");
+		}
+		
+		public static IConstructor $getTo(IConstructor exp) {
+			return (IConstructor) exp.get("to");
+		}
+
 		public static IConstructor $getValue(IConstructor stat) {
 			return (IConstructor) stat.get("value");
 		}
@@ -807,8 +1100,11 @@ public class ClassCompiler {
 		 * Dispatch on a consumer on a type. The idea is to never accidentally forget a type using this higher-order function.
 		 * @param type
 		 */
-		public static void type(IConstructor type, Consumer<IConstructor> ints, Consumer<IConstructor> shorts, Consumer<IConstructor> bytes, Consumer<IConstructor> chars, Consumer<IConstructor> floats, Consumer<IConstructor> doubles, Consumer<IConstructor> longs, Consumer<IConstructor> voids, Consumer<IConstructor> classes, Consumer<IConstructor> arrays) {
+		public static void type(IConstructor type, Consumer<IConstructor> bools, Consumer<IConstructor> ints, Consumer<IConstructor> shorts, Consumer<IConstructor> bytes, Consumer<IConstructor> chars, Consumer<IConstructor> floats, Consumer<IConstructor> doubles, Consumer<IConstructor> longs, Consumer<IConstructor> voids, Consumer<IConstructor> classes, Consumer<IConstructor> arrays) {
 			switch (AST.$getConstructorName(type)) {
+			case "boolean": 
+				bools.accept(type);
+				break;
 			case "integer": 
 				ints.accept(type);
 				break;
@@ -848,8 +1144,10 @@ public class ClassCompiler {
 		 * Dispatch on a function on a type. The idea is to never accidentally forget a type using this higher-order function.
 		 * @param type
 		 */
-		public static <T> T type(IConstructor type, Function<IConstructor, T> ints, Function<IConstructor, T> shorts, Function<IConstructor, T> bytes, Function<IConstructor, T> chars, Function<IConstructor, T> floats, Function<IConstructor, T> doubles, Function<IConstructor, T> longs, Function<IConstructor, T> voids, Function<IConstructor, T> classes, Function<IConstructor, T> arrays) {
+		public static <T> T type(IConstructor type, Function<IConstructor, T> bools, Function<IConstructor, T> ints, Function<IConstructor, T> shorts, Function<IConstructor, T> bytes, Function<IConstructor, T> chars, Function<IConstructor, T> floats, Function<IConstructor, T> doubles, Function<IConstructor, T> longs, Function<IConstructor, T> voids, Function<IConstructor, T> classes, Function<IConstructor, T> arrays) {
 			switch (AST.$getConstructorName(type)) {
+			case "boolean" :
+				return bools.apply(type);
 			case "integer": 
 				return ints.apply(type);
 			case "short":
@@ -879,8 +1177,11 @@ public class ClassCompiler {
 		 * Dispatch a consumer on a type and pass a parameter
 		 * @param type
 		 */
-		public static <T> void type(IConstructor type, T arg, BiConsumer<IConstructor,T> ints, BiConsumer<IConstructor,T> shorts, BiConsumer<IConstructor,T> bytes, BiConsumer<IConstructor,T> chars, BiConsumer<IConstructor,T> floats, BiConsumer<IConstructor,T> doubles, BiConsumer<IConstructor,T> longs, BiConsumer<IConstructor,T> voids, BiConsumer<IConstructor,T> classes, BiConsumer<IConstructor,T> arrays) {
+		public static <T> void type(IConstructor type, T arg,  BiConsumer<IConstructor,T> bools, BiConsumer<IConstructor,T> ints, BiConsumer<IConstructor,T> shorts, BiConsumer<IConstructor,T> bytes, BiConsumer<IConstructor,T> chars, BiConsumer<IConstructor,T> floats, BiConsumer<IConstructor,T> doubles, BiConsumer<IConstructor,T> longs, BiConsumer<IConstructor,T> voids, BiConsumer<IConstructor,T> classes, BiConsumer<IConstructor,T> arrays) {
 			switch (AST.$getConstructorName(type)) {
+			case "boolean":
+				bools.accept(type, arg);
+				break;
 			case "integer": 
 				ints.accept(type, arg);
 				break;

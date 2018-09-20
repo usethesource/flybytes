@@ -23,17 +23,22 @@ void main() {
     methods=[
      defaultConstructor(\private()),
      main("args", 
-        block([var(classType("HelloWorld"), "hw")],[
-          stderr(index("args", 0)),
+        block([var(classType("HelloWorld"), "hw"), var(integer(), "i")],[
           store("hw", new("HelloWorld")),
-          do(true, invokeVirtual("HelloWorld", load("hw"), methodDesc(\void(),"f",[string()]), [index("args", 0)])),
+          do(true, invokeVirtual("HelloWorld", load("hw"), methodDesc(\void(),"f",[array(string())]), [load("args")])),
           \return()
         ])
       ),
      
-     method(\public(), \void(), "f", [var(string(), "s")], block([],[
-       stdout(load("s")),
-       stdout(this()),
+     method(\public(), \void(), "f", [var(array(string()), "s")], block([var(integer(),"i"), var(long(),"j")],[
+       store("i", const(integer(), 243)),
+       //store("j", const(long(), 243)),
+       //store("j", const(integer(), 2)),
+       //stdout(load("s")),
+       //stdout(aaload(load("s"), const(integer(), 0))),
+       //stdout(aaload(load("s"), const(integer(), 1))),
+        //stdout(aaload(load("s"), const(integer(), 2))),
+       //\return(long(), load("j"))
        \return()
      ]))
     ]

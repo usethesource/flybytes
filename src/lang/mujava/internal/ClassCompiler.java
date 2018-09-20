@@ -232,13 +232,13 @@ public class ClassCompiler {
 		}
 
 		private void compileStat_Store(IConstructor stat) {
-			int pos = positionOf(AST.$getName(stat));
-			
+			String name = AST.$getName(stat);
+			int pos = positionOf(name);
 			compileExpression(AST.$getValue(stat));
 			
 			Switch.type(variableTypes[pos],
 					(z) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
-					(i) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
+					(i) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
 					(s) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
 					(b) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
 					(c) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
@@ -323,7 +323,6 @@ public class ClassCompiler {
 			case "instanceof":
 				compileInstanceof(AST.$getArg(exp), AST.$getClass(exp));
 				break;
-				// block(list[Statement] block, Expression result)
 			case "block":
 				compileBlock(AST.$getStatements(exp), AST.$getArg(exp));
 				break;
@@ -825,24 +824,19 @@ public class ClassCompiler {
 			
 			Switch.type(variableTypes[pos], pos,
 					(z,p) -> { 
-						intConstant(p);
-						method.visitInsn(Opcodes.ILOAD);
+						method.visitVarInsn(Opcodes.ILOAD, p);
 					},
 					(i,p) -> { 
-						intConstant(p);
-						method.visitInsn(Opcodes.ILOAD);
+						method.visitVarInsn(Opcodes.ILOAD, p);
 					},
 					(s,p) -> { 
-						intConstant(p);
-						method.visitInsn(Opcodes.ILOAD);
+						method.visitVarInsn(Opcodes.ILOAD, p);
 					},
 					(b,p) -> { 
-						intConstant(p);
-						method.visitInsn(Opcodes.ILOAD);
+						method.visitVarInsn(Opcodes.ILOAD, p);
 					},
 					(c,p) -> { 
-						intConstant(p);
-						method.visitInsn(Opcodes.ILOAD);
+						method.visitVarInsn(Opcodes.ILOAD, p);
 					},
 					(f,p) -> { 
 						intConstant(p);
@@ -870,13 +864,61 @@ public class ClassCompiler {
 
 		private void intConstant(int constant) {
 			switch (constant) {
-			case 0: method.visitInsn(Opcodes.ICONST_0); break;
-			case 1: method.visitInsn(Opcodes.ICONST_1); break;
-			case 2: method.visitInsn(Opcodes.ICONST_2); break;
-			case 3: method.visitInsn(Opcodes.ICONST_3); break;
-			case 4: method.visitInsn(Opcodes.ICONST_4); break;
-			case 5: method.visitInsn(Opcodes.ICONST_5); break;
-			default: method.visitIntInsn(Opcodes.BIPUSH, constant);
+			case 0: method.visitInsn(Opcodes.ICONST_0); return;
+			case 1: method.visitInsn(Opcodes.ICONST_1); return;
+			case 2: method.visitInsn(Opcodes.ICONST_2); return;
+			case 3: method.visitInsn(Opcodes.ICONST_3); return;
+			case 4: method.visitInsn(Opcodes.ICONST_4); return;
+			case 5: method.visitInsn(Opcodes.ICONST_5); return;
+			}
+			
+			if (constant < Byte.MAX_VALUE) {
+				method.visitIntInsn(Opcodes.BIPUSH, constant);
+			}
+			else if (constant < Short.MAX_VALUE) {
+				method.visitIntInsn(Opcodes.SIPUSH, constant);
+			}
+			else {
+				method.visitLdcInsn(new Integer(constant));
+			}
+		}
+		
+		private void longConstant(long constant) {
+			if (constant == 0) {
+				method.visitInsn(Opcodes.LCONST_0); 
+			}
+			else if (constant == 1) {
+				method.visitInsn(Opcodes.LCONST_1);
+			}
+			else {
+				method.visitLdcInsn(new Long(constant));
+			}
+		}
+		
+		private void floatConstant(float constant) {
+			if (constant == 0) {
+				method.visitInsn(Opcodes.FCONST_0); 
+			}
+			else if (constant == 1) {
+				method.visitInsn(Opcodes.FCONST_1);
+			}
+			else if (constant == 2) { // float has a 2 constant, double does not.
+				method.visitInsn(Opcodes.FCONST_2);
+			}
+			else {
+				method.visitLdcInsn(new Float(constant));
+			}
+		}
+		
+		private void doubleConstant(double constant) {
+			if (constant == 0) {
+				method.visitInsn(Opcodes.DCONST_0);
+			}
+			else if (constant == 1) {
+				method.visitInsn(Opcodes.DCONST_1);
+			}
+			else {
+				method.visitLdcInsn(new Double(constant));
 			}
 		}
 
@@ -893,16 +935,34 @@ public class ClassCompiler {
 		private void compileExpression_Const(IConstructor type, IValue constant) {
 			switch(AST.$getConstructorName(type)) {
 			case "integer":
-				intConstant(AST.$getInteger(constant));
+			case "character":
+			case "byte":
+				intConstant(AST.$getIntegerConstant(constant));
+				break;
+			case "long":
+				longConstant(AST.$getLongConstant(constant));
+				break;
+			case "float":
+				floatConstant(AST.$getFloatConstant(constant));
+				break;
+			case "double":
+				doubleConstant(AST.$getDoubleConstant(constant));
+				break;
+			case "boolean":
+				booleanConstant(AST.$getBoolean(constant));
 				break;
 			default:
 				throw new IllegalArgumentException("not supported: " + constant.toString());
 			}
 		}
 
-		@SuppressWarnings("unused")
-		private void swap() {
-			method.visitInsn(Opcodes.SWAP);
+		private void booleanConstant(boolean val) {
+			if (val) {
+				compileTrue();
+			}
+			else {
+				compileFalse();
+			}
 		}
 
 		private void dup() {
@@ -1022,7 +1082,7 @@ public class ClassCompiler {
 
 				@Override
 				public Object visitInteger(Type arg0) throws RuntimeException {
-					return AST.$getInteger(parameter);
+					return AST.$getIntegerConstant(parameter);
 				}
 
 
@@ -1197,8 +1257,20 @@ public class ClassCompiler {
 			return (IConstructor) exp.get("type");
 		}
 
-		public static int $getInteger(IValue parameter) {
+		public static int $getIntegerConstant(IValue parameter) {
 			return ((IInteger) parameter).intValue();
+		}
+		
+		public static long $getLongConstant(IValue parameter) {
+			return ((IInteger) parameter).longValue();
+		}
+		
+		public static float $getFloatConstant(IValue parameter) {
+			return ((IReal) parameter).floatValue();
+		}
+		
+		public static double $getDoubleConstant(IValue parameter) {
+			return ((IReal) parameter).doubleValue();
 		}
 		
 		public static boolean $getBoolean(IValue parameter) {

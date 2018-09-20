@@ -32,11 +32,11 @@ void main() {
      
      method(\public(), \void(), "f", [var(array(string()), "s")], block([var(integer(),"i"), var(long(),"j"), var(float(), "k"), var(double(), "l"), var(integer(), "m")],[
        // test storing numbers in local variables
-       store("i", const(integer(), 243)),
+       store("i", const(integer(), 245)),
        store("j", const(long(), 350000)),
        store("k", const(float(), 10.5)),
        store("l", const(double(), 3456.3456)),
-       store("m", const(integer(), 243)),
+       store("m", const(integer(), 244)),
        
        // test loading numbers
        do(integer(), load("i")),
@@ -46,7 +46,7 @@ void main() {
        do(double(), load("l")),
        
        // print the 3 elements of the argument list:
-       \if(eq(load("i"), load("m")), [
+       \if(gt(integer(), load("i"), load("m")), [
          stdout(aaload(load("s"), const(integer(), 0))),
          stdout(aaload(load("s"), const(integer(), 1))),
          stdout(aaload(load("s"), const(integer(), 2)))

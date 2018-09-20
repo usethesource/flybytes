@@ -319,19 +319,39 @@ public class ClassCompiler {
 				compileStat_Return(stat);
 				break;
 			case "if":
-				compileStat_If(AST.$getCondition(stat), AST.$getThenBlock(stat));
+				if (stat.getConstructorType().getArity() == 3) {
+					compileStat_IfThenElse(AST.$getCondition(stat), AST.$getThenBlock(stat), AST.$getElseBlock(stat));
+				}
+				else {
+					compileStat_If(AST.$getCondition(stat), AST.$getThenBlock(stat));
+				}
 			}
 		}
 
 		private void compileStat_If(IConstructor cond, IList thenBlock) {
-			compileExpression(cond);
-			// TODO: special case for ==, !=, <, <=, >=, > operators
-			Label jump = new Label();
-			compileTrue();
-			method.visitJumpInsn(Opcodes.IF_ICMPNE, jump);
-			compileStatements(thenBlock);
-			method.visitLabel(jump);
-			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+			// TODO: special case this for eq, ne, le, lt, gt, ge, null, nonnull
+			compileConditionalInverted(
+					() -> {
+						compileExpression(cond);
+						compileTrue();
+					}
+					, 0, Opcodes.IF_ICMPNE, 
+					() -> compileStatements(thenBlock),
+					() -> { }
+					);
+		}
+		
+		private void compileStat_IfThenElse(IConstructor cond, IList thenBlock, IList elseBlock) {
+			// TODO: special case this for eq, ne, le, lt, gt, ge, null, nonnull
+			compileConditionalInverted(
+					() -> {
+						compileExpression(cond);
+						compileTrue();
+					}
+					, 0, Opcodes.IF_ICMPNE, 
+					() -> compileStatements(thenBlock),
+					() -> compileStatements(elseBlock)
+					);
 		}
 
 		private void compileStat_PutStatic(String cls, IConstructor type, String name, IConstructor arg) {
@@ -487,7 +507,7 @@ public class ClassCompiler {
 			case "eq":
 				compileEq(AST.$getLhs(exp), AST.$getRhs(exp));
 				break;
-			case "neq":
+			case "ne":
 				compileNeq(AST.$getLhs(exp), AST.$getRhs(exp));
 				break;
 			case "le":
@@ -569,143 +589,149 @@ public class ClassCompiler {
 		}
 
 		private void compileLt(IConstructor type, IConstructor lhs, IConstructor rhs) {
-			compileExpression(lhs);
-			compileExpression(rhs);
-			Label jump = new Label();
 			Switch.type0(type, 
-					(z) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump),
-					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
-					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
-					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
-					(c) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
-					(f) -> { method.visitInsn(Opcodes.FCMPG); method.visitJumpInsn(Opcodes.IFGE, jump); }, 
-					(d) -> { method.visitInsn(Opcodes.DCMPG); method.visitJumpInsn(Opcodes.IFGE, jump); }, 
-					(l) -> { method.visitInsn(Opcodes.LCMP); method.visitJumpInsn(Opcodes.IFGE, jump); }, 
+					(z) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGE, lhs, rhs),
+					(i) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGE, lhs, rhs), 
+					(s) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGE, lhs, rhs), 
+					(b) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGE, lhs, rhs), 
+					(c) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGE, lhs, rhs), 
+					(f) -> compileBoolExpInverted(Opcodes.FCMPG, Opcodes.IFGE, lhs, rhs),
+					(d) -> compileBoolExpInverted(Opcodes.DCMPG, Opcodes.IFGE, lhs, rhs),
+					(l) -> compileBoolExpInverted(Opcodes.LCMP, Opcodes.IFGE, lhs, rhs),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
-			method.visitInsn(Opcodes.ICONST_1);
-			method.visitInsn(Opcodes.IRETURN);
-			method.visitLabel(jump);
-			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-			method.visitInsn(Opcodes.ICONST_0);
 		}
 
 		private void compileLe(IConstructor type, IConstructor lhs, IConstructor rhs) {
-			compileExpression(lhs);
-			compileExpression(rhs);
-			Label jump = new Label();
 			Switch.type0(type, 
-					(z) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump),
-					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
-					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
-					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
-					(c) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
-					(f) -> { method.visitInsn(Opcodes.FCMPG); method.visitJumpInsn(Opcodes.IFGT, jump); }, 
-					(d) -> { method.visitInsn(Opcodes.DCMPG); method.visitJumpInsn(Opcodes.IFGT, jump); }, 
-					(l) -> { method.visitInsn(Opcodes.LCMP); method.visitJumpInsn(Opcodes.IFGT, jump); }, 
+					(z) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGT, lhs, rhs),
+					(i) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGT, lhs, rhs), 
+					(s) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGT, lhs, rhs), 
+					(b) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGT, lhs, rhs), 
+					(c) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGT, lhs, rhs), 
+					(f) -> compileBoolExpInverted(Opcodes.FCMPG, Opcodes.IFGT, lhs, rhs),
+					(d) -> compileBoolExpInverted(Opcodes.DCMPG, Opcodes.IFGT, lhs, rhs),
+					(l) -> compileBoolExpInverted(Opcodes.LCMP, Opcodes.IFGT, lhs, rhs),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
-			method.visitInsn(Opcodes.ICONST_1);
-			method.visitLabel(jump);
-			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-			method.visitInsn(Opcodes.ICONST_0);
 		}
 
 		private void compileGt(IConstructor type, IConstructor lhs, IConstructor rhs) {
-			compileExpression(lhs);
-			compileExpression(rhs);
-			Label jump = new Label();
 			Switch.type0(type, 
-					(z) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump),
-					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
-					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
-					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
-					(c) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
-					(f) -> { method.visitInsn(Opcodes.FCMPG); method.visitJumpInsn(Opcodes.IFLE, jump); }, 
-					(d) -> { method.visitInsn(Opcodes.DCMPG); method.visitJumpInsn(Opcodes.IFLE, jump); }, 
-					(l) -> { method.visitInsn(Opcodes.LCMP); method.visitJumpInsn(Opcodes.IFLE, jump); }, 
+					(z) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLE, lhs, rhs),
+					(i) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLE, lhs, rhs), 
+					(s) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLE, lhs, rhs), 
+					(b) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLE, lhs, rhs), 
+					(c) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLE, lhs, rhs), 
+					(f) -> compileBoolExpInverted(Opcodes.FCMPG, Opcodes.IFLE, lhs, rhs),
+					(d) -> compileBoolExpInverted(Opcodes.DCMPG, Opcodes.IFLE, lhs, rhs),
+					(l) -> compileBoolExpInverted(Opcodes.LCMP, Opcodes.IFLE, lhs, rhs),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
-			method.visitInsn(Opcodes.ICONST_1);
-			method.visitLabel(jump);
-			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-			method.visitInsn(Opcodes.ICONST_0);
 		}
 
 		private void compileGe(IConstructor type, IConstructor lhs, IConstructor rhs) {
-			compileExpression(lhs);
-			compileExpression(rhs);
-			Label jump = new Label();
 			Switch.type0(type, 
-					(z) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump),
-					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
-					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
-					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
-					(c) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
-					(f) -> { method.visitInsn(Opcodes.FCMPG); method.visitJumpInsn(Opcodes.IFLT, jump); }, 
-					(d) -> { method.visitInsn(Opcodes.DCMPG); method.visitJumpInsn(Opcodes.IFLT, jump); }, 
-					(l) -> { method.visitInsn(Opcodes.LCMP); method.visitJumpInsn(Opcodes.IFLT, jump); }, 
+					(z) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLT, lhs, rhs),
+					(i) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLT, lhs, rhs), 
+					(s) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLT, lhs, rhs), 
+					(b) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLT, lhs, rhs), 
+					(c) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLT, lhs, rhs), 
+					(f) -> compileBoolExpInverted(Opcodes.FCMPG, Opcodes.IFLT, lhs, rhs),
+					(d) -> compileBoolExpInverted(Opcodes.DCMPG, Opcodes.IFLT, lhs, rhs),
+					(l) -> compileBoolExpInverted(Opcodes.LCMP, Opcodes.IFLT, lhs, rhs),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
-			method.visitInsn(Opcodes.ICONST_1);
-			method.visitLabel(jump);
-			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-			method.visitInsn(Opcodes.ICONST_0);
 		}
 
 		private void compileEq(IConstructor lhs, IConstructor rhs) {
-			compileExpression(lhs);
-			compileExpression(rhs);
-			// TODO: is this the most efficient encoding?
+			compileBoolExpInverted(0, Opcodes.IF_ICMPNE, lhs, rhs);
+		}
+		
+		@FunctionalInterface
+		private static interface Builder { 
+			void build();
+		}
+		
+		private void compileBoolExpInverted(int compare, int opcode, IConstructor lhs, IConstructor rhs) {
+			compileConditionalInverted(
+					() -> { 
+						compileExpression(lhs);
+						compileExpression(rhs);
+					},
+					compare, 
+					opcode,
+					() -> {
+						intConstant(1);
+					},
+					() -> {
+						intConstant(0);
+					}
+			);
+		}
+		
+		private void compileBoolExpInverted(int compare, int opcode, IConstructor arg) {
+			compileConditionalInverted(
+					() -> { 
+						compileExpression(arg);
+					},
+					compare,
+					opcode,
+					() -> {
+						intConstant(1);
+					},
+					() -> {
+						intConstant(0);
+					}
+			);
+		}
+
+		/**
+		 * The branching work horse compileCondition generates the pattern for conditional
+		 * code execution.
+		 * 
+		 * @param args     first compile the code for the arguments of the condition
+		 * @param compare  then decide how to compare the result 
+		 * @param opcode   the conditional jump instriction
+		 * @param thenPart compile code for the thenPart
+		 * @param elsePart compile code for the elsePart
+		 */
+		private void compileConditionalInverted(Builder args, int compare, int opcode, Builder thenPart, Builder elsePart) {
+			args.build();
+			// TODO: is this the most efficient encoding? probably not. 
 			Label jump = new Label();
-			method.visitJumpInsn(Opcodes.IF_ICMPNE, jump);
-			method.visitInsn(Opcodes.ICONST_1);
+			if (compare != 0) {
+				method.visitInsn(compare);
+			}
+			method.visitJumpInsn(opcode, jump);
+			thenPart.build();
 			Label elseLabel = new Label();
 			method.visitJumpInsn(Opcodes.GOTO, elseLabel);
 			method.visitInsn(Opcodes.GOTO);
 			method.visitLabel(jump);
 			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-			method.visitInsn(Opcodes.ICONST_0);
+			elsePart.build();
 			method.visitLabel(elseLabel);
 		}
-
+		
 		private void compileNull(IConstructor arg) {
-			compileExpression(arg);
-			Label jump = new Label();
-			method.visitJumpInsn(Opcodes.IFNONNULL, jump);
-			method.visitInsn(Opcodes.ICONST_1);
-			method.visitLabel(jump);
-			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-			method.visitInsn(Opcodes.ICONST_0);
+			compileBoolExpInverted(0, Opcodes.IFNONNULL, arg);
 		}
 
 		private void compileNonNull(IConstructor arg) {
-			compileExpression(arg);
-			Label jump = new Label();
-			method.visitJumpInsn(Opcodes.IFNULL, jump);
-			method.visitInsn(Opcodes.ICONST_1);
-			method.visitLabel(jump);
-			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-			method.visitInsn(Opcodes.ICONST_0);
+			compileBoolExpInverted(0, Opcodes.IFNULL, arg);
 		}
 
 		private void compileNeq(IConstructor lhs, IConstructor rhs) {
-			compileExpression(lhs);
-			compileExpression(rhs);
-			Label jump = new Label();
-			method.visitJumpInsn(Opcodes.IF_ICMPEQ, jump);
-			method.visitInsn(Opcodes.ICONST_1);
-			method.visitLabel(jump);
-			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-			method.visitInsn(Opcodes.ICONST_0);
+			compileBoolExpInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs);
 		}
 
 		private void compileCoerce(IConstructor from, IConstructor to, IConstructor arg) {
@@ -725,6 +751,7 @@ public class ClassCompiler {
 		}
 
 		private void coerceFromBool(IConstructor to, IConstructor arg) {
+			throw new IllegalArgumentException("Can not coerce " + "bool" + " to " + to.getConstructorType().getName());
 		}
 
 		private void failedCoercion(String from, IConstructor to) {

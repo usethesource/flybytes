@@ -35,14 +35,14 @@ void main() {
        store("i", const(integer(), 243)),
        store("j", const(long(), 350000)),
        store("k", const(float(), 10.5)),
-       //store("l", const(double(), 3456.3456)),
+       store("l", const(double(), 3456.3456)),
        
        // test loading numbers
        do(integer(), load("i")),
        //do(long(), load("j")),
-       do(integer(), load("i")),
-       do(float(), load("k")),
-       //do(double(), load("l")),
+       //do(integer(), load("i")),
+       //do(float(), load("k")),
+       do(double(), load("l")),
        
        // print the 3 elements of the argument list:
        stdout(aaload(load("s"), const(integer(), 0))),

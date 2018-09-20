@@ -664,6 +664,7 @@ public class ClassCompiler {
 		private void compileEq(IConstructor lhs, IConstructor rhs) {
 			compileExpression(lhs);
 			compileExpression(rhs);
+			// TODO: is this the most efficient encoding?
 			Label jump = new Label();
 			method.visitJumpInsn(Opcodes.IF_ICMPNE, jump);
 			method.visitInsn(Opcodes.ICONST_1);

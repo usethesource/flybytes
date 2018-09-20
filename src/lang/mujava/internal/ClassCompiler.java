@@ -318,7 +318,20 @@ public class ClassCompiler {
 			case "return" : 
 				compileStat_Return(stat);
 				break;
+			case "if":
+				compileStat_If(AST.$getCondition(stat), AST.$getThenBlock(stat));
 			}
+		}
+
+		private void compileStat_If(IConstructor cond, IList thenBlock) {
+			compileExpression(cond);
+			// TODO: special case for ==, !=, <, <=, >=, > operators
+			Label jump = new Label();
+			compileTrue();
+			method.visitJumpInsn(Opcodes.IF_ICMPNE, jump);
+			compileStatements(thenBlock);
+			method.visitLabel(jump);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 		}
 
 		private void compileStat_PutStatic(String cls, IConstructor type, String name, IConstructor arg) {
@@ -597,7 +610,6 @@ public class ClassCompiler {
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
 			method.visitInsn(Opcodes.ICONST_1);
-			method.visitInsn(Opcodes.IRETURN);
 			method.visitLabel(jump);
 			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			method.visitInsn(Opcodes.ICONST_0);
@@ -621,7 +633,6 @@ public class ClassCompiler {
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
 			method.visitInsn(Opcodes.ICONST_1);
-			method.visitInsn(Opcodes.IRETURN);
 			method.visitLabel(jump);
 			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			method.visitInsn(Opcodes.ICONST_0);
@@ -645,7 +656,6 @@ public class ClassCompiler {
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
 			method.visitInsn(Opcodes.ICONST_1);
-			method.visitInsn(Opcodes.IRETURN);
 			method.visitLabel(jump);
 			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			method.visitInsn(Opcodes.ICONST_0);
@@ -657,10 +667,13 @@ public class ClassCompiler {
 			Label jump = new Label();
 			method.visitJumpInsn(Opcodes.IF_ICMPNE, jump);
 			method.visitInsn(Opcodes.ICONST_1);
-			method.visitInsn(Opcodes.IRETURN);
+			Label elseLabel = new Label();
+			method.visitJumpInsn(Opcodes.GOTO, elseLabel);
+			method.visitInsn(Opcodes.GOTO);
 			method.visitLabel(jump);
 			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			method.visitInsn(Opcodes.ICONST_0);
+			method.visitLabel(elseLabel);
 		}
 
 		private void compileNull(IConstructor arg) {
@@ -668,7 +681,6 @@ public class ClassCompiler {
 			Label jump = new Label();
 			method.visitJumpInsn(Opcodes.IFNONNULL, jump);
 			method.visitInsn(Opcodes.ICONST_1);
-			method.visitInsn(Opcodes.IRETURN);
 			method.visitLabel(jump);
 			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			method.visitInsn(Opcodes.ICONST_0);
@@ -679,7 +691,6 @@ public class ClassCompiler {
 			Label jump = new Label();
 			method.visitJumpInsn(Opcodes.IFNULL, jump);
 			method.visitInsn(Opcodes.ICONST_1);
-			method.visitInsn(Opcodes.IRETURN);
 			method.visitLabel(jump);
 			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			method.visitInsn(Opcodes.ICONST_0);
@@ -691,7 +702,6 @@ public class ClassCompiler {
 			Label jump = new Label();
 			method.visitJumpInsn(Opcodes.IF_ICMPEQ, jump);
 			method.visitInsn(Opcodes.ICONST_1);
-			method.visitInsn(Opcodes.IRETURN);
 			method.visitLabel(jump);
 			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			method.visitInsn(Opcodes.ICONST_0);
@@ -1356,6 +1366,18 @@ public class ClassCompiler {
 
 		public static IValue $getConstant(IConstructor exp) {
 			return exp.get("constant");
+		}
+
+		public static IConstructor $getCondition(IConstructor stat) {
+			return (IConstructor) stat.get("condition");
+		}
+		
+		public static IList $getThenBlock(IConstructor stat) {
+			return (IList) stat.get("thenBlock");
+		}
+		
+		public static IList $getElseBlock(IConstructor stat) {
+			return (IList) stat.get("elseBlock");
 		}
 
 		public static IConstructor $getSize(IConstructor exp) {

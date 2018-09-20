@@ -107,9 +107,8 @@ data Statement(loc src = |unknown:///|)
   | \return(Type \type, Expression arg)
   | \putField(str class, Expression receiver, Type \type, str name, Expression arg)
   | \putStatic(str class, str name, Type \type, Expression arg)
+  | \if(Expression condition, list[Statement] thenBlock)
  // TODO: these are still to be implemented:
-  
-  //| \if(Expression condition, list[Statement] block)
   //| \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
   //| \while(Expression condition, list[Statement] block)
   //| \doWhile(list[Statement] block, Expression condition)

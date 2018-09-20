@@ -203,21 +203,21 @@ public class ClassCompiler {
 				variableTypes[variableCounter] = AST.$getType(var);
 				variableNames[variableCounter] = AST.$getName(var);
 				method.visitLocalVariable(variableNames[variableCounter], Signature.type(variableTypes[variableCounter]), null, scopeStart, scopeEnd, i++);
-				variableCounter++;
+//				variableCounter++;
 				
-//				Switch.type(variableTypes[variableCounter], 
-//						(Consumer<IConstructor>) (z) -> variableCounter++,
-//						(ii) -> variableCounter++,
-//						(s) -> variableCounter++,
-//						(b) -> variableCounter++,
-//						(c) -> variableCounter++,
-//						(f) -> variableCounter++,
-//						(d) -> variableCounter++, // wide var
-//						(l) -> variableCounter++, // wide var
-//						(v) -> { throw new IllegalArgumentException("void variable"); },
-//						(c) -> variableCounter++,
-//						(a) -> variableCounter++
-//						);
+				Switch.type(variableTypes[variableCounter], 
+						(Consumer<IConstructor>) (z) -> variableCounter++,
+						(ii) -> variableCounter++,
+						(s) -> variableCounter++,
+						(b) -> variableCounter++,
+						(c) -> variableCounter++,
+						(f) -> variableCounter++,
+						(d) -> { variableCounter+=2 ; }, // wide var
+						(l) -> { variableCounter+=2 ; }, // wide var
+						(v) -> { throw new IllegalArgumentException("void variable"); },
+						(c) -> variableCounter++,
+						(a) -> variableCounter++
+						);
 			}
 		}
 
@@ -857,24 +857,12 @@ public class ClassCompiler {
 					(s,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
 					(b,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
 					(c,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
-					(f,p) -> { 
-						method.visitVarInsn(Opcodes.FLOAD, p);
-					},
-					(d,p) -> { 
-						method.visitVarInsn(Opcodes.DLOAD, p);
-					},
-					(l,p) -> { 
-						method.visitVarInsn(Opcodes.LLOAD, p);
-					},
-					(v,p) -> { 
-						/* void */;
-					},
-					(c,p) -> { 
-						method.visitVarInsn(Opcodes.ALOAD, p);
-					},
-					(a,p) -> { 
-						method.visitVarInsn(Opcodes.ALOAD, p);
-					}
+					(f,p) -> method.visitVarInsn(Opcodes.FLOAD, p),
+					(d,p) -> method.visitVarInsn(Opcodes.DLOAD, p),
+					(l,p) -> method.visitVarInsn(Opcodes.LLOAD, p),
+					(v,p) -> { /* void */ },
+					(c,p) -> method.visitVarInsn(Opcodes.ALOAD, p),
+					(a,p) -> method.visitVarInsn(Opcodes.ALOAD, p)
 					);
 		}
 
@@ -940,7 +928,7 @@ public class ClassCompiler {
 
 		private int positionOf(String name) {
 			for (int pos = 0; pos < variableNames.length; pos++) {
-				if (variableNames[pos].equals(name)) {
+				if (name.equals(variableNames[pos])) {
 					return pos;
 				}
 			}

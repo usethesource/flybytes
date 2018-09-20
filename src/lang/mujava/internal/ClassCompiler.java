@@ -206,25 +206,13 @@ public class ClassCompiler {
 
 				// initializing all locals to avoid confusing JVM crashes when
 				// using uninitialized variables:
-				Switch.type(variableTypes[variableCounter], 
-						(Consumer<IConstructor>) (z) -> { 
-							variableCounter++; 
-						},
-						(ii) -> { 
-							variableCounter++; 
-						},
-						(s) -> { 
-							variableCounter++; 
-						},
-						(b) -> { 
-							variableCounter++; 
-						},
-						(c) -> { 
-							variableCounter++; 
-						},
-						(f) -> { 
-							variableCounter++; 
-						},
+				Switch.type0(variableTypes[variableCounter], 
+						(z)  -> variableCounter++,
+						(ii) -> variableCounter++,
+						(s) -> variableCounter++,
+						(b) -> variableCounter++,
+						(c) -> variableCounter++,
+						(f) -> variableCounter++,
 						(d) -> { 
 							// doubles take up 2 stack positions
 							variableCounter+=2; 
@@ -236,14 +224,9 @@ public class ClassCompiler {
 						(v) -> { 
 							throw new IllegalArgumentException("void variable"); 
 						},
-						(c) -> { 
-							variableCounter++; 
-						},
-						(a) -> { 
-							variableCounter++; 
-						}
+						(c) -> variableCounter++,
+						(a) -> variableCounter++
 						);
-
 			}
 
 			if (initialize) {
@@ -299,7 +282,6 @@ public class ClassCompiler {
 								method.visitVarInsn(Opcodes.ASTORE, j); 
 							}
 							);
-
 				}
 			}
 		}
@@ -334,7 +316,7 @@ public class ClassCompiler {
 			int pos = positionOf(name);
 			compileExpression(AST.$getValue(stat));
 
-			Switch.type(variableTypes[pos],
+			Switch.type0(variableTypes[pos],
 					(z) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
 					(i) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
 					(s) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
@@ -356,7 +338,7 @@ public class ClassCompiler {
 			else {
 				compileExpression(AST.$getArg(stat));
 
-				Switch.type(AST.$getType(stat),
+				Switch.type0(AST.$getType(stat),
 						(z) -> { method.visitInsn(Opcodes.IRETURN); },
 						(i) -> { method.visitInsn(Opcodes.IRETURN); },
 						(s) -> { method.visitInsn(Opcodes.IRETURN); },
@@ -374,7 +356,7 @@ public class ClassCompiler {
 
 		private void compileStat_Do(IConstructor type, IConstructor exp) {
 			compileExpression(exp);
-			Switch.type(type, 
+			Switch.type0(type, 
 					(z) -> pop(), 
 					(i) -> pop(), 
 					(s) -> pop(), 
@@ -408,11 +390,21 @@ public class ClassCompiler {
 			case "newInstance":
 				compileExpression_NewInstance(exp);
 				break;
+			case "newArray":
+				compileExpression_NewArray(AST.$getType(exp), AST.$getSize(exp));
+				break;
+			case "alength":
+				compileExpression_ALength(AST.$getArg(exp));
+				break;
 			case "load" : 
 				compileExpression_Load(AST.$getName(exp)); 
 				break;
 			case "aaload" :
 				compileExpression_AALoad(AST.$getArray(exp), AST.$getIndex(exp));
+				break;
+			case "astore" :
+				// astore(Type \type, Expression array, Expression index, Expression arg)
+				compileExpression_AStore(AST.$getType(exp), AST.$getArray(exp), AST.$getIndex(exp), AST.$getArg(exp));
 				break;
 			case "getStatic":
 				compileGetStatic(AST.$getClass(exp), AST.$getType(exp), AST.$getName(exp));
@@ -476,17 +468,78 @@ public class ClassCompiler {
 			case "lt":
 				compileLt(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
 				break;
+			case "checkcast":
+				compileCheckCast(AST.$getArg(exp), AST.$getType(exp));
+				break;
 			default: 
 				throw new IllegalArgumentException("unknown expression: " + exp);                                     
 			}
+		}
+
+		private void compileExpression_AStore(IConstructor type, IConstructor array, IConstructor index,
+				IConstructor arg) {
+			compileExpression(array);
+			compileExpression(index);
+			compileExpression(arg);
+			Switch.type0(type, 
+					(z) -> method.visitInsn(Opcodes.IASTORE),
+					(i) -> method.visitInsn(Opcodes.IASTORE),
+					(s) -> method.visitInsn(Opcodes.IASTORE),
+					(b) -> method.visitInsn(Opcodes.IASTORE),
+					(c) -> method.visitInsn(Opcodes.IASTORE),
+					(f) -> method.visitInsn(Opcodes.FASTORE),
+					(d) -> method.visitInsn(Opcodes.DASTORE),
+					(l) -> method.visitInsn(Opcodes.LASTORE),
+					(v) -> { throw new IllegalArgumentException("store void in array"); },
+					(c) -> method.visitInsn(Opcodes.AASTORE),
+					(a) -> method.visitInsn(Opcodes.AASTORE)
+					);
+		}
+
+		private void compileCheckCast(IConstructor arg, IConstructor type) {
+			compileExpression(arg);
+			String cons = type.getConstructorType().getName();
+			
+			// weird inconsistency in CHECKCAST instruction?
+			if (cons == "classType") {
+				method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type));
+			}
+			else if (cons == "array") {
+				method.visitTypeInsn(Opcodes.CHECKCAST, Signature.type(type));
+			}
+			else {
+				throw new IllegalArgumentException("can not check cast to " + type);
+			}
+		}
+
+		private void compileExpression_ALength(IConstructor $getArg) {
+			method.visitInsn(Opcodes.ARRAYLENGTH);
+		}
+
+		private void compileExpression_NewArray(IConstructor type, IConstructor size) {
+			compileExpression(size);
+			
+			Switch.type0(type,
+					(z) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BOOLEAN) ,
+					(i) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_INT) , 
+					(s) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_SHORT) , 
+					(b) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BYTE) , 
+					(c) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_CHAR) ,
+					(f) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_FLOAT) ,
+					(d) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_DOUBLE) ,
+					(j) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_LONG) , 
+					(v) -> { throw new IllegalArgumentException("void array"); }, 
+					(c) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type))), 
+					(c) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type)))
+					);
 		}
 
 		private void compileLt(IConstructor type, IConstructor lhs, IConstructor rhs) {
 			compileExpression(lhs);
 			compileExpression(rhs);
 			Label jump = new Label();
-			Switch.type(type, 
-					(Consumer<IConstructor>) (z) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump),
+			Switch.type0(type, 
+					(z) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump),
 					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
 					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
 					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPGE, jump), 
@@ -509,8 +562,8 @@ public class ClassCompiler {
 			compileExpression(lhs);
 			compileExpression(rhs);
 			Label jump = new Label();
-			Switch.type(type, 
-					(Consumer<IConstructor>) (z) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump),
+			Switch.type0(type, 
+					(z) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump),
 					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
 					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
 					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPGT, jump), 
@@ -533,8 +586,8 @@ public class ClassCompiler {
 			compileExpression(lhs);
 			compileExpression(rhs);
 			Label jump = new Label();
-			Switch.type(type, 
-					(Consumer<IConstructor>) (z) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump),
+			Switch.type0(type, 
+					(z) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump),
 					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
 					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
 					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPLE, jump), 
@@ -557,8 +610,8 @@ public class ClassCompiler {
 			compileExpression(lhs);
 			compileExpression(rhs);
 			Label jump = new Label();
-			Switch.type(type, 
-					(Consumer<IConstructor>) (z) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump),
+			Switch.type0(type, 
+					(z) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump),
 					(i) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
 					(s) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
 					(b) -> method.visitJumpInsn(Opcodes.IF_ICMPLT, jump), 
@@ -624,8 +677,8 @@ public class ClassCompiler {
 		}
 
 		private void compileCoerce(IConstructor from, IConstructor to, IConstructor arg) {
-			Switch.type(from,
-					(Consumer<IConstructor>) (z) -> coerceFromBool(to, arg),
+			Switch.type0(from,
+					(z) -> coerceFromBool(to, arg),
 					(i) -> coerceFromInt(to, arg),
 					(s) -> coerceFromShort(to, arg),
 					(b) -> coerceFromByte(to, arg),
@@ -647,8 +700,8 @@ public class ClassCompiler {
 		}
 
 		private void coerceFromArray(IConstructor from, IConstructor to, IConstructor arg) {
-			Switch.type(to,
-					(Consumer<IConstructor>) (z) -> failedCoercion("int", to),
+			Switch.type0(to,
+					(z) -> failedCoercion("int", to),
 					(i) -> failedCoercion("int", to),
 					(s) -> failedCoercion("short", to),
 					(b) -> failedCoercion("boolean", to),
@@ -667,8 +720,8 @@ public class ClassCompiler {
 		}
 
 		private void coerceFromLong(IConstructor to, IConstructor arg) {
-			Switch.type(to,
-					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
 					(i) -> { method.visitInsn(Opcodes.L2I); },
 					(s) -> { method.visitInsn(Opcodes.L2I); },
 					(b) -> { method.visitInsn(Opcodes.L2I); },
@@ -685,8 +738,8 @@ public class ClassCompiler {
 		private void coerceFromClass(IConstructor from, IConstructor to, IConstructor arg) {
 			String cls = AST.$getName(from);
 
-			Switch.type(to,
-					(Consumer<IConstructor>) (z) -> {
+			Switch.type0(to,
+					(z) -> {
 						if (cls.equals("java/lang/Boolean")) {
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "booleanValue", "()Z", false);
 						}
@@ -757,8 +810,8 @@ public class ClassCompiler {
 		}
 
 		private void coerceFromDouble(IConstructor to, IConstructor arg) {
-			Switch.type(to,
-					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
 					(i) -> { method.visitInsn(Opcodes.D2I); },
 					(s) -> { method.visitInsn(Opcodes.D2I); },
 					(b) -> { method.visitInsn(Opcodes.D2I); },
@@ -773,8 +826,8 @@ public class ClassCompiler {
 		}
 
 		private void coerceFromFloat(IConstructor to, IConstructor arg) {
-			Switch.type(to,
-					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
 					(i) -> { method.visitInsn(Opcodes.F2I); },
 					(s) -> { method.visitInsn(Opcodes.F2I); },
 					(b) -> { method.visitInsn(Opcodes.F2I); },
@@ -789,8 +842,8 @@ public class ClassCompiler {
 		}
 
 		private void coerceFromChar(IConstructor to, IConstructor arg) {
-			Switch.type(to,
-					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
 					(s) -> { /* do nothing */ },
 					(b) -> { /* do nothing */ },
@@ -805,8 +858,8 @@ public class ClassCompiler {
 		}
 
 		private void coerceFromByte(IConstructor to, IConstructor arg) {
-			Switch.type(to,
-					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
 					(s) -> { /* do nothing */ },
 					(b) -> { /* do nothing */ },
@@ -821,8 +874,8 @@ public class ClassCompiler {
 		}
 
 		private void coerceFromShort(IConstructor to, IConstructor arg) {
-			Switch.type(to,
-					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
 					(s) -> { /* do nothing */ },
 					(b) -> { /* do nothing */ },
@@ -837,8 +890,8 @@ public class ClassCompiler {
 		}
 
 		private void coerceFromInt(IConstructor to, IConstructor arg) {
-			Switch.type(to,
-					(Consumer<IConstructor>) (z) -> failedCoercion("boolean", to),
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
 					(s) -> { /* do nothing */ },
 					(b) -> { /* do nothing */ },
@@ -1284,6 +1337,10 @@ public class ClassCompiler {
 			return exp.get("constant");
 		}
 
+		public static IConstructor $getSize(IConstructor exp) {
+			return (IConstructor) exp.get("size");
+		}
+
 		public static IConstructor $getLhs(IConstructor exp) {
 			return (IConstructor) exp.get("lhs");
 		}
@@ -1440,7 +1497,7 @@ public class ClassCompiler {
 		 * Dispatch on a consumer on a type. The idea is to never accidentally forget a type using this higher-order function.
 		 * @param type
 		 */
-		public static void type(IConstructor type, Consumer<IConstructor> bools, Consumer<IConstructor> ints, Consumer<IConstructor> shorts, Consumer<IConstructor> bytes, Consumer<IConstructor> chars, Consumer<IConstructor> floats, Consumer<IConstructor> doubles, Consumer<IConstructor> longs, Consumer<IConstructor> voids, Consumer<IConstructor> classes, Consumer<IConstructor> arrays) {
+		public static void type0(IConstructor type, Consumer<IConstructor> bools, Consumer<IConstructor> ints, Consumer<IConstructor> shorts, Consumer<IConstructor> bytes, Consumer<IConstructor> chars, Consumer<IConstructor> floats, Consumer<IConstructor> doubles, Consumer<IConstructor> longs, Consumer<IConstructor> voids, Consumer<IConstructor> classes, Consumer<IConstructor> arrays) {
 			switch (AST.$getConstructorName(type)) {
 			case "boolean": 
 				bools.accept(type);

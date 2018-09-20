@@ -39,9 +39,9 @@ void main() {
        
        // test loading numbers
        do(integer(), load("i")),
-       //do(long(), load("j")),
-       //do(integer(), load("i")),
-       //do(float(), load("k")),
+       do(long(), load("j")),
+       do(integer(), load("i")),
+       do(float(), load("k")),
        do(double(), load("l")),
        
        // print the 3 elements of the argument list:

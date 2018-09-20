@@ -103,21 +103,23 @@ data Variable = var(Type \type, str name);
 data Statement(loc src = |unknown:///|)
   = \store(str name, Expression \value)
   | \do(Type \type, Expression exp) // pops the result of the expression when needed
-  | \putField(Expression receiver, str fieldName, Expression \value)
-  | \putStatic(str class, str fieldName, Expression \value)
-  | \if(Expression condition, list[Statement] block)
-  | \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
-  | \while(Expression condition, list[Statement] block)
-  | \doWhile(list[Statement] block, Expression condition)
-  | \for(list[Statement] init, Expression condition, list[Statement] next, list[Statement] block)
   | \return()
   | \return(Type \type, Expression arg)
-  | \try(list[Statement] tryBlock, list[Catch] \catchBlock, list[Statement] \finallyBlock)
-  | label(str label)
-  | \goto(str label)
-  | \switch(Expression \value, list[Case] caseBlocks, list[Statement] defaultBlock)
-  | \throw(Expression exception)
-  | monitor(Expression lock, list[Statement] block)
+ 
+ // TODO: these are still to be implemented:
+  //| \putField(Expression receiver, str fieldName, Expression \value)
+  //| \putStatic(str class, str fieldName, Expression \value)
+  //| \if(Expression condition, list[Statement] block)
+  //| \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
+  //| \while(Expression condition, list[Statement] block)
+  //| \doWhile(list[Statement] block, Expression condition)
+  //| \for(list[Statement] init, Expression condition, list[Statement] next, list[Statement] block)
+  //| \try(list[Statement] tryBlock, list[Catch] \catchBlock, list[Statement] \finallyBlock)
+  //| label(str label)
+  //| \goto(str label)
+  //| \switch(Expression \value, list[Case] caseBlocks, list[Statement] defaultBlock)
+  //| \throw(Expression exception)
+  //| monitor(Expression lock, list[Statement] block)
   ;
 
 data Statement(loc src = |unknown:///|)  
@@ -178,7 +180,6 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   //| neg(Type \type, Expression arg)
   //| inc(Expression arg, Expression inc)
   ;
- 
  
  // below some typical macros for the sake of convenience:
  

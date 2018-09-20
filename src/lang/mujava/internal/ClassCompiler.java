@@ -86,6 +86,8 @@ public class ClassCompiler {
 			classNode.name = AST.$getName(classType);
 			classNode.signature = "L" + classNode.name + ";"; 
 
+			out.println("Compiling " + classNode.name + " with JVM version " + version);
+			
 			if (kws.hasParameter("modifiers")) {
 				classNode.access = compileAccessCode(AST.$getModifiers(o));
 			}
@@ -125,6 +127,8 @@ public class ClassCompiler {
 
 			// now stream the entire class to a (hidden) bytearray
 			classNode.accept(cw);
+			
+			out.println("done.");
 		}
 
 		private void compileFields(ClassNode classNode, IList fields) {
@@ -305,6 +309,7 @@ public class ClassCompiler {
 			case "store" : 
 				compileStat_Store(stat); 
 				break;
+				
 			case "return" : 
 				compileStat_Return(stat);
 				break;

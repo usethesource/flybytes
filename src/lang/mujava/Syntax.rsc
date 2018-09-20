@@ -102,7 +102,7 @@ data Variable = var(Type \type, str name);
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Statement(loc src = |unknown:///|)
   = \store(str name, Expression \value)
-  | \do(bool isVoid, Expression exp)
+  | \do(Type \type, Expression exp) // pops the result of the expression when needed
   | \putField(Expression receiver, str fieldName, Expression \value)
   | \putStatic(str class, str fieldName, Expression \value)
   | \if(Expression condition, list[Statement] block)
@@ -189,13 +189,13 @@ Method main(str args, Block block)
   
 Method defaultConstructor(Modifier access)
   = method(constructorDesc([]), [], block([], [
-      do(true, invokeSuper("java.lang.Object")),
+      do(\void(), invokeSuper("java.lang.Object")),
       \return()
   ]), modifiers={access});   
  
 Method defaultConstructor(Modifier access, str super)
   = method(constructorDesc([]), [], block([], [
-      do(true, invokeSuper(super)),
+      do(\void(), invokeSuper(super)),
       \return()
   ])); 
   
@@ -232,10 +232,10 @@ Expression index(str array, Expression index)
    = aaload(load(array), index);  
     
 Statement stdout(Expression arg)
-   = \do(true, println("out", arg));
+   = \do(\void(), println("out", arg));
 
 Statement stderr(Expression arg)
-   = \do(true, println("err", arg));
+   = \do(\void(), println("err", arg));
          
 Expression println(str stream, Expression arg)
    = invokeVirtual("java.io.PrintStream", getStatic("java.lang.System", classType("java.io.PrintStream"), stream), 

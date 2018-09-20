@@ -165,9 +165,10 @@ public class ClassCompiler {
 			
 			// "this" is the implicit first argument for all non-static methods
 			boolean isStatic = (modifiers & Opcodes.ACC_STATIC) != 0;
+			
 			variableCounter = isStatic ? 0 : 1;
-			variableTypes = new IConstructor[varFormals.length() + locals.length() + variableCounter];
-			variableNames = new String[varFormals.length() + locals.length() + variableCounter];
+			variableTypes = new IConstructor[2 /*for wide var */ * (varFormals.length() + locals.length()) + variableCounter];
+			variableNames = new String[2 /*for wide vars*/ * (varFormals.length() + locals.length()) + variableCounter];
 			
 			if (!isStatic) {
 				variableTypes[0] = classType;
@@ -203,6 +204,20 @@ public class ClassCompiler {
 				variableNames[variableCounter] = AST.$getName(var);
 				method.visitLocalVariable(variableNames[variableCounter], Signature.type(variableTypes[variableCounter]), null, scopeStart, scopeEnd, i++);
 				variableCounter++;
+				
+//				Switch.type(variableTypes[variableCounter], 
+//						(Consumer<IConstructor>) (z) -> variableCounter++,
+//						(ii) -> variableCounter++,
+//						(s) -> variableCounter++,
+//						(b) -> variableCounter++,
+//						(c) -> variableCounter++,
+//						(f) -> variableCounter++,
+//						(d) -> variableCounter++, // wide var
+//						(l) -> variableCounter++, // wide var
+//						(v) -> { throw new IllegalArgumentException("void variable"); },
+//						(c) -> variableCounter++,
+//						(a) -> variableCounter++
+//						);
 			}
 		}
 
@@ -220,7 +235,7 @@ public class ClassCompiler {
 		private void compileStatement(IConstructor stat) {
 			switch (stat.getConstructorType().getName()) {
 			case "do" : 
-				compileStat_Do(AST.$getIsVoid(stat), (IConstructor) stat.get("exp")); 
+				compileStat_Do(AST.$getType(stat), (IConstructor) stat.get("exp")); 
 				break;
 			case "store" : 
 				compileStat_Store(stat); 
@@ -237,14 +252,14 @@ public class ClassCompiler {
 			compileExpression(AST.$getValue(stat));
 			
 			Switch.type(variableTypes[pos],
-					(z) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
+					(z) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
 					(i) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
-					(s) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
-					(b) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
-					(c) -> { intConstant(pos); method.visitInsn(Opcodes.ISTORE); },
-					(f) -> { intConstant(pos); method.visitInsn(Opcodes.FSTORE); },
-					(d) -> { intConstant(pos); method.visitInsn(Opcodes.DSTORE); },
-					(l) -> { intConstant(pos); method.visitInsn(Opcodes.LSTORE); },
+					(s) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
+					(b) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
+					(c) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
+					(f) -> { method.visitVarInsn(Opcodes.FSTORE, pos); },
+					(d) -> { method.visitVarInsn(Opcodes.DSTORE, pos); },
+					(l) -> { method.visitVarInsn(Opcodes.LSTORE, pos); },
 					(v) -> { /* void */ },
 					(c) -> { /* class */ method.visitVarInsn(Opcodes.ASTORE, pos); },
 					(a) -> { /* array */ method.visitVarInsn(Opcodes.ASTORE, pos); }
@@ -274,15 +289,29 @@ public class ClassCompiler {
 			}
 		}
 
-		private void compileStat_Do(boolean isVoid, IConstructor exp) {
+		private void compileStat_Do(IConstructor type, IConstructor exp) {
 			compileExpression(exp);
-			if (!isVoid) {
-				pop();
-			}
+			Switch.type(type, 
+					(z) -> pop(), 
+					(i) -> pop(), 
+					(s) -> pop(), 
+					(b) -> pop(), 
+					(c) -> pop(), 
+					(f) -> pop(), 
+					(d) -> pop2(), // wide pop
+					(j) -> pop2(), // wide pop
+					(v) -> { /* no pop */ }, 
+					(c) -> pop(), 
+					(a) -> pop()
+					);
 		}
 
 		private void pop() {
 			method.visitInsn(Opcodes.POP);
+		}
+		
+		private void pop2() {
+			method.visitInsn(Opcodes.POP2);
 		}
 
 		private void compileExpression(IConstructor exp) {
@@ -823,32 +852,19 @@ public class ClassCompiler {
 			int pos = positionOf(name);
 			
 			Switch.type(variableTypes[pos], pos,
-					(z,p) -> { 
-						method.visitVarInsn(Opcodes.ILOAD, p);
-					},
-					(i,p) -> { 
-						method.visitVarInsn(Opcodes.ILOAD, p);
-					},
-					(s,p) -> { 
-						method.visitVarInsn(Opcodes.ILOAD, p);
-					},
-					(b,p) -> { 
-						method.visitVarInsn(Opcodes.ILOAD, p);
-					},
-					(c,p) -> { 
-						method.visitVarInsn(Opcodes.ILOAD, p);
-					},
+					(z,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
+					(i,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
+					(s,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
+					(b,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
+					(c,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
 					(f,p) -> { 
-						intConstant(p);
-						method.visitInsn(Opcodes.FLOAD);
+						method.visitVarInsn(Opcodes.FLOAD, p);
 					},
 					(d,p) -> { 
-						intConstant(p);
-						method.visitInsn(Opcodes.DLOAD);
+						method.visitVarInsn(Opcodes.DLOAD, p);
 					},
 					(l,p) -> { 
-						intConstant(p);
-						method.visitInsn(Opcodes.LLOAD);
+						method.visitVarInsn(Opcodes.LLOAD, p);
 					},
 					(v,p) -> { 
 						/* void */;
@@ -906,7 +922,7 @@ public class ClassCompiler {
 				method.visitInsn(Opcodes.FCONST_2);
 			}
 			else {
-				method.visitLdcInsn(new Float(constant));
+				method.visitLdcInsn(new Float(Float.toString(constant)));
 			}
 		}
 		
@@ -918,7 +934,7 @@ public class ClassCompiler {
 				method.visitInsn(Opcodes.DCONST_1);
 			}
 			else {
-				method.visitLdcInsn(new Double(constant));
+				method.visitLdcInsn(new Double(Double.toString(constant)));
 			}
 		}
 
@@ -1180,7 +1196,7 @@ public class ClassCompiler {
 					(c) -> { return "C";},
 					(f) -> { return "F";},
 					(d) -> { return "D";},
-					(l) -> { return "L";},
+					(l) -> { return "J";},
 					(v) -> { return "V";},
 					(c) -> { return "L" + AST.$getName(c).replaceAll("\\.", "/") + ";"; },
 					(a) -> {  return "[" + type(AST.$getArg(a)); }

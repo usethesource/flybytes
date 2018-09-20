@@ -105,10 +105,10 @@ data Statement(loc src = |unknown:///|)
   | \do(Type \type, Expression exp) // pops the result of the expression when needed
   | \return()
   | \return(Type \type, Expression arg)
- 
+  | \putField(str class, Expression receiver, Type \type, str name, Expression arg)
+  | \putStatic(str class, str name, Type \type, Expression arg)
  // TODO: these are still to be implemented:
-  //| \putField(Expression receiver, str fieldName, Expression \value)
-  //| \putStatic(str class, str fieldName, Expression \value)
+  
   //| \if(Expression condition, list[Statement] block)
   //| \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
   //| \while(Expression condition, list[Statement] block)

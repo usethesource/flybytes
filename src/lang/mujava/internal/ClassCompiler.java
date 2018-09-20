@@ -309,11 +309,27 @@ public class ClassCompiler {
 			case "store" : 
 				compileStat_Store(stat); 
 				break;
-				
+			case "putField":
+				compileStat_PutField(AST.$getClass(stat), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
+				break;
+			case "putStatic":
+				compileStat_PutStatic(AST.$getClass(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
+				break;
 			case "return" : 
 				compileStat_Return(stat);
 				break;
 			}
+		}
+
+		private void compileStat_PutStatic(String cls, IConstructor type, String name, IConstructor arg) {
+			compileExpression(arg);
+			method.visitFieldInsn(Opcodes.PUTSTATIC, cls, name, Signature.type(type));
+		}
+
+		private void compileStat_PutField(String cls, IConstructor receiver, IConstructor type, String name, IConstructor arg) {
+			compileExpression(receiver);
+			compileExpression(arg);
+			method.visitFieldInsn(Opcodes.PUTFIELD, cls, name, Signature.type(type));
 		}
 
 		private void compileStat_Store(IConstructor stat) {

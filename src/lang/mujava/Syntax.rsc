@@ -109,11 +109,11 @@ data Statement(loc src = |unknown:///|)
   | \putStatic(str class, str name, Type \type, Expression arg)
   | \if(Expression condition, list[Statement] thenBlock)
   | \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
+  | \for(list[Statement] init, Expression condition, list[Statement] next, list[Statement] block)
  // TODO: these are still to be implemented:
-  //| \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
   //| \while(Expression condition, list[Statement] block)
   //| \doWhile(list[Statement] block, Expression condition)
-  //| \for(list[Statement] init, Expression condition, list[Statement] next, list[Statement] block)
+  
   //| \try(list[Statement] tryBlock, list[Catch] \catchBlock, list[Statement] \finallyBlock)
   //| label(str label)
   //| \goto(str label)

@@ -122,12 +122,13 @@ data Statement(loc src = |unknown:///|)
   //| monitor(Expression lock, list[Statement] block)
   ;
 
-data Statement(loc src = |unknown:///|)  
-  = assertEquals(Expression lhs, Expression rhs)
-  | assertNotEquals(Expression lhs, Expression rhs)
-  | assertTrue(Expression e)
-  | assertFalse(Expression e)
-  ;
+// TODO:
+//data Statement(loc src = |unknown:///|)  
+//  = assertEquals(Expression lhs, Expression rhs)
+//  | assertNotEquals(Expression lhs, Expression rhs)
+//  | assertTrue(Expression e)
+//  | assertFalse(Expression e)
+//  ;
   
 data Case = \case(int label, list[Statement] block);
   
@@ -267,11 +268,12 @@ Statement stdout(Expression arg)
 // print object to System.err (toString() is called automatically)
 Statement stderr(Expression arg)
    = \do(\void(), println("err", arg));
-         
+
+// not-public because it depends on the magic constants "err" and "out" to work         
 private Expression println(str stream, Expression arg)
    = invokeVirtual("java.io.PrintStream", getStatic("java.lang.System", classType("java.io.PrintStream"), stream), 
          methodDesc(\void(), "println", [object()]), [arg]);         
  
-// refer to the standard "this" reference 
+// Load the standard "this" reference for every object. 
 // NB! This works only inside non-static methods and inside constructors 
 Expression this() = load("this");

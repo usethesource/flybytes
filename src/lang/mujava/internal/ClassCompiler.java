@@ -88,7 +88,7 @@ public class ClassCompiler {
 			classNode.signature = "L" + classNode.name + ";"; 
 
 			out.println("Compiling " + classNode.name + " with JVM version " + version);
-			
+
 			if (kws.hasParameter("modifiers")) {
 				classNode.access = compileAccessCode(AST.$getModifiers(o));
 			}
@@ -128,7 +128,7 @@ public class ClassCompiler {
 
 			// now stream the entire class to a (hidden) bytearray
 			classNode.accept(cw);
-			
+
 			out.println("done.");
 		}
 
@@ -355,27 +355,45 @@ public class ClassCompiler {
 		}
 
 		private void compileStat_If(IConstructor cond, IList thenBlock, Builder continuation) {
-			// TODO: special case this for eq, ne, le, lt, gt, ge, null, nonnull
-			compileConditionalInverted(
-					() -> compileExpression(cond, () -> compileTrue()),
-					0, 
-					Opcodes.IF_ICMPNE, 
-					() -> compileStatements(thenBlock, DONE),
-					DONE,
-					continuation
-					);
+			compileStat_IfThenElse(cond, thenBlock, null, continuation);
 		}
-		
+
 		private void compileStat_IfThenElse(IConstructor cond, IList thenBlock, IList elseBlock, Builder continuation) {
-			// TODO: special case this for eq, ne, le, lt, gt, ge, null, nonnull
-			compileConditionalInverted(
-					() -> compileExpression(cond, () -> compileTrue()),
-					0, 
-					Opcodes.IF_ICMPNE, 
-					() -> compileStatements(thenBlock, DONE),
-					() -> compileStatements(elseBlock, DONE),
-					continuation
-					);
+			Builder thenBuilder = () -> compileStatements(thenBlock, DONE);
+			Builder elseBuilder = elseBlock != null ? () -> compileStatements(elseBlock, DONE) : DONE;
+			
+			// here we special case for !=, ==, <=, >=, < and >, null, nonnull, because
+			// there are special jump instructions for these operators on the JVM and we don't want to push
+			// a boolean on the stack and then conditionally have to jump on that boolean again:
+			switch (cond.getConstructorType().getName()) {
+			case "eq":
+				compileEq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				break;
+			case "ne":
+				compileNeq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				break;
+			case "le":
+				compileLe(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				break;
+			case "gt":
+				compileGt(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				break;
+			case "ge":
+				compileGe(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				break;
+			case "lt":
+				compileLt(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				break;
+			default:
+				compileConditionalInverted(
+						() -> compileExpression(cond, () -> compileTrue()),
+						0, 
+						Opcodes.IF_ICMPNE, 
+						thenBuilder,
+						elseBuilder,
+						continuation
+						);
+			}
 		}
 
 		private void compileStat_PutStatic(String cls, IConstructor type, String name, IConstructor arg) {
@@ -528,11 +546,11 @@ public class ClassCompiler {
 					continuation.build();
 				}
 				else { 
-					compileNull(AST.$getArg(exp), continuation); // null check 
+					compileNull(AST.$getArg(exp), () -> compileTrue(), () -> compileFalse(), continuation); // null check 
 				}
 				break;
 			case "nonnull":
-				compileNonNull(AST.$getArg(exp), continuation); // null check 
+				compileNonNull(AST.$getArg(exp), () -> compileTrue(), () -> compileFalse(),continuation); // null check 
 				break;
 			case "true":
 				compileTrue();
@@ -544,22 +562,22 @@ public class ClassCompiler {
 				compileCoerce(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
 				break;
 			case "eq":
-				compileEq(AST.$getLhs(exp), AST.$getRhs(exp), continuation);
+				compileEq(AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
 				break;
 			case "ne":
-				compileNeq(AST.$getLhs(exp), AST.$getRhs(exp), continuation);
+				compileNeq(AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
 				break;
 			case "le":
-				compileLe(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), continuation);
+				compileLe(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
 				break;
 			case "gt":
-				compileGt(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), continuation);
+				compileGt(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
 				break;
 			case "ge":
-				compileGe(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), continuation);
+				compileGe(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
 				break;
 			case "lt":
-				compileLt(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), continuation);
+				compileLt(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(),continuation);
 				break;
 			case "checkcast":
 				compileCheckCast(AST.$getArg(exp), AST.$getType(exp));
@@ -600,7 +618,7 @@ public class ClassCompiler {
 		private void compileCheckCast(IConstructor arg, IConstructor type) {
 			compileExpression(arg, DONE);
 			String cons = type.getConstructorType().getName();
-			
+
 			// weird inconsistency in CHECKCAST instruction?
 			if (cons == "classType") {
 				method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type));
@@ -635,113 +653,77 @@ public class ClassCompiler {
 					);
 		}
 
-		private void compileLt(IConstructor type, IConstructor lhs, IConstructor rhs, Builder continuation) {
+		private void compileLt(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
 			Switch.type0(type, 
-					(z) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, continuation),
-					(i) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, continuation), 
-					(s) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, continuation), 
-					(b) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, continuation), 
-					(c) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, continuation), 
-					(f) -> compileBoolExpInverted(Opcodes.FCMPG, Opcodes.IFGE, lhs, rhs, continuation),
-					(d) -> compileBoolExpInverted(Opcodes.DCMPG, Opcodes.IFGE, lhs, rhs, continuation),
-					(l) -> compileBoolExpInverted(Opcodes.LCMP, Opcodes.IFGE, lhs, rhs, continuation),
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, thenPart, elsePart, continuation),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, thenPart, elsePart, continuation), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, thenPart, elsePart, continuation), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, thenPart, elsePart, continuation), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, thenPart, elsePart, continuation), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGE, lhs, rhs, thenPart, elsePart, continuation),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGE, lhs, rhs, thenPart, elsePart, continuation),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGE, lhs, rhs, thenPart, elsePart, continuation),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
 		}
 
-		private void compileLe(IConstructor type, IConstructor lhs, IConstructor rhs, Builder continuation) {
+		private void compileLe(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
 			Switch.type0(type, 
-					(z) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, continuation),
-					(i) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, continuation), 
-					(s) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, continuation), 
-					(b) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, continuation), 
-					(c) -> compileBoolExpInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, continuation), 
-					(f) -> compileBoolExpInverted(Opcodes.FCMPG, Opcodes.IFGT, lhs, rhs, continuation),
-					(d) -> compileBoolExpInverted(Opcodes.DCMPG, Opcodes.IFGT, lhs, rhs, continuation),
-					(l) -> compileBoolExpInverted(Opcodes.LCMP, Opcodes.IFGT, lhs, rhs, continuation),
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, thenPart, elsePart, continuation),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, thenPart, elsePart, continuation), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, thenPart, elsePart, continuation), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, thenPart, elsePart, continuation), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, thenPart, elsePart, continuation), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGT, lhs, rhs, thenPart, elsePart, continuation),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGT, lhs, rhs, thenPart, elsePart, continuation),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGT, lhs, rhs, thenPart, elsePart, continuation),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
 		}
 
-		private void compileGt(IConstructor type, IConstructor lhs, IConstructor rhs, Builder continuation) {
+		private void compileGt(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
 			Switch.type0(type, 
-					(z) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, continuation),
-					(i) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, continuation), 
-					(s) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, continuation), 
-					(b) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, continuation), 
-					(c) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, continuation), 
-					(f) -> compileBoolExpInverted(Opcodes.FCMPG, Opcodes.IFLE, lhs, rhs, continuation),
-					(d) -> compileBoolExpInverted(Opcodes.DCMPG, Opcodes.IFLE, lhs, rhs, continuation),
-					(l) -> compileBoolExpInverted(Opcodes.LCMP, Opcodes.IFLE, lhs, rhs, continuation),
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, thenPart, elsePart, continuation),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, thenPart, elsePart, continuation), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, thenPart, elsePart, continuation), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, thenPart, elsePart, continuation), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, thenPart, elsePart, continuation), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLE, lhs, rhs, thenPart, elsePart, continuation),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLE, lhs, rhs, thenPart, elsePart, continuation),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLE, lhs, rhs, thenPart, elsePart, continuation),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
 		}
 
-		private void compileGe(IConstructor type, IConstructor lhs, IConstructor rhs, Builder continuation) {
+		private void compileGe(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
 			Switch.type0(type, 
-					(z) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, continuation),
-					(i) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, continuation), 
-					(s) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, continuation), 
-					(b) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, continuation), 
-					(c) -> compileBoolExpInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, continuation), 
-					(f) -> compileBoolExpInverted(Opcodes.FCMPG, Opcodes.IFLT, lhs, rhs, continuation),
-					(d) -> compileBoolExpInverted(Opcodes.DCMPG, Opcodes.IFLT, lhs, rhs, continuation),
-					(l) -> compileBoolExpInverted(Opcodes.LCMP, Opcodes.IFLT, lhs, rhs, continuation),
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, thenPart, elsePart, continuation),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, thenPart, elsePart, continuation), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, thenPart, elsePart, continuation), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, thenPart, elsePart, continuation), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, thenPart, elsePart, continuation), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLT, lhs, rhs, thenPart, elsePart, continuation),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLT, lhs, rhs, thenPart, elsePart, continuation),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLT, lhs, rhs, thenPart, elsePart, continuation),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); }
 					);
 		}
 
-		private void compileEq(IConstructor lhs, IConstructor rhs, Builder continuation) {
-			compileBoolExpInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, continuation);
+		private void compileEq(IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
+			compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation);
 		}
-		
+
 		@FunctionalInterface
 		private static interface Builder { 
 			void build();
-		}
-		
-		private void compileBoolExpInverted(int compare, int opcode, IConstructor lhs, IConstructor rhs, Builder continuation) {
-			compileConditionalInverted(
-					() -> { 
-						compileExpression(lhs, DONE);
-						compileExpression(rhs, DONE);
-					},
-					compare, 
-					opcode,
-					() -> {
-						intConstant(1);
-					},
-					() -> {
-						intConstant(0);
-					},
-					continuation
-			);
-		}
-		
-		private void compileBoolExpInverted(int compare, int opcode, IConstructor arg, Builder continuation) {
-			compileConditionalInverted(
-					() -> { 
-						compileExpression(arg, DONE);
-					},
-					compare,
-					opcode,
-					() -> {
-						intConstant(1);
-					},
-					() -> {
-						intConstant(0);
-					},
-					continuation
-					
-			);
 		}
 
 		/**
@@ -760,7 +742,7 @@ public class ClassCompiler {
 			// TODO: is this the most efficient encoding? probably not. 
 			Label jump = new Label();
 			Label join = new Label();
-			
+
 			if (compare != 0) {
 				method.visitInsn(compare);
 			}
@@ -774,17 +756,38 @@ public class ClassCompiler {
 			method.visitLabel(join);
 			continuation.build();
 		}
-		
-		private void compileNull(IConstructor arg, Builder continuation) {
-			compileBoolExpInverted(0, Opcodes.IFNONNULL, arg, continuation);
+
+		private void compileConditionalInverted(int compare, int opcode, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
+			compileConditionalInverted(
+					() -> compileExpression(lhs, 
+							() -> compileExpression(rhs, DONE)), 
+					compare, 
+					opcode, 
+					thenPart, 
+					elsePart, 
+					continuation);
 		}
 
-		private void compileNonNull(IConstructor arg, Builder continuation) {
-			compileBoolExpInverted(0, Opcodes.IFNULL, arg, continuation);
+		private void compileConditionalInverted(int compare, int opcode, IConstructor arg, Builder thenPart, Builder elsePart, Builder continuation) {
+			compileConditionalInverted(
+					() -> compileExpression(arg, DONE),
+					compare, 
+					opcode, 
+					thenPart, 
+					elsePart, 
+					continuation);
 		}
 
-		private void compileNeq(IConstructor lhs, IConstructor rhs, Builder continuation) {
-			compileBoolExpInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, continuation);
+		private void compileNull(IConstructor arg, Builder thenPart, Builder elsePart, Builder continuation) {
+			compileConditionalInverted(0, Opcodes.IFNONNULL, arg, thenPart, elsePart, continuation);
+		}
+
+		private void compileNonNull(IConstructor arg, Builder thenPart, Builder elsePart, Builder continuation) {
+			compileConditionalInverted(0, Opcodes.IFNULL, arg, thenPart, elsePart, continuation);
+		}
+
+		private void compileNeq(IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
+			compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation);
 		}
 
 		private void compileCoerce(IConstructor from, IConstructor to, IConstructor arg) {
@@ -1459,11 +1462,11 @@ public class ClassCompiler {
 		public static IConstructor $getCondition(IConstructor stat) {
 			return (IConstructor) stat.get("condition");
 		}
-		
+
 		public static IList $getThenBlock(IConstructor stat) {
 			return (IList) stat.get("thenBlock");
 		}
-		
+
 		public static IList $getElseBlock(IConstructor stat) {
 			return (IList) stat.get("elseBlock");
 		}

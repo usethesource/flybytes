@@ -1,6 +1,8 @@
 module lang::mujava::Compiler
 
 import lang::mujava::Syntax;
+import lang::mujava::api::Object;
+import lang::mujava::api::System;
 import IO;
 
 data JDKVersion = v1_6() | v1_7() | v1_8();

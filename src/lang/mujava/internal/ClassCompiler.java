@@ -100,7 +100,7 @@ public class ClassCompiler {
 				classNode.superName = AST.$getSuper(kws);
 			}
 			else {
-				classNode.superName = "java/lang/Object";
+				classNode.superName = Signature.objectName;
 			}
 
 			if (kws.hasParameter("interfaces")) {
@@ -230,7 +230,8 @@ public class ClassCompiler {
 							throw new IllegalArgumentException("void variable"); 
 						},
 						(c) -> variableCounter++,
-						(a) -> variableCounter++
+						(a) -> variableCounter++,
+						(S) -> variableCounter++
 						);
 			}
 
@@ -285,7 +286,12 @@ public class ClassCompiler {
 							(a,j) -> { 
 								method.visitInsn(Opcodes.ACONST_NULL);
 								method.visitVarInsn(Opcodes.ASTORE, j); 
+							},
+							(S,j) -> {
+								stringConstant("");
+								method.visitVarInsn(Opcodes.ASTORE, j);
 							}
+							
 							);
 				}
 			}
@@ -434,7 +440,8 @@ public class ClassCompiler {
 					(l) -> { method.visitVarInsn(Opcodes.LSTORE, pos); },
 					(v) -> { /* void */ },
 					(c) -> { /* class */ method.visitVarInsn(Opcodes.ASTORE, pos); },
-					(a) -> { /* array */ method.visitVarInsn(Opcodes.ASTORE, pos); }
+					(a) -> { /* array */ method.visitVarInsn(Opcodes.ASTORE, pos); },
+					(S) -> { /* string */ method.visitVarInsn(Opcodes.ASTORE, pos); }
 					);
 		}
 
@@ -456,7 +463,8 @@ public class ClassCompiler {
 						(l) -> { method.visitInsn(Opcodes.LRETURN); },
 						(v) -> { /* void  */ method.visitInsn(Opcodes.RETURN); },
 						(c) -> { /* class */ method.visitInsn(Opcodes.ARETURN); },
-						(a) -> { /* array */ method.visitInsn(Opcodes.ARETURN); }
+						(a) -> { /* array */ method.visitInsn(Opcodes.ARETURN); },
+						(S) -> { /* string */ method.visitInsn(Opcodes.ARETURN); }
 						);
 			}
 		}
@@ -474,7 +482,8 @@ public class ClassCompiler {
 					(j) -> pop2(), // wide pop
 					(v) -> { /* no pop */ }, 
 					(c) -> pop(), 
-					(a) -> pop()
+					(a) -> pop(),
+					(S) -> pop()
 					));
 		}
 
@@ -609,21 +618,26 @@ public class ClassCompiler {
 			compileExpression(array, 
 					() -> compileExpression(index, 
 							() -> compileExpression(arg,
-									() -> Switch.type0(type, 
-											(z) -> method.visitInsn(Opcodes.IASTORE),
-											(i) -> method.visitInsn(Opcodes.IASTORE),
-											(s) -> method.visitInsn(Opcodes.IASTORE),
-											(b) -> method.visitInsn(Opcodes.IASTORE),
-											(c) -> method.visitInsn(Opcodes.IASTORE),
-											(f) -> method.visitInsn(Opcodes.FASTORE),
-											(d) -> method.visitInsn(Opcodes.DASTORE),
-											(l) -> method.visitInsn(Opcodes.LASTORE),
-											(v) -> { throw new IllegalArgumentException("store void in array"); },
-											(c) -> method.visitInsn(Opcodes.AASTORE),
-											(a) -> method.visitInsn(Opcodes.AASTORE)
-											)
+									() -> compileArrayStoreWithArrayIndexValueOnStack(type)
 									)
 							)
+					);
+		}
+
+		private void compileArrayStoreWithArrayIndexValueOnStack(IConstructor type) {
+			Switch.type0(type, 
+					(z) -> method.visitInsn(Opcodes.IASTORE),
+					(i) -> method.visitInsn(Opcodes.IASTORE),
+					(s) -> method.visitInsn(Opcodes.IASTORE),
+					(b) -> method.visitInsn(Opcodes.IASTORE),
+					(c) -> method.visitInsn(Opcodes.IASTORE),
+					(f) -> method.visitInsn(Opcodes.FASTORE),
+					(d) -> method.visitInsn(Opcodes.DASTORE),
+					(l) -> method.visitInsn(Opcodes.LASTORE),
+					(v) -> { throw new IllegalArgumentException("store void in array"); },
+					(c) -> method.visitInsn(Opcodes.AASTORE),
+					(a) -> method.visitInsn(Opcodes.AASTORE),
+					(S) -> method.visitInsn(Opcodes.AASTORE)
 					);
 		}
 
@@ -648,20 +662,23 @@ public class ClassCompiler {
 		}
 
 		private void compileExpression_NewArray(IConstructor type, IConstructor size) {
-			compileExpression(size, 
-					() -> Switch.type0(type,
-							(z) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BOOLEAN) ,
-							(i) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_INT) , 
-							(s) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_SHORT) , 
-							(b) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BYTE) , 
-							(c) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_CHAR) ,
-							(f) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_FLOAT) ,
-							(d) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_DOUBLE) ,
-							(j) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_LONG) , 
-							(v) -> { throw new IllegalArgumentException("void array"); }, 
-							(c) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type))), 
-							(c) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type)))
-							)
+			compileExpression(size, () -> compileNewArrayWithSizeOnStack(type));
+		}
+
+		private void compileNewArrayWithSizeOnStack(IConstructor type) {
+			Switch.type0(type,
+					(z) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BOOLEAN) ,
+					(i) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_INT) , 
+					(s) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_SHORT) , 
+					(b) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BYTE) , 
+					(c) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_CHAR) ,
+					(f) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_FLOAT) ,
+					(d) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_DOUBLE) ,
+					(j) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_LONG) , 
+					(v) -> { throw new IllegalArgumentException("void array"); }, 
+					(c) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type))), 
+					(a) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type))),
+					(S) -> method.visitTypeInsn(Opcodes.ANEWARRAY, Signature.stringType)
 					);
 		}
 
@@ -677,7 +694,8 @@ public class ClassCompiler {
 					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGE, lhs, rhs, thenPart, elsePart, continuation),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
-					(a) -> { throw new IllegalArgumentException("< on array"); }
+					(a) -> { throw new IllegalArgumentException("< on array"); },
+					(S) -> { throw new IllegalArgumentException("< on string"); }
 					);
 		}
 
@@ -691,9 +709,10 @@ public class ClassCompiler {
 					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGT, lhs, rhs, thenPart, elsePart, continuation),
 					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGT, lhs, rhs, thenPart, elsePart, continuation),
 					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGT, lhs, rhs, thenPart, elsePart, continuation),
-					(v) -> { throw new IllegalArgumentException("< on void"); }, 
-					(c) -> { throw new IllegalArgumentException("< on class"); }, 
-					(a) -> { throw new IllegalArgumentException("< on array"); }
+					(v) -> { throw new IllegalArgumentException("<= on void"); }, 
+					(c) -> { throw new IllegalArgumentException("<= on class"); }, 
+					(a) -> { throw new IllegalArgumentException("<= on array"); },
+					(a) -> { throw new IllegalArgumentException("<= on string"); }
 					);
 		}
 
@@ -707,9 +726,10 @@ public class ClassCompiler {
 					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLE, lhs, rhs, thenPart, elsePart, continuation),
 					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLE, lhs, rhs, thenPart, elsePart, continuation),
 					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLE, lhs, rhs, thenPart, elsePart, continuation),
-					(v) -> { throw new IllegalArgumentException("< on void"); }, 
-					(c) -> { throw new IllegalArgumentException("< on class"); }, 
-					(a) -> { throw new IllegalArgumentException("< on array"); }
+					(v) -> { throw new IllegalArgumentException("> on void"); }, 
+					(c) -> { throw new IllegalArgumentException("> on class"); }, 
+					(a) -> { throw new IllegalArgumentException("> on array"); },
+					(S) -> { throw new IllegalArgumentException("> on array"); }
 					);
 		}
 
@@ -723,9 +743,10 @@ public class ClassCompiler {
 					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLT, lhs, rhs, thenPart, elsePart, continuation),
 					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLT, lhs, rhs, thenPart, elsePart, continuation),
 					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLT, lhs, rhs, thenPart, elsePart, continuation),
-					(v) -> { throw new IllegalArgumentException("< on void"); }, 
-					(c) -> { throw new IllegalArgumentException("< on class"); }, 
-					(a) -> { throw new IllegalArgumentException("< on array"); }
+					(v) -> { throw new IllegalArgumentException(">= on void"); }, 
+					(c) -> { throw new IllegalArgumentException(">= on class"); }, 
+					(a) -> { throw new IllegalArgumentException(">= on array"); },
+					(S) -> { throw new IllegalArgumentException(">= on array"); }
 					);
 		}
 
@@ -814,7 +835,46 @@ public class ClassCompiler {
 					(l) -> coerceFromLong(to, arg),
 					(v) -> failedCoercion("void", to),
 					(c) -> coerceFromClass(from, to, arg),
-					(a) -> coerceFromArray(from, to, arg) 
+					(a) -> coerceFromArray(from, to, arg), 
+					(S) -> coerceFromString(from, to, arg) 
+					);
+		}
+
+		private void coerceFromString(IConstructor from, IConstructor to, IConstructor arg) {
+			Switch.type0(to, 
+					(z) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "parseBoolean", Signature.stringType, false);
+					}, 
+					(i) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Integer", "parseInt", "I", false);
+					}, 
+					(s) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Short", "parseShort", "S", false);
+					},
+					(b) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Byte", "parseByte", "B", false);
+					}, 
+					(c) -> failedCoercion("string", to), 
+					(f) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Float", "parseFloat", "F", false);
+					}, 
+					(d) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Double", "parseDouble", "D", false);
+					}, 
+					(j) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "parseLong", "J", false);
+					}, 
+					(v) -> failedCoercion("string", to), 
+					(a) -> failedCoercion("string", to),
+					(c) -> failedCoercion("class", to),
+					(S) -> { /* identity */ }
 					);
 		}
 
@@ -838,7 +898,8 @@ public class ClassCompiler {
 					(l) -> failedCoercion("long", to),
 					(v) -> failedCoercion("void", to),
 					(c) -> failedCoercion("class", to),
-					(a) -> coerceArrayToArray(from, to, arg) 
+					(a) -> coerceArrayToArray(from, to, arg),
+					(S) -> failedCoercion("string", to) // TODO byteArray?
 					);
 		}
 
@@ -858,7 +919,11 @@ public class ClassCompiler {
 					(l) -> { /* do nothing */ },
 					(v) -> { pop(); compileNull(); },
 					(c) -> failedCoercion("class", to),
-					(a) -> failedCoercion("array", to)
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
 					);
 		}
 
@@ -868,6 +933,7 @@ public class ClassCompiler {
 			Switch.type0(to,
 					(z) -> {
 						if (cls.equals("java/lang/Boolean")) {
+							compileExpression(from, DONE);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "booleanValue", "()Z", false);
 						}
 						else {
@@ -876,6 +942,7 @@ public class ClassCompiler {
 					},
 					(i) -> {
 						if (cls.equals("java/lang/Integer")) {
+							compileExpression(from, DONE);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "intValue", "()I", false);
 						}
 						else {
@@ -884,6 +951,7 @@ public class ClassCompiler {
 					},
 					(s) -> {
 						if (cls.equals("java/lang/Integer")) {
+							compileExpression(from, DONE);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "shortValue", "()S", false);
 						}
 						else {
@@ -892,6 +960,7 @@ public class ClassCompiler {
 					},
 					(b) -> {
 						if (cls.equals("java/lang/Integer")) {
+							compileExpression(from, DONE);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "byteValue", "()B", false);
 						}
 						else {
@@ -901,6 +970,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion(cls, arg),
 					(f) -> {
 						if (cls.equals("java/lang/Float")) {
+							compileExpression(from, DONE);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Float", "floatValue", "()F", false);
 						}
 						else {
@@ -909,6 +979,7 @@ public class ClassCompiler {
 					},
 					(d) -> {
 						if (cls.equals("java/lang/Double")) {
+							compileExpression(from, DONE);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Double", "doubleValue", "()D", false);
 						}
 						else {
@@ -917,6 +988,7 @@ public class ClassCompiler {
 					},
 					(l) -> {
 						if (cls.equals("java/lang/Long")) {
+							compileExpression(from, DONE);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Long", "longValue", "()L", false);
 						}
 						else {
@@ -932,7 +1004,11 @@ public class ClassCompiler {
 							failedCoercion("class", to);
 						}
 					},
-					(a) -> failedCoercion("array", to)
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
 					);
 		}
 
@@ -948,7 +1024,11 @@ public class ClassCompiler {
 					(l) -> { method.visitInsn(Opcodes.D2L); } ,
 					(v) -> { pop(); compileNull(); },
 					(c) -> failedCoercion("class", to),
-					(a) -> failedCoercion("array", to)
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
 					);
 		}
 
@@ -964,7 +1044,11 @@ public class ClassCompiler {
 					(l) -> { method.visitInsn(Opcodes.F2L); },
 					(v) -> { pop(); compileNull(); },
 					(c) -> failedCoercion("class", to),
-					(a) -> failedCoercion("array", to)
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
 					);
 		}
 
@@ -980,7 +1064,11 @@ public class ClassCompiler {
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); compileNull(); },
 					(c) -> failedCoercion("class", to),
-					(a) -> failedCoercion("array", to)
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
 					);
 		}
 
@@ -996,7 +1084,11 @@ public class ClassCompiler {
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); compileNull(); },
 					(c) -> failedCoercion("class", to),
-					(a) -> failedCoercion("array", to)
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
 					);
 		}
 
@@ -1012,7 +1104,11 @@ public class ClassCompiler {
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); compileNull(); },
 					(c) -> failedCoercion("class", to),
-					(a) -> failedCoercion("array", to)
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
 					);
 		}
 
@@ -1028,7 +1124,11 @@ public class ClassCompiler {
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); compileNull(); },
 					(c) -> failedCoercion("class", to),
-					(a) -> failedCoercion("array", to)
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg, DONE);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
 					);
 		}
 
@@ -1124,7 +1224,8 @@ public class ClassCompiler {
 					(l,p) -> method.visitVarInsn(Opcodes.LLOAD, p),
 					(v,p) -> { /* void */ },
 					(c,p) -> method.visitVarInsn(Opcodes.ALOAD, p),
-					(a,p) -> method.visitVarInsn(Opcodes.ALOAD, p)
+					(a,p) -> method.visitVarInsn(Opcodes.ALOAD, p),
+					(S,p) -> method.visitVarInsn(Opcodes.ALOAD, p)
 					);
 		}
 
@@ -1159,6 +1260,10 @@ public class ClassCompiler {
 			else {
 				method.visitLdcInsn(new Long(constant));
 			}
+		}
+		
+		private void stringConstant(String constant) {
+			method.visitLdcInsn(constant);
 		}
 
 		private void floatConstant(float constant) {
@@ -1199,26 +1304,39 @@ public class ClassCompiler {
 		}
 
 		private void compileExpression_Const(IConstructor type, IValue constant) {
-			switch(AST.$getConstructorName(type)) {
-			case "integer":
-			case "character":
-			case "byte":
-				intConstant(AST.$getIntegerConstant(constant));
-				break;
-			case "long":
-				longConstant(AST.$getLongConstant(constant));
-				break;
-			case "float":
-				floatConstant(AST.$getFloatConstant(constant));
-				break;
-			case "double":
-				doubleConstant(AST.$getDoubleConstant(constant));
-				break;
-			case "boolean":
-				booleanConstant(AST.$getBoolean(constant));
-				break;
-			default:
-				throw new IllegalArgumentException("not supported: " + constant.toString());
+			Switch.type0(type, 
+					(z) -> booleanConstant(AST.$getBoolean(constant)), 
+					(i) -> intConstant(AST.$getIntegerConstant(constant)), 
+					(s) -> intConstant(AST.$getIntegerConstant(constant)), 
+					(b) -> intConstant(AST.$getIntegerConstant(constant)), 
+					(c) -> intConstant(AST.$getIntegerConstant(constant)), 
+					(f) -> floatConstant(AST.$getFloatConstant(constant)), 
+					(d) -> doubleConstant(AST.$getDoubleConstant(constant)), 
+					(j) -> longConstant(AST.$getLongConstant(constant)), 
+					(v) -> { throw new IllegalArgumentException("void constant"); }, 
+					(c) -> { throw new IllegalArgumentException("object constant"); }, 
+					(a) -> {
+						if (constant instanceof IList) {
+							constantArray(AST.$getArg(type), (IList) constant);
+						}
+						else {
+							{ throw new IllegalArgumentException("array constant without list input"); }	
+						}
+					}, 
+					(S) -> stringConstant(AST.$getStringConstant(constant))
+			);
+		}
+
+		private void constantArray(IConstructor type, IList constant) {
+			intConstant(constant.length());
+			compileNewArrayWithSizeOnStack(type);
+			int index = 0;
+			
+			for (IValue elem : constant) {
+				dup();
+				intConstant(index);
+				compileExpression_Const((IConstructor) elem, elem);
+				compileArrayStoreWithArrayIndexValueOnStack(type);
 			}
 		}
 
@@ -1424,6 +1542,12 @@ public class ClassCompiler {
 	 * Building mangled signature names from symbolic types
 	 */
 	private static class Signature {
+		public static final String objectName = "java/lang/Object";
+		public static final String stringName = "java/lang/String";
+		@SuppressWarnings("unused")
+		public static final String objectType = "L" + objectName + ";";
+		public static final String stringType = "L" + stringName + ";";
+		
 		private static String method(IConstructor sig) {
 			StringBuilder val = new StringBuilder();
 			val.append("(");
@@ -1449,7 +1573,8 @@ public class ClassCompiler {
 					(l) -> { return "J";},
 					(v) -> { return "V";},
 					(c) -> { return "L" + AST.$getName(c).replaceAll("\\.", "/") + ";"; },
-					(a) -> {  return "[" + type(AST.$getArg(a)); }
+					(a) -> {  return "[" + type(AST.$getArg(a)); },
+					(S) -> { return "Ljava/lang/String;"; }
 					);
 		}
 	}
@@ -1558,6 +1683,10 @@ public class ClassCompiler {
 		public static double $getDoubleConstant(IValue parameter) {
 			return ((IReal) parameter).doubleValue();
 		}
+		
+		public static String $getStringConstant(IValue parameter) {
+			return ((IString) parameter).getValue();
+		}
 
 		public static boolean $getBoolean(IValue parameter) {
 			return ((IBool) parameter).getValue();
@@ -1643,7 +1772,7 @@ public class ClassCompiler {
 		 * Dispatch on a consumer on a type. The idea is to never accidentally forget a type using this higher-order function.
 		 * @param type
 		 */
-		public static void type0(IConstructor type, Consumer<IConstructor> bools, Consumer<IConstructor> ints, Consumer<IConstructor> shorts, Consumer<IConstructor> bytes, Consumer<IConstructor> chars, Consumer<IConstructor> floats, Consumer<IConstructor> doubles, Consumer<IConstructor> longs, Consumer<IConstructor> voids, Consumer<IConstructor> classes, Consumer<IConstructor> arrays) {
+		public static void type0(IConstructor type, Consumer<IConstructor> bools, Consumer<IConstructor> ints, Consumer<IConstructor> shorts, Consumer<IConstructor> bytes, Consumer<IConstructor> chars, Consumer<IConstructor> floats, Consumer<IConstructor> doubles, Consumer<IConstructor> longs, Consumer<IConstructor> voids, Consumer<IConstructor> classes, Consumer<IConstructor> arrays, Consumer<IConstructor> strings) {
 			switch (AST.$getConstructorName(type)) {
 			case "boolean": 
 				bools.accept(type);
@@ -1678,6 +1807,9 @@ public class ClassCompiler {
 			case "array" :
 				arrays.accept(type);
 				break;
+			case "string":
+				strings.accept(type);
+				break;
 			default:
 				throw new IllegalArgumentException("type not supported: " + type);
 			}
@@ -1687,7 +1819,7 @@ public class ClassCompiler {
 		 * Dispatch on a function on a type. The idea is to never accidentally forget a type using this higher-order function.
 		 * @param type
 		 */
-		public static <T> T type(IConstructor type, Function<IConstructor, T> bools, Function<IConstructor, T> ints, Function<IConstructor, T> shorts, Function<IConstructor, T> bytes, Function<IConstructor, T> chars, Function<IConstructor, T> floats, Function<IConstructor, T> doubles, Function<IConstructor, T> longs, Function<IConstructor, T> voids, Function<IConstructor, T> classes, Function<IConstructor, T> arrays) {
+		public static <T> T type(IConstructor type, Function<IConstructor, T> bools, Function<IConstructor, T> ints, Function<IConstructor, T> shorts, Function<IConstructor, T> bytes, Function<IConstructor, T> chars, Function<IConstructor, T> floats, Function<IConstructor, T> doubles, Function<IConstructor, T> longs, Function<IConstructor, T> voids, Function<IConstructor, T> classes, Function<IConstructor, T> arrays, Function<IConstructor, T> strings) {
 			switch (AST.$getConstructorName(type)) {
 			case "boolean" :
 				return bools.apply(type);
@@ -1711,6 +1843,8 @@ public class ClassCompiler {
 				return classes.apply(type);
 			case "array" :
 				return arrays.apply(type);
+			case "string":
+				return strings.apply(type);
 			default:
 				throw new IllegalArgumentException("type not supported: " + type);
 			}
@@ -1720,7 +1854,7 @@ public class ClassCompiler {
 		 * Dispatch a consumer on a type and pass a parameter
 		 * @param type
 		 */
-		public static <T> void type(IConstructor type, T arg,  BiConsumer<IConstructor,T> bools, BiConsumer<IConstructor,T> ints, BiConsumer<IConstructor,T> shorts, BiConsumer<IConstructor,T> bytes, BiConsumer<IConstructor,T> chars, BiConsumer<IConstructor,T> floats, BiConsumer<IConstructor,T> doubles, BiConsumer<IConstructor,T> longs, BiConsumer<IConstructor,T> voids, BiConsumer<IConstructor,T> classes, BiConsumer<IConstructor,T> arrays) {
+		public static <T> void type(IConstructor type, T arg,  BiConsumer<IConstructor,T> bools, BiConsumer<IConstructor,T> ints, BiConsumer<IConstructor,T> shorts, BiConsumer<IConstructor,T> bytes, BiConsumer<IConstructor,T> chars, BiConsumer<IConstructor,T> floats, BiConsumer<IConstructor,T> doubles, BiConsumer<IConstructor,T> longs, BiConsumer<IConstructor,T> voids, BiConsumer<IConstructor,T> classes, BiConsumer<IConstructor,T> arrays, BiConsumer<IConstructor, T> strings) {
 			switch (AST.$getConstructorName(type)) {
 			case "boolean":
 				bools.accept(type, arg);
@@ -1754,6 +1888,9 @@ public class ClassCompiler {
 				break;
 			case "array" :
 				arrays.accept(type, arg);
+				break;
+			case "string":
+				strings.accept(type, arg);
 				break;
 			default:
 				throw new IllegalArgumentException("type not supported: " + type);

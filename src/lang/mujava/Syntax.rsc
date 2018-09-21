@@ -89,6 +89,7 @@ data Type
   | classType(str name)
   | array(Type arg)
   | \void()
+  | string()
   ;
 
 data Annotation; // TODO
@@ -192,10 +193,9 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
  Expression ne(nonnull(), Expression arg) = null(arg);
  Expression ne(Expression arg, nonnull()) = null(arg);
  
- // Below popular elements of the java.lang API and some convenience macros for
+ // Below popular some convenience macros for
  // generating methods and constructors:
  
-Type string() = classType("java.lang.String");
 Type object() = classType("java.lang.Object");
 
 // generate a main method
@@ -241,39 +241,6 @@ Expression new(str class, list[Type] argTypes, list[Expression] args)
 Expression new(str class)
   = new(class, [], []);
      
-// call toString() on an object      
-Expression toString(Expression object) 
-   = invokeVirtual(object, methodDesc(string(), "toString", []), []);
-
-// call hashCode() on an object
-Expression hashCode(Expression object) 
-   = invokeVirtual(object, methodDesc(integer(), "hashCode", []), []);
-
-// call equals(Object a) on an object   
-Expression equals(Expression object, Expression compared) 
-   = invokeVirtual(object, methodDesc(boolean(), "equals", [object()]), [compared]);
-  
-// index an array variable using a constant  
-Expression index(str array, int index)
-   = index(array, const(integer(), index));
-   
-// index an array variable using the result of an expression as index
-Expression index(str array, Expression index)
-   = aaload(load(array), index);  
-    
-// print object to System.out (toString() is called automatically)    
-Statement stdout(Expression arg)
-   = \do(\void(), println("out", arg));
-
-// print object to System.err (toString() is called automatically)
-Statement stderr(Expression arg)
-   = \do(\void(), println("err", arg));
-
-// not-public because it depends on the magic constants "err" and "out" to work         
-private Expression println(str stream, Expression arg)
-   = invokeVirtual("java.io.PrintStream", getStatic("java.lang.System", classType("java.io.PrintStream"), stream), 
-         methodDesc(\void(), "println", [object()]), [arg]);         
- 
 // Load the standard "this" reference for every object. 
 // NB! This works only inside non-static methods and inside constructors 
 Expression this() = load("this");

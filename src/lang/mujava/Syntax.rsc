@@ -181,67 +181,97 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   //| inc(Expression arg, Expression inc)
   ;
  
- // below some typical macros for the sake of convenience:
+ // for run-time efficiency we simplify all null checks:
+ Expression eq(null(), Expression arg) = null(arg);
+ Expression eq(Expression arg, null()) = null(arg);
+ Expression eq(nonnull(), Expression arg) = nonnull(arg);
+ Expression eq(Expression arg, nonnull()) = nonnull(arg);
+ Expression ne(null(), Expression arg) = nonnull(arg);
+ Expression ne(Expression arg, null()) = nonnull(arg);
+ Expression ne(nonnull(), Expression arg) = null(arg);
+ Expression ne(Expression arg, nonnull()) = null(arg);
+ 
+ // Below popular elements of the java.lang API and some convenience macros for
+ // generating methods and constructors:
  
 Type string() = classType("java.lang.String");
-
 Type object() = classType("java.lang.Object");
 
+// generate a main method
 Method main(str args, Block block) 
   = method(methodDesc(\void(), "main", [array(string())]), [var(array(string()), args)], block, modifiers={\public(), \static(), \final()});
   
+// generate a default constructor for classes which have no supertype  
 Method defaultConstructor(Modifier access)
   = method(constructorDesc([]), [], block([], [
       do(\void(), invokeSuper("java.lang.Object")),
       \return()
   ]), modifiers={access});   
  
+// generate a default constructor based on a given superclass
 Method defaultConstructor(Modifier access, str super)
   = method(constructorDesc([]), [], block([], [
       do(\void(), invokeSuper(super)),
       \return()
   ])); 
   
+// generate a constructor descriptor; hides the reserved method name for constructors  
 Signature constructorDesc(list[Type] formals) 
   = methodDesc(\void(), "\<init\>", formals);   
     
+// invoke a nullary super method   
 Expression invokeSuper(str super) = invokeSuper(super, [], []);
   
+// invoke a super method with arguments
 Expression invokeSuper(str super, list[Type] formals, list[Expression] args)
   = invokeSpecial(super, this(), constructorDesc(formals), args);  
     
+// generate a constructor with argument and code 
+//   NB: don't forget to generate super call in the block!    
 Method constructor(Modifier access, str class, list[Variable] formals, Block block)
   = method(constructorDesc([ var.\type | var <- formals]), formals, block);
-      
+
+// allocate a new object using the constructor with the given argument types,
+// and passing the given actual parameters      
 Expression new(str class, list[Type] argTypes, list[Expression] args)
   = newInstance(class, constructorDesc(argTypes), args);
   
+// allocate a new object via its nullary constructor  
 Expression new(str class)
   = new(class, [], []);
-      
+     
+// call toString() on an object      
 Expression toString(Expression object) 
    = invokeVirtual(object, methodDesc(string(), "toString", []), []);
 
+// call hashCode() on an object
 Expression hashCode(Expression object) 
    = invokeVirtual(object, methodDesc(integer(), "hashCode", []), []);
-   
+
+// call equals(Object a) on an object   
 Expression equals(Expression object, Expression compared) 
    = invokeVirtual(object, methodDesc(boolean(), "equals", [object()]), [compared]);
   
+// index an array variable using a constant  
 Expression index(str array, int index)
-   = aaload(load(array), const(integer(), index));
+   = index(array, const(integer(), index));
    
+// index an array variable using the result of an expression as index
 Expression index(str array, Expression index)
    = aaload(load(array), index);  
     
+// print object to System.out (toString() is called automatically)    
 Statement stdout(Expression arg)
    = \do(\void(), println("out", arg));
 
+// print object to System.err (toString() is called automatically)
 Statement stderr(Expression arg)
    = \do(\void(), println("err", arg));
          
-Expression println(str stream, Expression arg)
+private Expression println(str stream, Expression arg)
    = invokeVirtual("java.io.PrintStream", getStatic("java.lang.System", classType("java.io.PrintStream"), stream), 
          methodDesc(\void(), "println", [object()]), [arg]);         
  
+// refer to the standard "this" reference 
+// NB! This works only inside non-static methods and inside constructors 
 Expression this() = load("this");

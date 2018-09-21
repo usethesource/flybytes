@@ -384,6 +384,18 @@ public class ClassCompiler {
 			case "lt":
 				compileLt(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				break;
+			case "null":
+				if (cond.getConstructorType().getArity() != 1) {
+					throw new IllegalArgumentException("null check without a parameter");
+				}
+				compileNull(AST.$getArg(cond), thenBuilder, elseBuilder, continuation);
+				break;
+			case "nonnull":
+				if (cond.getConstructorType().getArity() != 1) {
+					throw new IllegalArgumentException("nonnull check without a parameter");
+				}
+				compileNull(AST.$getArg(cond), thenBuilder, elseBuilder, continuation);
+				break;
 			default:
 				compileConditionalInverted(
 						() -> compileExpression(cond, () -> compileTrue()),

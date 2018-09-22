@@ -75,6 +75,7 @@ Method method(Modifier access, Type ret, str name, list[Variable] formals, Block
 
 data Signature 
   = methodDesc(Type \return, str name, list[Type] formals)
+  | constructorDesc(list[Type] formals)
   ;
 
 data Type
@@ -241,10 +242,6 @@ Method defaultConstructor(Modifier access, str super)
       \return()
   ])); 
   
-// generate a constructor descriptor; hides the reserved method name for constructors  
-Signature constructorDesc(list[Type] formals) 
-  = methodDesc(\void(), "\<init\>", formals);   
-    
 // generate a constructor with argument and code 
 //   NB: don't forget to generate super call in the block!    
 Method constructor(Modifier access, str class, list[Variable] formals, Block block)

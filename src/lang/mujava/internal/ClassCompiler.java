@@ -156,7 +156,8 @@ public class ClassCompiler {
 			}
 
 			IConstructor sig = AST.$getDesc(cons);
-			String name = AST.$getName(sig);
+			boolean isConstructor = sig.getConstructorType().getName().equals("constructorDesc");
+			String name = isConstructor ? "<init>" : AST.$getName(sig);
 
 			IList sigFormals = AST.$getFormals(sig);
 			IList varFormals = AST.$getFormals(cons);
@@ -167,7 +168,7 @@ public class ClassCompiler {
 				throw new IllegalArgumentException("type signature of " + name + " has different number of types (" + sigFormals.length() + ") from formal parameters (" + varFormals.length() + "), see: " + sigFormals + " versus " + varFormals);
 			}
 
-			method = new MethodNode(modifiers, name, Signature.method(sig), null, null);
+			method = new MethodNode(modifiers, name, isConstructor ? Signature.constructor(sig) : Signature.method(sig), null, null);
 
 			// "this" is the implicit first argument for all non-static methods
 			boolean isStatic = (modifiers & Opcodes.ACC_STATIC) != 0;
@@ -617,7 +618,7 @@ public class ClassCompiler {
 		private void compileInvokeSuper(String superclass, IConstructor sig, IList args) {
 			compileExpression_Load("this");
 			compileExpressionList(args, DONE);
-			method.visitMethodInsn(Opcodes.INVOKESPECIAL, superclass, AST.$getName(sig), Signature.method(sig), false);
+			method.visitMethodInsn(Opcodes.INVOKESPECIAL, superclass, "<init>", Signature.constructor(sig), false);
 		}
 
 		private void compileExpression_AStore(IConstructor type, IConstructor array, IConstructor index,
@@ -1172,7 +1173,7 @@ public class ClassCompiler {
 		private void compileExpression_NewInstance(IConstructor exp) {
 			compileExpressionList(AST.$getArgs(exp), DONE);
 			String cls = AST.$getClass(exp);
-			String desc = Signature.method(AST.$getDesc(exp));
+			String desc = Signature.constructor(AST.$getDesc(exp));
 			method.visitTypeInsn(Opcodes.NEW, cls);
 			dup();
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", desc, false);
@@ -1558,6 +1559,16 @@ public class ClassCompiler {
 		@SuppressWarnings("unused")
 		public static final String objectType = "L" + objectName + ";";
 		public static final String stringType = "L" + stringName + ";";
+		
+		private static String constructor(IConstructor sig) {
+			StringBuilder val = new StringBuilder();
+			val.append("(");
+			for (IValue formal : AST.$getFormals(sig)) {
+				val.append(type((IConstructor) formal));
+			}
+			val.append(")V");
+			return val.toString();
+		}
 		
 		private static String method(IConstructor sig) {
 			StringBuilder val = new StringBuilder();

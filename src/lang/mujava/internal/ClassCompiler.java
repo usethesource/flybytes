@@ -71,6 +71,7 @@ public class ClassCompiler {
 		private Label scopeEnd;
 		private MethodNode method;
 		private IConstructor classType;
+		private ClassNode classNode;
 
 		public Compile(ClassWriter cw, int version, PrintWriter out) {
 			this.cw = cw;
@@ -79,7 +80,7 @@ public class ClassCompiler {
 		}
 
 		public void compileClass(IConstructor o) {
-			ClassNode classNode = new ClassNode();
+			classNode = new ClassNode();
 			IWithKeywordParameters<? extends IConstructor> kws = o.asWithKeywordParameters();
 
 			classType = AST.$getType(o);
@@ -546,6 +547,10 @@ public class ClassCompiler {
 				compileInvokeSpecial(AST.$getClass(exp), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 				continuation.build();
 				break;
+			case "invokeSuper" : 
+				compileInvokeSuper(classNode.superName, AST.$getDesc(exp), AST.$getArgs(exp));
+				continuation.build();
+				break;
 			case "invokeStatic" : 
 				compileInvokeStatic(AST.$getClass(exp), AST.$getDesc(exp), AST.$getArgs(exp));
 				continuation.build();
@@ -607,6 +612,12 @@ public class ClassCompiler {
 			default: 
 				throw new IllegalArgumentException("unknown expression: " + exp);                                     
 			}
+		}
+
+		private void compileInvokeSuper(String superclass, IConstructor sig, IList args) {
+			compileExpression_Load("this");
+			compileExpressionList(args, DONE);
+			method.visitMethodInsn(Opcodes.INVOKESPECIAL, superclass, AST.$getName(sig), Signature.method(sig), false);
 		}
 
 		private void compileExpression_AStore(IConstructor type, IConstructor array, IConstructor index,

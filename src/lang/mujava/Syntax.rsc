@@ -110,8 +110,9 @@ data Statement(loc src = |unknown:///|)
   | \putStatic(str class, str name, Type \type, Expression arg)
   | \if(Expression condition, list[Statement] thenBlock)
   | \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
-  | \for(list[Statement] init, Expression condition, list[Statement] next, list[Statement] block)
+  
  // TODO: these are still to be implemented:
+ //| \for(list[Statement] init, Expression condition, list[Statement] next, list[Statement] block)
   //| \while(Expression condition, list[Statement] block)
   //| \doWhile(list[Statement] block, Expression condition)
   
@@ -148,6 +149,7 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | invokeSpecial(str class, Expression receiver, Signature desc, list[Expression] args)
   | invokeVirtual(str class, Expression receiver, Signature desc, list[Expression] args)
   | invokeInterface(str class, Expression receiver, Signature desc, list[Expression] args)
+  | invokeSuper(Signature desc, list[Expression] args)
   | newInstance(str class, Signature desc, list[Expression] args)
   | getField(str class, Expression receiver, Type \type, str name)
   | getStatic(str class, Type \type, str name)
@@ -198,14 +200,37 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
  
 Type object() = classType("java.lang.Object");
 
+Statement invokeSuper(list[Type] formals, list[Expression] args)
+  = do(\void(), invokeSuper(constructorDesc(formals), args));
+  
+Statement invokeSuper()
+  = invokeSuper([], []);
+  
 // generate a main method
 Method main(str args, Block block) 
-  = method(methodDesc(\void(), "main", [array(string())]), [var(array(string()), args)], block, modifiers={\public(), \static(), \final()});
-  
+  = method(methodDesc(\void(), "main", [array(string())]), 
+      [var(array(string()), args)], 
+      block, 
+      modifiers={\public(), \static(), \final()});
+ 
+// generate a normal method 
+Method method(Modifier access, Type ret, str name, list[Variable] args, Block block)
+  = method(methodDesc(ret, name, [a.\type | a <- args]), 
+           args, 
+           block, 
+           modifiers={access});
+ 
+// generate a static method           
+Method staticMethod(Modifier access, Type ret, str name, list[Variable] args, Block block)
+  = method(methodDesc(ret, name, [a.\type | a <- args]), 
+           args, 
+           block, 
+           modifiers={static(), access});
+    
 // generate a default constructor for classes which have no supertype  
 Method defaultConstructor(Modifier access)
   = method(constructorDesc([]), [], block([], [
-      do(\void(), invokeSuper("java.lang.Object")),
+      invokeSuper(),
       \return()
   ]), modifiers={access});   
  
@@ -219,13 +244,6 @@ Method defaultConstructor(Modifier access, str super)
 // generate a constructor descriptor; hides the reserved method name for constructors  
 Signature constructorDesc(list[Type] formals) 
   = methodDesc(\void(), "\<init\>", formals);   
-    
-// invoke a nullary super method   
-Expression invokeSuper(str super) = invokeSuper(super, [], []);
-  
-// invoke a super method with arguments
-Expression invokeSuper(str super, list[Type] formals, list[Expression] args)
-  = invokeSpecial(super, this(), constructorDesc(formals), args);  
     
 // generate a constructor with argument and code 
 //   NB: don't forget to generate super call in the block!    

@@ -84,6 +84,16 @@ public class ClassCompiler {
 		Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
 		return m.mirrorArray(elems);
 	}
+	
+	public IValue classMirror(IString n, IEvaluatorContext ctx) {
+		try {
+			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+			String name = n.getValue();
+			return m.mirrorClass(name, Class.forName(name));
+		} catch (ClassNotFoundException e) {
+			throw new IllegalArgumentException(n.getValue());
+		}
+	}
 
 	private Class<?> loadClass(String className, ClassWriter cw) {
 		Class<?> loaded = new ClassLoader(getClass().getClassLoader()) {

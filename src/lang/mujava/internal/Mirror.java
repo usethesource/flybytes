@@ -33,18 +33,10 @@ import io.usethesource.vallang.type.TypeStore;
 import lang.mujava.internal.ClassCompiler.AST;
 import lang.mujava.internal.ClassCompiler.Signature;
 
-//data Mirror
-//= class(str class, 
-//      Mirror (Signature method, list[Mirror] args) invokeStatic,
-//      Mirror (str name) getStatic,
-//      Mirror (Signature constructor) newInstance)
-//| object(Mirror class, 
-//      Mirror (Signature method, list[ObjectMirror] args) invoke,
-//      Mirror (str name) getField,
-//      &T  (type[&T] expect) toValue)
-//| \null()
-//;
-
+/**
+ * Representations of java objects and java classes as rascal values
+ * with callbacks into the reflection API. For testing purposes.
+ */
 public class Mirror {
 	private final IValueFactory vf;
 	private final TypeReifier tr;
@@ -373,6 +365,7 @@ public class Mirror {
 				try {
 					String name = ((IString) actuals[0]).getValue();
 					Field field = getWrapped().getField(name);
+					field.setAccessible(true);
 					Object result = field.get(null); 
 					return ResultFactory.makeResult(Mirror, mirrorObject(result), ctx);
 				} catch (IllegalAccessException | IllegalArgumentException
@@ -395,6 +388,7 @@ public class Mirror {
 				try {
 					String name = ((IString) actuals[0]).getValue();
 					Field field = getWrapped().getClass().getDeclaredField(name);
+					field.setAccessible(true);
 					Object result = field.get(getWrapped());
 					return ResultFactory.makeResult(Mirror, mirrorObject(result), ctx);
 				} catch (IllegalAccessException | IllegalArgumentException
@@ -419,6 +413,7 @@ public class Mirror {
 					IList args = (IList) actuals[1];
 					Class<?> objectClass = getWrapped().getClass();
 					Method meth = getMethod(objectClass, signature);
+					meth.setAccessible(true);
 					Object object = meth.invoke(getWrapped(), unreflect(args));
 					return ResultFactory.makeResult(Mirror, mirrorObject(object), ctx);
 				} catch (IllegalAccessException | IllegalArgumentException
@@ -441,8 +436,8 @@ public class Mirror {
 				try {
 					IConstructor signature = (IConstructor) actuals[0];
 					IList args = (IList) actuals[1];
-					
 					Method meth = getMethod(getWrapped(), signature);
+					meth.setAccessible(true);
 					Object object = meth.invoke(null, unreflect(args));
 					return ResultFactory.makeResult(Mirror, mirrorObject(object), ctx);
 				} catch (IllegalAccessException | IllegalArgumentException

@@ -37,12 +37,13 @@ import io.usethesource.vallang.type.Type;
  */
 public class ClassCompiler {
 	private PrintWriter out;
+	private final IValueFactory vf;
 
 	public ClassCompiler(IValueFactory vf) {
-		super();
+		this.vf = vf;
 	}
 
-	public void compile(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
+	public void compileClass(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
 		this.out = ctx.getStdOut();
 
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
@@ -54,6 +55,46 @@ public class ClassCompiler {
 			e.printStackTrace(out);
 		}
 	}
+	
+	public IValue loadClass(IConstructor cls, IList classpath, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
+		this.out = ctx.getStdOut();
+
+		try {
+			String className = AST.$getName(AST.$getType(cls));
+			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+			new Compile(cw, AST.$getVersionCode(version), out).compileClass(cls);
+			
+			Class<?> loaded = loadClass(className, cw);
+			
+			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+			
+			return m.mirrorClass(className, loaded);
+		} 
+		catch (Throwable e) {
+			throw e;
+		}
+	}
+	
+	public IValue val(IValue v, IEvaluatorContext ctx) {
+		Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+		return m.mirrorObject(v);
+	}
+	
+	public IValue array(IList elems, IEvaluatorContext ctx) {
+		Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+		return m.mirrorArray(elems);
+	}
+
+	private Class<?> loadClass(String className, ClassWriter cw) {
+		Class<?> loaded = new ClassLoader(getClass().getClassLoader()) {
+			public Class<?> defineClass(byte[] bytes) {
+		        return super.defineClass(className, bytes, 0, bytes.length);
+		    }	
+		}.defineClass(cw.toByteArray());
+		
+		return loaded;
+	}
+	
 
 	/**
 	 * The Compile class encapsulates a single run of the muJava -> JVM bytecode compiler
@@ -1553,10 +1594,9 @@ public class ClassCompiler {
 	/**
 	 * Building mangled signature names from symbolic types
 	 */
-	private static class Signature {
+	public static class Signature {
 		public static final String objectName = "java/lang/Object";
 		public static final String stringName = "java/lang/String";
-		@SuppressWarnings("unused")
 		public static final String objectType = "L" + objectName + ";";
 		public static final String stringType = "L" + stringName + ";";
 		
@@ -1599,12 +1639,25 @@ public class ClassCompiler {
 					(S) -> { return "Ljava/lang/String;"; }
 					);
 		}
+
+		public static Class<?>[] classes(IList formals) throws ClassNotFoundException {
+			Class<?>[] result = new Class<?>[formals.length()];
+			int i = 0;
+			for (IValue elem : formals) {
+				result[i++] = clss((IConstructor) elem);
+			}
+			return result;
+		}
+		
+		public static Class<?> clss(IConstructor type) throws ClassNotFoundException {
+			return Class.forName(type(type));
+		}
 	}
 
 	/**
 	 * Wrappers to get stuff out of the Class ASTs
 	 */
-	private static class AST {
+	public static class AST {
 
 		public static IValue $getConstant(IConstructor exp) {
 			return exp.get("constant");

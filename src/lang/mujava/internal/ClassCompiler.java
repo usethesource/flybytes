@@ -1660,7 +1660,29 @@ public class ClassCompiler {
 		}
 		
 		public static Class<?> clss(IConstructor type) throws ClassNotFoundException {
-			return Class.forName(type(type));
+			return Switch.type(type,
+					(z) -> { return Boolean.class;},
+					(i) -> { return Integer.class;},
+					(s) -> { return Short.class;},
+					(b) -> { return Byte.class;},
+					(c) -> { return Character.class;},
+					(f) -> { return Float.class;},
+					(d) -> { return Double.class;},
+					(l) -> { return Long.class;},
+					(v) -> { return void.class;},
+					(c) -> { try {
+						return Class.forName(AST.$getName(c));
+					} catch (ClassNotFoundException e) {
+						return Object.class;
+					} },
+					(a) -> { try {
+						Class<?> elemClass = clss(AST.$getArg(type));
+						return Class.forName("[" + elemClass.getCanonicalName());
+					} catch (ClassNotFoundException e) {
+						return Object[].class;
+					} },
+					(S) -> { return String.class; }
+					);
 		}
 	}
 

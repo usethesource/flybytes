@@ -145,8 +145,7 @@ public class Mirror {
 			@Override
 			Result<IValue> call(Type[] formals, IValue[] actuals) {
 				int index = ((IInteger) actuals[0]).intValue();
-				Object[] array = (Object[]) getWrapped();
-				return ResultFactory.makeResult(Mirror, mirrorObject(array[index]), ctx);
+				return ResultFactory.makeResult(Mirror, mirrorObject(Array.get(getWrapped(), index)), ctx);
 			}
 		};
 	}
@@ -160,8 +159,7 @@ public class Mirror {
 
 			@Override
 			Result<IValue> call(Type[] formals, IValue[] actuals) {
-				Object[] array = (Object[]) getWrapped();
-				IInteger result = vf.integer(array.length);
+				IInteger result = vf.integer(Array.getLength(getWrapped()));
 				return ResultFactory.makeResult(result.getType(), result, ctx);
 			}
 		};
@@ -522,7 +520,15 @@ public class Mirror {
 		
 		for (int i = 0; i < elems.length(); i++) {
 			IConstructor mirror = (IConstructor) elems.get(i);
-			Array.set(newInstance, i, unreflect(mirror));
+			Object object = unreflect(mirror);
+			try {
+				Array.set(newInstance, i, object);
+			}
+			catch (IllegalArgumentException e) {
+				if (object != null) {
+					throw new IllegalArgumentException("element type mismatch: " + newInstance.getClass().getComponentType() + " vs " + object.getClass());
+				}
+			}
 		}
 		
 		return mirrorObject(newInstance);

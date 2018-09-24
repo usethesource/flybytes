@@ -43,8 +43,6 @@ java Mirror classMirror(str name);
 @doc{creates a mirrored array}
 java Mirror array(Type \type, list[Mirror] elems);
 
-Mirror vals(list[value] elems) = array([val(e) | e <- elems]);
-  
 str toString(Mirror m:object(_, _, _, _)) = m.invoke(methodDesc(string(),"toString", []), []).toValue(#str);
 str toString(class(str name,_,_,_)) = name; 
 str toString(null()) = "<null>";
@@ -70,6 +68,3 @@ Mirror \double(real v)
   
 Mirror \float(real v)
   = val(v).invoke(methodDesc(string(), "floatValue", []), []); 
-   
-Mirror native(list[value] vs) = array([native(v) | v <- vs]);
-                

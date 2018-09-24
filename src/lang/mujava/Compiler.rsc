@@ -1,7 +1,7 @@
 module lang::mujava::Compiler
 
 extend lang::mujava::Mirror;
-import lang::mujava::Syntax;
+extend lang::mujava::Syntax;
 import lang::mujava::api::Object;
 import lang::mujava::api::System;
 import IO;
@@ -31,9 +31,24 @@ public Class helloWorld = class(classType("HelloWorld"),
           \return()
         ])
       ),
-     
+      
+     staticMethod(\public(), \integer(), "MIN", [var(integer(),"i"),var(integer(), "j")], 
+        block([],[
+           \if (lt(\integer(), load("i"), load("j")),[
+             \return(\integer(), load("i"))
+           ],[
+             \return(\integer(), load("j"))
+           ])
+        ])),
+        
+     staticMethod(\public(), \integer(), "LEN", [var(array(string()),"a")], 
+        block([],[
+           \return(\integer(), alength(load("a")))
+        ])),   
+          
      method(\public(), \void(), "f", [var(array(string()), "s")], block([var(integer(),"i"), var(long(),"j"), var(float(), "k"), var(double(), "l"), var(integer(), "m")],[
        // test storing numbers in local variables
+       
        store("i", const(integer(), 245)),
        store("j", const(long(), 350000)),
        store("k", const(float(), 10.5)),

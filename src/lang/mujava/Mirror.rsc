@@ -41,7 +41,7 @@ java Mirror classMirror(str name);
 @javaClass{lang.mujava.internal.ClassCompiler}
 @reflect{for stdout}
 @doc{creates a mirrored array}
-java Mirror array(list[Mirror] elems);
+java Mirror array(Type \type, list[Mirror] elems);
 
 Mirror vals(list[value] elems) = array([val(e) | e <- elems]);
   

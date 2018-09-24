@@ -1,5 +1,6 @@
 package lang.mujava.internal;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -83,7 +84,7 @@ public class Mirror {
 	public IConstructor mirrorClass(String className, Class<?> cls) {
 		return vf.constructor(classCons, 
 				vf.string(className),
-				staticCall(className, cls),
+				invokeStatic(className, cls),
 				staticField(className, cls),
 				newInstance(className, cls)
 				);
@@ -424,7 +425,7 @@ public class Mirror {
 		};
 	}
 	
-	private IValue staticCall(String className, Class<?> cls) {
+	private IValue invokeStatic(String className, Class<?> cls) {
 		return new MirrorCallBack<Class<?>>(cls, invokeStaticFunc, ctx) {
 			@Override
 			public int getArity() {
@@ -459,11 +460,11 @@ public class Mirror {
 	}
 
 	private Method getMethod(Class<?> cls, IConstructor sig) throws NoSuchMethodException, SecurityException, ClassNotFoundException {
-		return cls.getMethod(AST.$getName(sig), Signature.classes(AST.$getFormals(sig)));
+		return cls.getMethod(AST.$getName(sig), Signature.binaryClasses(AST.$getFormals(sig), ctx.getStdOut()));
 	}
 	
 	private <T> Constructor<T> getDeclaredConstructor(Class<T> cls, IConstructor sig) throws NoSuchMethodException, SecurityException, ClassNotFoundException {
-		return cls.getDeclaredConstructor(Signature.classes(AST.$getFormals(sig)));
+		return cls.getDeclaredConstructor(Signature.binaryClasses(AST.$getFormals(sig), ctx.getStdOut()));
 	}
 
 	private abstract static class MirrorCallBack<T> extends AbstractFunction {
@@ -514,16 +515,17 @@ public class Mirror {
 		abstract Result<IValue> call(Type[] argTypes, IValue[] argValues);
 	}
 
-	public IValue mirrorArray(IList elems) {
-		Object[] result = new Object[elems.length()];
-		int i = 0;
+	public IValue mirrorArray(IConstructor type, IList elems) throws ClassNotFoundException {
+		Class<?> componentType = Signature.binaryClass(type);
+		int len = elems.length();
+		Object newInstance = Array.newInstance(componentType, len);
 		
-		for (IValue elem : elems) {
-			IConstructor mirror = (IConstructor) elem;
-			result[i++] = unreflect(mirror);
+		for (int i = 0; i < elems.length(); i++) {
+			IConstructor mirror = (IConstructor) elems.get(i);
+			Array.set(newInstance, i, unreflect(mirror));
 		}
 		
-		return mirrorObject(result);
+		return mirrorObject(newInstance);
 	}
 
 	private Object unreflect(IConstructor mirror) {
@@ -535,7 +537,8 @@ public class Mirror {
 		case "object": 
 			return ((MirrorCallBack<?>) mirror.get("invoke")).getWrapped();
 		case "array" :
-			return ((MirrorCallBack<?>) mirror.get("load")).getWrapped();
+			Object wrapped = ((MirrorCallBack<?>) mirror.get("load")).getWrapped();
+			return wrapped;
 		default:
 			throw new IllegalArgumentException(mirror.toString());
 		}

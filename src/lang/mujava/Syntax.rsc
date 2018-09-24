@@ -162,7 +162,7 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | ge(Type \type, Expression lhs, Expression rhs)
   | lt(Type \type, Expression lhs, Expression rhs)
   | newArray(Type \type, Expression size)
-  | alength(Expression array)
+  | alength(Expression arg)
   | checkcast(Expression arg, Type \type)
   | coerce(Type from, Type to, Expression arg)
   | nonnull(Expression arg)
@@ -196,6 +196,7 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
  Expression ne(nonnull(), Expression arg) = null(arg);
  Expression ne(Expression arg, nonnull()) = null(arg);
  
+ 
  // Below popular some convenience macros for
  // generating methods and constructors:
  
@@ -213,14 +214,14 @@ Method main(str args, Block block)
       [var(array(string()), args)], 
       block, 
       modifiers={\public(), \static(), \final()});
- 
+      
 // generate a normal method 
 Method method(Modifier access, Type ret, str name, list[Variable] args, Block block)
   = method(methodDesc(ret, name, [a.\type | a <- args]), 
            args, 
            block, 
            modifiers={access});
- 
+           
 // generate a static method           
 Method staticMethod(Modifier access, Type ret, str name, list[Variable] args, Block block)
   = method(methodDesc(ret, name, [a.\type | a <- args]), 

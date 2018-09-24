@@ -2,6 +2,7 @@ package lang.mujava.internal;
 
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -80,9 +81,9 @@ public class ClassCompiler {
 		return m.mirrorObject(v);
 	}
 	
-	public IValue array(IList elems, IEvaluatorContext ctx) {
+	public IValue array(IConstructor type, IList elems, IEvaluatorContext ctx) throws ClassNotFoundException {
 		Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
-		return m.mirrorArray(elems);
+		return m.mirrorArray(type, elems);
 	}
 	
 	public IValue classMirror(IString n, IEvaluatorContext ctx) {
@@ -158,7 +159,7 @@ public class ClassCompiler {
 			if (kws.hasParameter("interfaces")) {
 				ArrayList<String> interfaces = new ArrayList<String>();
 				for (IValue v : AST.$getInterfaces(kws)) {
-					interfaces.add(AST.$string(v).replaceAll("\\.","/"));
+					interfaces.add(AST.$string(v).replace('.','/'));
 				}
 				classNode.interfaces = interfaces;
 			}
@@ -720,7 +721,8 @@ public class ClassCompiler {
 			}
 		}
 
-		private void compileExpression_ALength(IConstructor $getArg) {
+		private void compileExpression_ALength(IConstructor arg) {
+			compileExpression(arg, DONE);
 			method.visitInsn(Opcodes.ARRAYLENGTH);
 		}
 
@@ -1631,58 +1633,66 @@ public class ClassCompiler {
 			return val.toString();
 		}
 
-		private static String type(IConstructor t) {
+		public static String type(IConstructor t) {
 			IConstructor type = (IConstructor) t;
 
 			return Switch.type(type,
-					(z) -> { return "Z";},
-					(i) -> { return "I";},
-					(s) -> { return "S";},
-					(b) -> { return "B";},
-					(c) -> { return "C";},
-					(f) -> { return "F";},
-					(d) -> { return "D";},
-					(l) -> { return "J";},
-					(v) -> { return "V";},
-					(c) -> { return "L" + AST.$getName(c).replaceAll("\\.", "/") + ";"; },
-					(a) -> {  return "[" + type(AST.$getArg(a)); },
-					(S) -> { return "Ljava/lang/String;"; }
+					(z) -> "Z",
+					(i) -> "I",
+					(s) -> "S",
+					(b) -> "B",
+					(c) -> "C",
+					(f) -> "F",
+					(d) -> "D",
+					(j) -> "J",
+					(v) -> "V",
+					(c) -> "L" + AST.$getName(c).replace('.', '/') + ";",
+					(a) -> "[" + type(AST.$getArg(a)),
+					(S) -> "Ljava/lang/String;"
 					);
 		}
 
-		public static Class<?>[] classes(IList formals) throws ClassNotFoundException {
+		public static Class<?>[] binaryClasses(IList formals, PrintWriter out) throws ClassNotFoundException {
 			Class<?>[] result = new Class<?>[formals.length()];
 			int i = 0;
 			for (IValue elem : formals) {
-				result[i++] = clss((IConstructor) elem);
+				result[i++] = binaryClass((IConstructor) elem);
 			}
 			return result;
 		}
 		
-		public static Class<?> clss(IConstructor type) throws ClassNotFoundException {
+		public static Class<?> binaryClass(IConstructor type) throws ClassNotFoundException {
 			return Switch.type(type,
-					(z) -> { return Boolean.class;},
-					(i) -> { return Integer.class;},
-					(s) -> { return Short.class;},
-					(b) -> { return Byte.class;},
-					(c) -> { return Character.class;},
-					(f) -> { return Float.class;},
-					(d) -> { return Double.class;},
-					(l) -> { return Long.class;},
-					(v) -> { return void.class;},
-					(c) -> { try {
-						return Class.forName(AST.$getName(c));
-					} catch (ClassNotFoundException e) {
-						return Object.class;
-					} },
-					(a) -> { try {
-						Class<?> elemClass = clss(AST.$getArg(type));
-						return Class.forName("[" + elemClass.getCanonicalName());
-					} catch (ClassNotFoundException e) {
-						return Object[].class;
-					} },
-					(S) -> { return String.class; }
+					(z) -> boolean.class,
+					(i) -> int.class,
+					(s) -> short.class,
+					(b) -> byte.class,
+					(c) -> char.class,
+					(f) -> float.class,
+					(d) -> double.class,
+					(j) -> long.class,
+					(v) -> void.class,
+					(c) -> forName(AST.$getName(type)),
+					(a) -> arrayClass(AST.$getArg(type)),
+					(S) -> String.class
 					);
+		}
+		
+		private static Class<?> arrayClass(IConstructor component) {
+			try {
+				Class<?> elem = binaryClass(component);
+				return Array.newInstance(elem, 0).getClass();
+			} catch (ClassNotFoundException e) {
+				return Object[].class;
+			}
+		}
+		
+		private static Class<?> forName(String name) {
+			try {
+				return Class.forName(name);
+			} catch (ClassNotFoundException e) {
+				return Object.class;
+			}
 		}
 	}
 
@@ -1760,7 +1770,7 @@ public class ClassCompiler {
 		}
 
 		public static String $getClass(IValue parameter) {
-			return ((IString) ((IConstructor) parameter).get("class")).getValue().replaceAll("\\.", "/");
+			return ((IString) ((IConstructor) parameter).get("class")).getValue().replace('.', '/');
 		}
 
 		public static String $getConstructorName(IValue parameter) {
@@ -1844,7 +1854,7 @@ public class ClassCompiler {
 		}
 
 		public static String $getSuper(IWithKeywordParameters<? extends IConstructor> kws) {
-			return ((IString) kws.getParameter("super")).getValue().replaceAll("\\.","/");
+			return ((IString) kws.getParameter("super")).getValue().replace('.','/');
 		}
 
 		public static String $string(IValue v) {

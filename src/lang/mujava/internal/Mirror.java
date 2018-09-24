@@ -85,7 +85,7 @@ public class Mirror {
 		return vf.constructor(classCons, 
 				vf.string(className),
 				invokeStatic(className, cls),
-				staticField(className, cls),
+				getStatic(className, cls),
 				newInstance(className, cls)
 				);
 	}
@@ -352,7 +352,7 @@ public class Mirror {
 		};
 	}
 	
-	private IValue staticField(String className, Class<?> cls) {
+	private IValue getStatic(String className, Class<?> cls) {
 		return new MirrorCallBack<Class<?>>(cls, getStaticFunc, ctx) {
 			@Override
 			public int getArity() {

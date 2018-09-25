@@ -51,8 +51,7 @@ public class ClassCompiler {
 
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES + ClassWriter.COMPUTE_MAXS);
-		    ClassVisitor checkedCw = new CheckClassAdapter(cw, false);
-			new Compile(checkedCw, AST.$getVersionCode(version), out).compileClass(cls);
+			new Compile(cw, AST.$getVersionCode(version), out).compileClass(cls);
 		    
 			output.write(cw.toByteArray());
 		} catch (Throwable e) {

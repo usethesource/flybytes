@@ -86,6 +86,11 @@ public class ClassCompiler {
 		return m.mirrorArray(type, elems);
 	}
 	
+	public IValue array(IConstructor type, IInteger length, IEvaluatorContext ctx) throws ClassNotFoundException {
+		Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+		return m.mirrorArray(type, length.intValue());
+	}
+	
 	public IValue classMirror(IString n, IEvaluatorContext ctx) {
 		try {
 			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
@@ -1884,7 +1889,7 @@ public class ClassCompiler {
 		}
 	}
 
-	private static class Switch {
+	public static class Switch {
 		/**
 		 * Dispatch on a consumer on a type. The idea is to never accidentally forget a type using this higher-order function.
 		 * @param type

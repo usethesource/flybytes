@@ -1,6 +1,5 @@
 package lang.mujava.internal;
 
-import java.io.PrintWriter;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -31,10 +30,10 @@ import io.usethesource.vallang.IValue;
 import io.usethesource.vallang.IValueFactory;
 import io.usethesource.vallang.type.ITypeVisitor;
 import io.usethesource.vallang.type.Type;
-import io.usethesource.vallang.type.TypeFactory;
 import io.usethesource.vallang.type.TypeStore;
 import lang.mujava.internal.ClassCompiler.AST;
 import lang.mujava.internal.ClassCompiler.Signature;
+import lang.mujava.internal.ClassCompiler.Switch;
 
 /**
  * Representations of java objects and java classes as rascal values
@@ -54,7 +53,6 @@ public class Mirror {
 	private final FunctionType toValueFunc;
 	private final Type arrayCons;
 	private final FunctionType lengthFunc;
-	private final FunctionType storeFunc;
 	private final FunctionType loadFunc;
 	private final Type nullCons;
 	private IEvaluatorContext ctx;
@@ -71,14 +69,13 @@ public class Mirror {
 		this.newInstanceFunc = (FunctionType) classCons.getFieldType(3);
 		
 		this.objectCons = store.lookupConstructor(Mirror, "object").iterator().next();
-		this.invokeFunc = (FunctionType) classCons.getFieldType(1);
-		this.getFieldFunc = (FunctionType) classCons.getFieldType(2);
-		this.toValueFunc = (FunctionType) classCons.getFieldType(3);
+		this.invokeFunc = (FunctionType) objectCons.getFieldType(1);
+		this.getFieldFunc = (FunctionType) objectCons.getFieldType(2);
+		this.toValueFunc = (FunctionType) objectCons.getFieldType(3);
 		
 		this.arrayCons = store.lookupConstructor(Mirror, "array").iterator().next();
 		this.lengthFunc = (FunctionType) arrayCons.getFieldType(0);
 		this.loadFunc = (FunctionType) arrayCons.getFieldType(1);
-		this.storeFunc = (FunctionType) arrayCons.getFieldType(2);
 		
 		this.nullCons = store.lookupConstructor(Mirror, "null").iterator().next();
 	}
@@ -106,8 +103,7 @@ public class Mirror {
 		if (object.getClass().isArray()) {
 			return vf.constructor(arrayCons,
 					length(object),
-					load(object),
-					store(object));
+					load(object));
 		}
 		else {
 			return vf.constructor(objectCons,
@@ -117,24 +113,6 @@ public class Mirror {
 					toValue(object)
 					);
 		}
-	}
-
-	private IValue store(Object object) {
-		return new MirrorCallBack<Object>(object, storeFunc, ctx) {
-			@Override
-			public Type getType() {
-				return storeFunc;
-			}
-
-			@Override
-			Result<IValue> call(Type[] formals, IValue[] actuals) {
-				int index = ((IInteger) actuals[0]).intValue();
-				Object arg = unreflect((IConstructor) actuals[1]);
-				Object[] array = (Object[]) getWrapped();
-				array[index] = arg;
-				return ResultFactory.nothing(TypeFactory.getInstance().voidType());
-			}
-		};
 	}
 
 	private IValue load(Object object) {
@@ -181,6 +159,7 @@ public class Mirror {
 				Object wrapped = getWrapped();
 				IValue result = null;
 
+				
 				if (wrapped instanceof IValue) {
 					result = (IValue) wrapped;
 				}
@@ -513,6 +492,18 @@ public class Mirror {
 		public Result<IValue> call(Type[] argTypes, IValue[] argValues, Map<String, IValue> keyArgValues)
 				throws MatchFailed {
 			try {
+				if (argTypes.length != argValues.length) {
+					RuntimeExceptionFactory.illegalArgument(vf.string("function should have " + argTypes.length + " arguments"), null, null);
+				}
+				
+				for (int i = 0; i < argTypes.length; i++) {
+					Type actualType = argValues[i].getType();
+					Type formalType = getFunctionType().getFieldType(i);
+					if (!actualType.isSubtypeOf(formalType)) {
+						throw new RuntimeException("argument " + i + " is a " + actualType + " but should be a " + formalType);
+					}
+				}
+				
 				return call(argTypes, argValues);
 			}
 			catch (Throwable e) {
@@ -544,16 +535,35 @@ public class Mirror {
 		abstract Result<IValue> call(Type[] argTypes, IValue[] argValues);
 	}
 
+	public IValue mirrorArray(IConstructor type, int length) throws ClassNotFoundException {
+		return mirrorObject(newArray(type, length));
+	}
+
+	private Object newArray(IConstructor type, int length) throws ClassNotFoundException {
+		return Array.newInstance(Signature.binaryClass(type), length);
+	}
+	
 	public IValue mirrorArray(IConstructor type, IList elems) throws ClassNotFoundException {
-		Class<?> componentType = Signature.binaryClass(type);
-		int len = elems.length();
-		Object newInstance = Array.newInstance(componentType, len);
+		Object newInstance = newArray(type, elems.length());
 		
 		for (int i = 0; i < elems.length(); i++) {
 			IConstructor mirror = (IConstructor) elems.get(i);
 			Object object = unreflect(mirror);
 			try {
-				Array.set(newInstance, i, object);
+				Switch.type(type, i,
+						(z,ind) -> Array.setBoolean(newInstance, ind, (boolean) object), 
+						(I,ind) -> Array.setInt(newInstance, ind, (int) object),
+						(s,ind) -> Array.setShort(newInstance, ind, (short) object), 
+						(b,ind) -> Array.setByte(newInstance, ind, (byte) object), 
+						(c,ind) -> Array.setChar(newInstance, ind, (char) object), 
+						(f,ind) -> Array.setFloat(newInstance, ind, (float) object), 
+						(d,ind) -> Array.setDouble(newInstance, ind, (double) object), 
+						(l,ind) -> Array.setLong(newInstance, ind, (long) object),
+						(v,ind) -> Array.set(newInstance, ind, null), 
+						(c,ind) -> Array.set(newInstance, ind, object), 
+						(a,ind) -> Array.set(newInstance, ind, object), 
+						(S,ind) -> Array.set(newInstance, ind, object)
+						);
 			}
 			catch (IllegalArgumentException e) {
 				if (object != null) {
@@ -580,4 +590,6 @@ public class Mirror {
 			throw new IllegalArgumentException(mirror.toString());
 		}
 	}
+	
+	
 }

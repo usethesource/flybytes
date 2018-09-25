@@ -20,9 +20,8 @@ data Mirror
         Mirror (Signature method, list[Mirror] args) invoke,
         Mirror (str name) getField,
         &T  (type[&T] expect) toValue)
-  | array(Mirror () length,
-        Mirror (int index) load,
-        void   (int index, Mirror object) store)
+  | array(int () length,
+        Mirror (int index) load)
   | \null()
   ;
               
@@ -42,6 +41,11 @@ java Mirror classMirror(str name);
 @reflect{for stdout}
 @doc{creates a mirrored array}
 java Mirror array(Type \type, list[Mirror] elems);
+
+@javaClass{lang.mujava.internal.ClassCompiler}
+@reflect{for stdout}
+@doc{creates a mirrored array}
+java Mirror array(Type \type, int length);
 
 str toString(Mirror m:object(_, _, _, _)) = m.invoke(methodDesc(string(),"toString", []), []).toValue(#str);
 str toString(class(str name,_,_,_)) = name; 

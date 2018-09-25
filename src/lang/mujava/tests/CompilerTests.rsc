@@ -45,7 +45,7 @@ public Class testClass() =
       //   return field;
       // }
       method(\public(), integer(), "getField", [], [
-        \return(integer(), getField(integer(), "staticField"))
+        \return(integer(), getField(integer(), "field"))
       ]),
       
       // public void setField(int v) {

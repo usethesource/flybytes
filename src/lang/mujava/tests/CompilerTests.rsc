@@ -1,7 +1,11 @@
 module lang::mujava::tests::CompilerTests
 
 import lang::mujava::Compiler;
+import lang::mujava::Mirror;
 import lang::mujava::api::JavaLang;
+import lang::mujava::api::Object;
+import Node;
+import String;
 import IO;
 
 public Class testClass() = 
@@ -84,7 +88,7 @@ public Class testClass() =
     ]
   );
   
-Mirror compiledTestClass() = loadClass(testClass());
+Mirror compiledTestClass() = compileLoadClass(testClass());
  
 test bool newInstanceGetUnitializedInteger() {
   c = compiledTestClass();
@@ -115,8 +119,9 @@ test bool staticMethod() {
   c = compiledTestClass();
   int tester = 666;
   c.invokeStatic(methodDesc(\void(), "putStatic", [integer()]), [integer(tester)]);
-  c.getStatic("staticField").toValue(#int) == tester;
-  return true;
+  r = c.getStatic("staticField").toValue(#int);
+  c.invokeStatic(methodDesc(\void(), "putStatic", [integer()]), [integer(42)]); // set it back
+  return r == tester;
 }
   
 
@@ -162,28 +167,61 @@ test bool lessThan() {
   return  result1.toValue(#bool) && !result2.toValue(#bool); 
 }  
 
+alias BinOp = Expression (Type, Expression, Expression);
+alias UnOp = Expression (Type, Expression);
 
-bool testBinIntOp(str name, Expression (Type, Expression, Expression) op, int lhs, int rhs, int res) {
-  cl = 
-    class(classType("Op<name>"),
+Class binOpClass(Type t, BinOp op) {
+  expr = op(t, load("i"), load("j"));
+  name = "Operator_<getName(expr)>_<getName(t)>";
+  
+  return class(classType(name),
       methods=[
-        staticMethod(\public(), integer(), "op", [var(integer(),"i"), var(integer(),"j")], [
-           \return(integer(), op(integer(), load("i"), load("j")))
+        staticMethod(\public(), boolean(), "op", [var(t,"i"), var(t,"j"), var(t,"a")], [
+           \return(boolean(), eq(expr, load("a")))
+        ])
+        ,
+        staticMethod(\public(), t, "result", [var(t,"i"), var(t,"j")], [
+           \return(t, expr)
         ])
       ]
     );
+}
   
-  m = loadClass(cl);
-  obj = m.invokeStatic(methodDesc(integer(), "op", [integer(), integer()]), [integer(lhs), integer(rhs)]);
-  
-  return obj.toValue(#int) == res;
+@memo  
+private Mirror compileLoadClass(Class c) {
+  compileClass(c, |project://mujava/generated| + "<c.\type.name>.class"); 
+  return loadClass(c);
 }
 
-test bool testAdd(int i, int j) = testBinIntOp("Add", add, I, J, I + J) 
-  when I := i mod intMax(), J := j mod intMax();
+bool testBinOp(Class c, Type t, value lhs, value rhs, value answer) { 
+  m = compileLoadClass(c);
+  r = m.invokeStatic(methodDesc(boolean(), "op", [t, t, t]), [prim(t, lhs), prim(t,rhs), prim(t,answer)]);
   
-test bool testMul(int i, int j) = testBinIntOp("Mul", mul, I, J, I * J) 
-  when I := i mod 50, J := j mod 50;
+  if (!r.toValue(#bool)) {
+    println("<lhs> op <rhs> != <m.invokeStatic(methodDesc(boolean(), "result", [t, t]), [prim(t, lhs), prim(t,rhs)]).toValue(#str)>");
+    return false;
+  }
   
-test bool testSub(int i, int j) = testBinIntOp("Sub", sub, I, J, I - J)
-  when I := i mod intMax(), J := j mod intMax();
+  return true;
+}
+
+list[Type] arithmeticTypes = [integer(), short(), byte()];
+
+test bool testAdd(int i, int j) 
+  = all (t <- arithmeticTypes,
+         I := (i % maxValue(t)) / 2,
+         J := (j % maxValue(t)) / 2, 
+         testBinOp(binOpClass(t, add), t, I, J, I + J));
+         
+test bool testMul(int i, int j) 
+  = all (t <- arithmeticTypes,
+         I := (i % 10),
+         J := (j % 10), 
+         testBinOp(binOpClass(t, mul), t, I, J, I * J)); 
+         
+test bool testSub(int i, int j) 
+  = all (t <- arithmeticTypes,
+         I := (i % maxValue(t)) / 2,
+         J := (j % maxValue(t)) / 2, 
+         testBinOp(binOpClass(t, sub), t, I, J, I - J));                 
+         

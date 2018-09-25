@@ -64,6 +64,9 @@ Mirror byte(int v)
 Mirror short(int v)
   = classMirror("java.lang.Short").invokeStatic(methodDesc(byte(), "parseShort", [string()]), [\string("<v>")]);  
 
+Mirror character(int v)
+  = classMirror("java.lang.Character").invokeStatic(methodDesc(array(character()), "toChars", [integer()]), [\integer(v)]).load(0); 
+
 Mirror string(str v)
   = val(v).invoke(methodDesc(string(), "getValue", []), []);
   
@@ -72,7 +75,16 @@ Mirror double(real v)
   
 Mirror float(real v)
   = val(v).invoke(methodDesc(string(), "floatValue", []), []);
-  
+
+Mirror prim(integer(), int t) = integer(t);
+Mirror prim(short(), int t) = short(t);
+Mirror prim(byte(), int t) = byte(t);
+Mirror prim(long(), int t) = long(t);
+Mirror prim(double(), real t) = double(t);
+Mirror prim(float(), real t) = float(t);
+Mirror prim(string(), str t) = string(t); 
+Mirror prim(character(), int t) = character(t); 
+
 int integer(Mirror i) = i.toValue(#int);
 int long(Mirror l) = l.toValue(#int);
 int byte(Mirror b) = b.toValue(#int);
@@ -80,4 +92,5 @@ int short(Mirror s) = s.toValue(#int);
 str string(Mirror s) = s.toValue(#str);
 real double(Mirror d) = d.toValue(#real);
 real float(Mirror f) = f.toValue(#real);
+real character(Mirror f) = f.toValue(#int);
   

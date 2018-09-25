@@ -230,6 +230,9 @@ public class Mirror {
 				else if (wrapped instanceof Short) {
 					return vf.integer(((Short) wrapped).intValue());
 				}
+				else if (wrapped instanceof Character) {
+					return vf.integer(((Character) wrapped).charValue());
+				}
 				else if (wrapped instanceof Long) {
 					return vf.integer(((Long) wrapped).longValue());
 				}
@@ -354,7 +357,6 @@ public class Mirror {
 				try {
 					String name = ((IString) actuals[0]).getValue();
 					Field field = getWrapped().getField(name);
-					ctx.getStdOut().println(field);
 					Object result = field.get(null); 
 					return ResultFactory.makeResult(Mirror, mirrorObject(result), ctx);
 				} catch (IllegalAccessException | IllegalArgumentException
@@ -493,7 +495,7 @@ public class Mirror {
 				throws MatchFailed {
 			try {
 				if (argTypes.length != argValues.length) {
-					RuntimeExceptionFactory.illegalArgument(vf.string("function should have " + argTypes.length + " arguments"), null, null);
+					throw new RuntimeException("function should have " + argTypes.length + " arguments");
 				}
 				
 				for (int i = 0; i < argTypes.length; i++) {
@@ -511,10 +513,7 @@ public class Mirror {
 					e = e.getCause();
 				}
 
-				if (e instanceof IllegalArgumentException) {
-					throw RuntimeExceptionFactory.illegalArgument(vf.string(e.getMessage()), null, null);
-				}
-				else if (e instanceof Throw) {
+				if (e instanceof Throw) {
 					throw (Throw) e;
 				}
 				else if (e instanceof RuntimeException) {

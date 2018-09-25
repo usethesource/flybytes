@@ -22,21 +22,23 @@ Mirror LongMirror() = classMirror("java.lang.Long");
 Mirror ShortMirror() = classMirror("java.lang.Short");
 Mirror FloatMirror() = classMirror("java.lang.Float");
 
+real maxValue(float()) = FloatMirror().getStatic("MAX_VALUE").toValue(#real);
+real minValue(float()) = FloatMirror().getStatic("MIN_VALUE").toValue(#real);
 
-real floatMax() = FloatMirror().getStatic("MAX_VALUE").toValue(#real);
-real floatMin() = FloatMirror().getStatic("MIN_VALUE").toValue(#real);
+real maxValue(double()) = DoubleMirror().getStatic("MAX_VALUE").toValue(#real);
+real minValue(double()) = DoubleMirror().getStatic("MIN_VALUE").toValue(#real);
 
-real doubleMax() = DoubleMirror().getStatic("MAX_VALUE").toValue(#real);
-real doubleMin() = DoubleMirror().getStatic("MIN_VALUE").toValue(#real);
+int maxValue(short()) = ShortMirror().getStatic("MAX_VALUE").toValue(#int);
+int minValue(short()) = ShortMirror().getStatic("MIN_VALUE").toValue(#int);
 
-int shortMax() = ShortMirror().getStatic("MAX_VALUE").toValue(#int);
-int shortMin() = ShortMirror().getStatic("MIN_VALUE").toValue(#int);
+int maxValue(character()) = CharacterMirror().getStatic("MAX_VALUE").toValue(#int);
+int minValue(character()) = CharacterMirror().getStatic("MIN_VALUE").toValue(#int);
 
-int intMax() = IntegerMirror().getStatic("MAX_VALUE").toValue(#int);
-int intMin() = IntegerMirror().getStatic("MIN_VALUE").toValue(#int);
+int maxValue(integer())  = IntegerMirror().getStatic("MAX_VALUE").toValue(#int);
+int minValue(integer()) = IntegerMirror().getStatic("MIN_VALUE").toValue(#int);
 
-int longMax() = LongMirror().getStatic("MAX_VALUE").toValue(#int);
-int longMin() = LongMirror().getStatic("MIN_VALUE").toValue(#int);
+int maxValue(long())  = LongMirror().getStatic("MAX_VALUE").toValue(#int);
+int minValue(long()) = LongMirror().getStatic("MIN_VALUE").toValue(#int);
 
-int byteMax() = ByteMirror().getStatic("MAX_VALUE").toValue(#int);
-int byteMin() = ByteMirror().getStatic("MIN_VALUE").toValue(#int);
+int maxValue(byte()) = ByteMirror().getStatic("MAX_VALUE").toValue(#int);
+int minValue(byte()) = ByteMirror().getStatic("MIN_VALUE").toValue(#int);

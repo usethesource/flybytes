@@ -76,7 +76,11 @@ public Class testClass() =
       ]),
       
       // public String ifEqual(int i) {
-      //    return i < field;
+      //    if (i == staticField) {
+      //      return "parameter is equal to the static field";
+      //    } else {
+      //      return "parameter is not equal to the static field";
+      //    }
       // }
       method(\public(), \string(), "ifEqual", [var(integer(), "i")], [
          \if (eq(integer(), load("i"), getStatic(integer(), "staticField")), [
@@ -205,7 +209,7 @@ bool testBinOp(Class c, Type t, value lhs, value rhs, value answer) {
   return true;
 }
 
-list[Type] arithmeticTypes = [integer(), short(), byte()];
+list[Type] arithmeticTypes = [integer(), short(), byte(), long()];
 
 test bool testAdd(int i, int j) 
   = all (t <- arithmeticTypes,

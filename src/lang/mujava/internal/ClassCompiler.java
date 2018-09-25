@@ -433,10 +433,10 @@ public class ClassCompiler {
 			// a boolean on the stack and then conditionally have to jump on that boolean again:
 			switch (cond.getConstructorType().getName()) {
 			case "eq":
-				compileEq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				compileEq(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				break;
 			case "ne":
-				compileNeq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				compileNeq(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				break;
 			case "le":
 				compileLe(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
@@ -646,10 +646,10 @@ public class ClassCompiler {
 				compileCoerce(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
 				break;
 			case "eq":
-				compileEq(AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
+				compileEq(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
 				break;
 			case "ne":
-				compileNeq(AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
+				compileNeq(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
 				break;
 			case "le":
 				compileLe(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
@@ -1104,8 +1104,21 @@ public class ClassCompiler {
 				);
 	}
 
-	private void compileEq(IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
-		compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation);
+	private void compileEq(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
+		Switch.type0(type, 
+				(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation),
+				(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation), 
+				(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation), 
+				(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation), 
+				(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation), 
+				(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFNE, lhs, rhs, thenPart, elsePart, continuation),
+				(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFNE, lhs, rhs, thenPart, elsePart, continuation),
+				(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFNE, lhs, rhs, thenPart, elsePart, continuation),
+				(v) -> { throw new IllegalArgumentException(">= on void"); }, 
+				(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, lhs, rhs, thenPart, elsePart, continuation), 
+				(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, lhs, rhs, thenPart, elsePart, continuation),
+				(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, lhs, rhs, thenPart, elsePart, continuation)
+				);
 	}
 
 	@FunctionalInterface
@@ -1173,8 +1186,21 @@ public class ClassCompiler {
 		compileConditionalInverted(0, Opcodes.IFNULL, arg, thenPart, elsePart, continuation);
 	}
 
-	private void compileNeq(IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
-		compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation);
+	private void compileNeq(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
+		Switch.type0(type, 
+				(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation),
+				(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
+				(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
+				(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
+				(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
+				(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFEQ, lhs, rhs, thenPart, elsePart, continuation),
+				(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFEQ, lhs, rhs, thenPart, elsePart, continuation),
+				(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFEQ, lhs, rhs, thenPart, elsePart, continuation),
+				(v) -> { throw new IllegalArgumentException(">= on void"); }, 
+				(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
+				(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, lhs, rhs, thenPart, elsePart, continuation),
+				(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, lhs, rhs, thenPart, elsePart, continuation)
+				);
 	}
 
 	private void compileCoerce(IConstructor from, IConstructor to, IConstructor arg) {

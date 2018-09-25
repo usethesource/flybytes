@@ -252,7 +252,7 @@ public class Mirror {
 					return vf.integer(((Short) wrapped).intValue());
 				}
 				else if (wrapped instanceof Long) {
-					return vf.integer(((Long) wrapped).intValue());
+					return vf.integer(((Long) wrapped).longValue());
 				}
 				else {
 					throw illegalType(expected);

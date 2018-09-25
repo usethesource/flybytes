@@ -14,6 +14,7 @@ Type Float() = classType("java.lang.Float");
 
 Mirror StringMirror() = classMirror("java.lang.string");
 Mirror BooleanMirror() = classMirror("java.lang.Boolean");
+Mirror ByteMirror() = classMirror("java.lang.Byte");
 Mirror IntegerMirror() = classMirror("java.lang.Integer");
 Mirror CharacterMirror() = classMirror("java.lang.Character");
 Mirror DoubleMirror() = classMirror("java.lang.Double");

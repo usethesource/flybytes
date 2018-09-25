@@ -48,23 +48,32 @@ str toString(class(str name,_,_,_)) = name;
 str toString(null()) = "<null>";
 str toString(Mirror m:array(_,_,_)) = "array[<m.length()>]";              
    
-Mirror \integer(int v)
+Mirror integer(int v)
   = val(v).invoke(methodDesc(integer(), "intValue", []), []);
   
-Mirror \long(int v)
+Mirror long(int v)
   = val(v).invoke(methodDesc(integer(), "longValue", []), []);
   
-Mirror \byte(int v)
+Mirror byte(int v)
   = classMirror("java.lang.Byte").invokeStatic(methodDesc(byte(), "parseByte", [string()]), [\string("<v>")]);  
 
-Mirror \short(int v)
+Mirror short(int v)
   = classMirror("java.lang.Short").invokeStatic(methodDesc(byte(), "parseShort", [string()]), [\string("<v>")]);  
 
-Mirror \string(str v)
+Mirror string(str v)
   = val(v).invoke(methodDesc(string(), "getValue", []), []);
   
-Mirror \double(real v)
+Mirror double(real v)
   = val(v).invoke(methodDesc(string(), "doubleValue", []), []);
   
-Mirror \float(real v)
-  = val(v).invoke(methodDesc(string(), "floatValue", []), []); 
+Mirror float(real v)
+  = val(v).invoke(methodDesc(string(), "floatValue", []), []);
+  
+int integer(Mirror i) = i.toValue(#int);
+int long(Mirror l) = l.toValue(#int);
+int byte(Mirror b) = b.toValue(#int);
+int short(Mirror s) = s.toValue(#int);
+str string(Mirror s) = s.toValue(#str);
+real double(Mirror d) = d.toValue(#real);
+real float(Mirror f) = f.toValue(#real);
+  

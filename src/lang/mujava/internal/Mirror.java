@@ -1,5 +1,6 @@
 package lang.mujava.internal;
 
+import java.io.PrintWriter;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -12,6 +13,7 @@ import org.rascalmpl.debug.IRascalMonitor;
 import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.rascalmpl.interpreter.TypeReifier;
 import org.rascalmpl.interpreter.control_exceptions.MatchFailed;
+import org.rascalmpl.interpreter.control_exceptions.Throw;
 import org.rascalmpl.interpreter.env.Environment;
 import org.rascalmpl.interpreter.result.AbstractFunction;
 import org.rascalmpl.interpreter.result.ICallableValue;
@@ -197,7 +199,7 @@ public class Mirror {
 	}
 
 	private IValue asValue(Type expected, Object wrapped) {
-		return expected.accept(new ITypeVisitor<IValue,RuntimeException>() {
+		return expected.accept(new ITypeVisitor<IValue, RuntimeException>() {
 
 			@Override
 			public IValue visitAbstractData(Type arg0) throws RuntimeException {
@@ -205,7 +207,7 @@ public class Mirror {
 			}
 
 			private RuntimeException illegalType(Type expected) {
-				return RuntimeExceptionFactory.illegalTypeArgument(expected.toString(), null, null);
+				return RuntimeExceptionFactory.illegalTypeArgument(wrapped.getClass().toString() + " can not convert to " + expected.toString(), null, null);
 			}
 
 			@Override
@@ -219,7 +221,7 @@ public class Mirror {
 					return vf.bool(((Boolean) wrapped).booleanValue());
 				}
 				else {
-					throw illegalType(expected);
+					throw illegalType(arg0);
 				}
 			}
 
@@ -242,6 +244,15 @@ public class Mirror {
 			public IValue visitInteger(Type arg0) throws RuntimeException {
 				if (wrapped instanceof Integer) {
 					return vf.integer(((Integer) wrapped).intValue());
+				}
+				else if (wrapped instanceof Byte) {
+					return vf.integer(((Byte) wrapped).intValue());
+				}
+				else if (wrapped instanceof Short) {
+					return vf.integer(((Short) wrapped).intValue());
+				}
+				else if (wrapped instanceof Long) {
+					return vf.integer(((Long) wrapped).intValue());
 				}
 				else {
 					throw illegalType(expected);
@@ -281,10 +292,10 @@ public class Mirror {
 			@Override
 			public IValue visitReal(Type arg0) throws RuntimeException {
 				if (wrapped instanceof Double) {
-					return vf.real(((Double) wrapped).intValue());
+					return vf.real(((Double) wrapped).doubleValue());
 				}
 				else if (wrapped instanceof Float) {
-					return vf.real(((Float) wrapped).intValue());
+					return vf.real(Float.toString((Float) wrapped));
 				}
 				else {
 					throw illegalType(expected);
@@ -501,13 +512,33 @@ public class Mirror {
 		@Override
 		public Result<IValue> call(Type[] argTypes, IValue[] argValues, Map<String, IValue> keyArgValues)
 				throws MatchFailed {
-			return call(argTypes, argValues);
+			try {
+				return call(argTypes, argValues);
+			}
+			catch (Throwable e) {
+				while (e.getCause() != e && e.getCause() != null) {
+					e = e.getCause();
+				}
+
+				if (e instanceof IllegalArgumentException) {
+					throw RuntimeExceptionFactory.illegalArgument(vf.string(e.getMessage()), null, null);
+				}
+				else if (e instanceof Throw) {
+					throw (Throw) e;
+				}
+				else if (e instanceof RuntimeException) {
+					throw (RuntimeException) e;
+				}
+				else {
+					throw new RuntimeException(e);
+				}
+			}
 		}
 		
 		@Override
 		public Result<IValue> call(IRascalMonitor monitor, Type[] argTypes, IValue[] argValues,
 				Map<String, IValue> keyArgValues) {
-			return call(argTypes, argValues);
+			return call(argTypes, argValues, null);
 		}
 
 		abstract Result<IValue> call(Type[] argTypes, IValue[] argValues);

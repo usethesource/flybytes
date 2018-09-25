@@ -177,11 +177,11 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   //| and(Type \type, Expression lhs, Expression rhs)
   //| or(Type \type, Expression lhs, Expression rhs)
   //| xor(Type \type, Expression lhs, Expression rhs)
-  //| add(Type \type, Expression lhs, Expression rhs)
+  | add(Type \type, Expression lhs, Expression rhs)
   //| sub(Type \type, Expression lhs, Expression rhs)
   //| div(Type \type, Expression lhs, Expression rhs)
   //| rem(Type \type, Expression lhs, Expression rhs)
-  //| mul(Type \type, Expression lhs, Expression rhs)
+  | mul(Type \type, Expression lhs, Expression rhs)
   //| neg(Type \type, Expression arg)
   //| inc(Expression arg, Expression inc)
   ;
@@ -221,13 +221,21 @@ Method method(Modifier access, Type ret, str name, list[Variable] args, Block bl
            args, 
            block, 
            modifiers={access});
-           
+ 
+ // generate a normal method without local variables
+Method method(Modifier access, Type ret, str name, list[Variable] args, list[Statement] stats)
+  = method(access, ret, name, args, block([], stats));
+             
 // generate a static method           
 Method staticMethod(Modifier access, Type ret, str name, list[Variable] args, Block block)
   = method(methodDesc(ret, name, [a.\type | a <- args]), 
            args, 
            block, 
            modifiers={static(), access});
+
+// generate a static method without local variables
+Method staticMethod(Modifier access, Type ret, str name, list[Variable] args, list[Statement] stats)
+  = staticMethod(access, ret, name, args, block([], stats));
     
 // generate a default constructor for classes which have no supertype  
 Method defaultConstructor(Modifier access)
@@ -245,8 +253,11 @@ Method defaultConstructor(Modifier access, str super)
   
 // generate a constructor with argument and code 
 //   NB: don't forget to generate super call in the block!    
-Method constructor(Modifier access, str class, list[Variable] formals, Block block)
+Method constructor(Modifier access, list[Variable] formals, Block block)
   = method(constructorDesc([ var.\type | var <- formals]), formals, block);
+  
+Method constructor(Modifier access, list[Variable] formals, list[Statement] stats)
+  = method(constructorDesc([ var.\type | var <- formals]), formals, block([], stats));
 
 // allocate a new object using the constructor with the given argument types,
 // and passing the given actual parameters      
@@ -260,3 +271,20 @@ Expression new(str class)
 // Load the standard "this" reference for every object. 
 // NB! This works only inside non-static methods and inside constructors 
 Expression this() = load("this");
+
+// Load a field from the currently defined class
+Expression getField(Type \type, str name)
+  = getField("\<current\>", this(), \type, name);
+ 
+// Load a static field from the currently defined class  
+Expression getStatic(Type \type, str name)
+  = getStatic("\<current\>", \type, name);
+  
+// Store a field in the currently defined class  
+Statement putField(Type \type, str name, Expression arg)
+  = putField("\<current\>", this(), \type, name, arg);  
+
+// Store a static field in the currently defined class
+Statement putStatic(Type \type, str name, Expression arg)
+  = putStatic("\<current\>", name, \type, arg);
+  

@@ -354,7 +354,7 @@ public class Mirror {
 				try {
 					String name = ((IString) actuals[0]).getValue();
 					Field field = getWrapped().getField(name);
-					field.setAccessible(true);
+					ctx.getStdOut().println(field);
 					Object result = field.get(null); 
 					return ResultFactory.makeResult(Mirror, mirrorObject(result), ctx);
 				} catch (IllegalAccessException | IllegalArgumentException

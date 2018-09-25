@@ -106,7 +106,6 @@ test bool arrayLengthFilled(int l)
 test bool arrayLengthStringFilled(int l)
   = array(string(), [string("<e>") | e <- [0..l mod 100]]).length() == l mod 100;
   
-    
 test bool arrayLengthDefault()
   = array(integer(), 100).length() == 100;
   

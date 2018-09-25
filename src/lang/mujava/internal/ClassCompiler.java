@@ -8,12 +8,14 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.util.CheckClassAdapter;
 import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.rascalmpl.uri.URIResolverRegistry;
 
@@ -48,8 +50,10 @@ public class ClassCompiler {
 		this.out = ctx.getStdOut();
 
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
-			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
-			new Compile(cw, AST.$getVersionCode(version), out).compileClass(cls);
+			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES + ClassWriter.COMPUTE_MAXS);
+		    ClassVisitor checkedCw = new CheckClassAdapter(cw, false);
+			new Compile(checkedCw, AST.$getVersionCode(version), out).compileClass(cls);
+		    
 			output.write(cw.toByteArray());
 		} catch (Throwable e) {
 			// TODO better error handling
@@ -118,7 +122,7 @@ public class ClassCompiler {
 	 */
 	private static class Compile {
 		private static final Builder DONE = () -> {};
-		private final ClassWriter cw;
+		private final ClassVisitor cw;
 		private final int version;
 		private final PrintWriter out;
 		private IConstructor[] variableTypes;
@@ -130,7 +134,7 @@ public class ClassCompiler {
 		private IConstructor classType;
 		private ClassNode classNode;
 
-		public Compile(ClassWriter cw, int version, PrintWriter out) {
+		public Compile(ClassVisitor cw, int version, PrintWriter out) {
 			this.cw = cw;
 			this.version = version;
 			this.out = out;
@@ -142,9 +146,9 @@ public class ClassCompiler {
 
 			classType = AST.$getType(o);
 			classNode.version = version;
+			classNode.signature = null; /* anything else leads to the class extending itself! */
 			classNode.name = AST.$getName(classType);
-			classNode.signature = "L" + classNode.name + ";"; 
-
+			 
 			out.println("Compiling " + classNode.name + " with JVM version " + version);
 
 			if (kws.hasParameter("modifiers")) {
@@ -158,9 +162,9 @@ public class ClassCompiler {
 				classNode.superName = AST.$getSuper(kws);
 			}
 			else {
-				classNode.superName = Signature.objectName;
+				classNode.superName = "java/lang/Object";
 			}
-
+			
 			if (kws.hasParameter("interfaces")) {
 				ArrayList<String> interfaces = new ArrayList<String>();
 				for (IValue v : AST.$getInterfaces(kws)) {
@@ -184,7 +188,6 @@ public class ClassCompiler {
 				compileMethods(classNode, AST.$getMethodsParameter(kws));
 			}
 
-			// now stream the entire class to a (hidden) bytearray
 			classNode.accept(cw);
 
 			out.println("done.");
@@ -252,9 +255,11 @@ public class ClassCompiler {
 
 			compileVariables(varFormals, false /* no initialization */);
 			compileBlock(block);
+			
 			method.visitLabel(scopeEnd);
+			method.visitMaxs(0, 0);
 			method.visitEnd();
-
+			
 			classNode.methods.add(method);
 		}
 
@@ -389,11 +394,11 @@ public class ClassCompiler {
 				continuation.build();
 				break;
 			case "putField":
-				compileStat_PutField(AST.$getClass(stat), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
+				compileStat_PutField(AST.$getClass(stat, classNode.name), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
 				continuation.build();
 				break;
 			case "putStatic":
-				compileStat_PutStatic(AST.$getClass(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
+				compileStat_PutStatic(AST.$getClass(stat, classNode.name), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
 				continuation.build();
 				break;
 			case "return" : 
@@ -585,24 +590,23 @@ public class ClassCompiler {
 				continuation.build();
 				break;
 			case "astore" :
-				// astore(Type \type, Expression array, Expression index, Expression arg)
 				compileExpression_AStore(AST.$getType(exp), AST.$getArray(exp), AST.$getIndex(exp), AST.$getArg(exp));
 				continuation.build();
 				break;
 			case "getStatic":
-				compileGetStatic(AST.$getClass(exp), AST.$getType(exp), AST.$getName(exp));
+				compileGetStatic(AST.$getClass(exp, classNode.name), AST.$getType(exp), AST.$getName(exp));
 				continuation.build();
 				break;
 			case "invokeVirtual" : 
-				compileInvokeVirtual(AST.$getClass(exp), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
+				compileInvokeVirtual(AST.$getClass(exp, classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 				continuation.build();
 				break;
 			case "invokeInterface" : 
-				compileInvokeInterface(AST.$getClass(exp), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
+				compileInvokeInterface(AST.$getClass(exp, classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 				continuation.build();
 				break;
 			case "invokeSpecial" : 
-				compileInvokeSpecial(AST.$getClass(exp), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
+				compileInvokeSpecial(AST.$getClass(exp, classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 				continuation.build();
 				break;
 			case "invokeSuper" : 
@@ -610,15 +614,15 @@ public class ClassCompiler {
 				continuation.build();
 				break;
 			case "invokeStatic" : 
-				compileInvokeStatic(AST.$getClass(exp), AST.$getDesc(exp), AST.$getArgs(exp));
+				compileInvokeStatic(AST.$getClass(exp, classNode.name), AST.$getDesc(exp), AST.$getArgs(exp));
 				continuation.build();
 				break;
 			case "getField":
-				compileGetField(AST.$getReceiver(exp), AST.$getClass(exp), AST.$getType(exp), AST.$getName(exp));
+				compileGetField(AST.$getReceiver(exp), AST.$getClass(exp, classNode.name), AST.$getType(exp), AST.$getName(exp));
 				continuation.build();
 				break;
 			case "instanceof":
-				compileInstanceof(AST.$getArg(exp), AST.$getClass(exp));
+				compileInstanceof(AST.$getArg(exp), AST.$getClass(exp, classNode.name));
 				continuation.build();
 				break;
 			case "block":
@@ -663,6 +667,14 @@ public class ClassCompiler {
 			case "lt":
 				compileLt(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(),continuation);
 				break;
+			case "add":
+				compileAdd(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
+				continuation.build();
+				break;
+			case "mul":
+				compileMul(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
+				continuation.build();
+				break;
 			case "checkcast":
 				compileCheckCast(AST.$getArg(exp), AST.$getType(exp));
 				continuation.build();
@@ -670,6 +682,46 @@ public class ClassCompiler {
 			default: 
 				throw new IllegalArgumentException("unknown expression: " + exp);                                     
 			}
+		}
+
+		private void compileAdd(IConstructor type, IConstructor lhs, IConstructor rhs) {
+			compileExpression(lhs, DONE);
+			compileExpression(rhs, DONE);
+			Switch.type0(type, 
+					(z) -> method.visitInsn(Opcodes.IOR),
+					(i) -> method.visitInsn(Opcodes.IADD), 
+					(s) -> method.visitInsn(Opcodes.IADD), 
+					(b) -> method.visitInsn(Opcodes.IADD), 
+					(c) -> method.visitInsn(Opcodes.IADD), 
+					(f) -> method.visitInsn(Opcodes.FADD),
+					(d) -> method.visitInsn(Opcodes.DADD),
+					(l) -> method.visitInsn(Opcodes.LADD),
+					(v) -> { throw new IllegalArgumentException("add on void"); }, 
+					(c) -> { throw new IllegalArgumentException("add on object"); },
+					(a) -> { throw new IllegalArgumentException("add on array"); },
+					(S) -> { throw new IllegalArgumentException("add on string"); }
+					);
+			
+		}
+		
+		private void compileMul(IConstructor type, IConstructor lhs, IConstructor rhs) {
+			compileExpression(lhs, DONE);
+			compileExpression(rhs, DONE);
+			Switch.type0(type, 
+					(z) -> method.visitInsn(Opcodes.IAND),
+					(i) -> method.visitInsn(Opcodes.IMUL), 
+					(s) -> method.visitInsn(Opcodes.IMUL), 
+					(b) -> method.visitInsn(Opcodes.IMUL), 
+					(c) -> method.visitInsn(Opcodes.IMUL), 
+					(f) -> method.visitInsn(Opcodes.FMUL),
+					(d) -> method.visitInsn(Opcodes.DMUL),
+					(l) -> method.visitInsn(Opcodes.LMUL),
+					(v) -> { throw new IllegalArgumentException("add on void"); }, 
+					(c) -> { throw new IllegalArgumentException("add on object"); },
+					(a) -> { throw new IllegalArgumentException("add on array"); },
+					(S) -> { throw new IllegalArgumentException("add on string"); }
+					);
+			
 		}
 
 		private void compileInvokeSuper(String superclass, IConstructor sig, IList args) {
@@ -1230,7 +1282,7 @@ public class ClassCompiler {
 
 		private void compileExpression_NewInstance(IConstructor exp) {
 			compileExpressionList(AST.$getArgs(exp), DONE);
-			String cls = AST.$getClass(exp);
+			String cls = AST.$getClass(exp, classNode.name);
 			String desc = Signature.constructor(AST.$getDesc(exp));
 			method.visitTypeInsn(Opcodes.NEW, cls);
 			dup();
@@ -1425,10 +1477,13 @@ public class ClassCompiler {
 
 		private void compileField(ClassNode classNode, IConstructor cons) {
 			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
-
-			int access = Opcodes.ACC_PRIVATE;
+			int access = 0;
+			
 			if (kws.hasParameter("modifiers")) {
-				access = compileAccessCode(AST.$getModifiersParameter(kws));
+				access = compileModifiers(AST.$getModifiersParameter(kws));
+			}
+			else {
+				access = Opcodes.ACC_PRIVATE;
 			}
 
 			String name = AST.$getName(cons);
@@ -1439,7 +1494,7 @@ public class ClassCompiler {
 			if (kws.hasParameter("default")) {
 				value = compileValueConstant(AST.$getDefaultParameter(kws));
 			}
-
+			
 			classNode.fields.add(new FieldNode(access, name, signature, null, value));
 		}
 
@@ -1513,7 +1568,7 @@ public class ClassCompiler {
 
 				@Override
 				public Object visitBool(Type arg0) throws RuntimeException {
-					return AST.$getBoolean(parameter);
+					return new Boolean(AST.$getBoolean(parameter));
 				}
 
 				@Override
@@ -1536,7 +1591,7 @@ public class ClassCompiler {
 
 				@Override
 				public Object visitInteger(Type arg0) throws RuntimeException {
-					return AST.$getIntegerConstant(parameter);
+					return new Integer(AST.$getIntegerConstant(parameter));
 				}
 
 
@@ -1557,7 +1612,7 @@ public class ClassCompiler {
 
 				@Override
 				public Object visitNumber(Type arg0)  {
-					return AST.$getDouble(parameter);
+					return new Double(AST.$getDouble(parameter));
 				}
 
 				@Override
@@ -1567,12 +1622,12 @@ public class ClassCompiler {
 
 				@Override
 				public Object visitRational(Type arg0)  {
-					return AST.$getDouble(parameter);
+					return new Double(AST.$getDouble(parameter));
 				}
 
 				@Override
 				public Object visitReal(Type arg0)  {
-					return ((IReal) parameter).doubleValue();
+					return new Double(((IReal) parameter).doubleValue());
 				}
 
 				@Override
@@ -1774,8 +1829,14 @@ public class ClassCompiler {
 			return (IList) sig.get("args");
 		}
 
-		public static String $getClass(IValue parameter) {
-			return ((IString) ((IConstructor) parameter).get("class")).getValue().replace('.', '/');
+		public static String $getClass(IValue parameter, String currentClass) {
+			String result = ((IString) ((IConstructor) parameter).get("class")).getValue().replace('.', '/');
+			
+			if ("<current>".equals(result)) {
+				return currentClass;
+			}
+			
+			return result;
 		}
 
 		public static String $getConstructorName(IValue parameter) {

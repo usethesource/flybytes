@@ -1,6 +1,7 @@
 module lang::mujava::tests::CompilerTests
 
 import lang::mujava::Compiler;
+import IO;
 
 public Class testClass() = 
   //public class TestClass {
@@ -51,7 +52,7 @@ public Class testClass() =
       //   field = v;
       // }
       method(\public(), \void(), "setField", [var(integer(), "v")], [
-        putField(integer(), "staticField", load("v")),
+        putField(integer(), "field", load("v")),
         \return()
       ]),
       
@@ -66,13 +67,39 @@ public Class testClass() =
   
 Mirror compiledTestClass() = loadClass(testClass());
  
-//test bool staticMethod() {
-//  c = compiledTestClass();
-//  int tester = 666;
-//  c.invokeStatic(methodDesc(\void(), "putStatic", [integer()]), [integer(tester)]);
-//  c.getStatic("staticField").toValue(#int) == tester;
-//  return true;
-//}
-//  
-//test bool staticFieldInitializer() 
-//  = compiledTestClass().getStatic("staticField").toValue(#int) == 42;
+test bool newInstanceGetUnitializedInteger() {
+  c = compiledTestClass();
+  i = c.newInstance(constructorDesc([]),[]);
+  return i.getField("field").toValue(#int) == 0;
+}
+
+test bool newInstanceCallGetter() {
+  c = compiledTestClass();
+  i = c.newInstance(constructorDesc([]),[]);
+  return i.invoke(methodDesc(integer(), "getField", []), []).toValue(#int) == 0;
+}
+
+test bool newInstanceCallSetter() {
+  c = compiledTestClass();
+  i = c.newInstance(constructorDesc([]),[]);
+  
+  int tester = 32;
+  
+  // call method with the side-effect
+  i.invoke(methodDesc(\void(), "setField", [integer()]), [integer(tester)]);
+  
+  // test if it worked by retrieving the field
+  return i.getField("field").toValue(#int) == tester;
+}
+
+test bool staticMethod() {
+  c = compiledTestClass();
+  int tester = 666;
+  c.invokeStatic(methodDesc(\void(), "putStatic", [integer()]), [integer(tester)]);
+  c.getStatic("staticField").toValue(#int) == tester;
+  return true;
+}
+  
+
+test bool staticFieldInitializer() 
+  = compiledTestClass().getStatic("staticField").toValue(#int) == 42;

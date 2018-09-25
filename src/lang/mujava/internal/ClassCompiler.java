@@ -182,7 +182,7 @@ public class ClassCompiler {
 				compileFields(classNode, AST.$getFieldsParameter(kws));
 			}
 
-			if (kws.hasParameter("fields")) {
+			if (kws.hasParameter("methods")) {
 				compileMethods(classNode, AST.$getMethodsParameter(kws));
 			}
 

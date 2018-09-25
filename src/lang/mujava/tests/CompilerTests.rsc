@@ -1,6 +1,7 @@
 module lang::mujava::tests::CompilerTests
 
 import lang::mujava::Compiler;
+import lang::mujava::api::JavaLang;
 import IO;
 
 public Class testClass() = 
@@ -160,3 +161,29 @@ test bool lessThan() {
   
   return  result1.toValue(#bool) && !result2.toValue(#bool); 
 }  
+
+
+bool testBinIntOp(str name, Expression (Type, Expression, Expression) op, int lhs, int rhs, int res) {
+  cl = 
+    class(classType("Op<name>"),
+      methods=[
+        staticMethod(\public(), integer(), "op", [var(integer(),"i"), var(integer(),"j")], [
+           \return(integer(), op(integer(), load("i"), load("j")))
+        ])
+      ]
+    );
+  
+  m = loadClass(cl);
+  obj = m.invokeStatic(methodDesc(integer(), "op", [integer(), integer()]), [integer(lhs), integer(rhs)]);
+  
+  return obj.toValue(#int) == res;
+}
+
+test bool testAdd(int i, int j) = testBinIntOp("Add", add, I, J, I + J) 
+  when I := i mod intMax(), J := j mod intMax();
+  
+test bool testMul(int i, int j) = testBinIntOp("Mul", mul, I, J, I * J) 
+  when I := i mod 50, J := j mod 50;
+  
+test bool testSub(int i, int j) = testBinIntOp("Sub", sub, I, J, I - J)
+  when I := i mod intMax(), J := j mod intMax();

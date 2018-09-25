@@ -61,6 +61,24 @@ public Class testClass() =
       // }
       method(\public(), \integer(), "addField", [var(integer(), "v")], [
         \return(integer(), add(\integer(), getField(integer(), "field"), load("v")))
+      ]),
+      
+      // public boolean lessThanField(int i) {
+      //    return i < field;
+      // }
+      method(\public(), \boolean(), "lessThan", [var(integer(), "i")], [
+        \return(boolean(), lt(integer(), load("i"), getField(integer(), "field")))
+      ]),
+      
+      // public String ifEqual(int i) {
+      //    return i < field;
+      // }
+      method(\public(), \string(), "ifEqual", [var(integer(), "i")], [
+         \if (eq(load("i"), getStatic(integer(), "staticField")), [
+           \return(string(), const(string(), "parameter is equal to the static field"))         
+         ],[
+           \return(string(), const(string(), "parameter is not equal to the static field"))
+         ])
       ])
     ]
   );
@@ -103,3 +121,42 @@ test bool staticMethod() {
 
 test bool staticFieldInitializer() 
   = compiledTestClass().getStatic("staticField").toValue(#int) == 42;
+
+test bool ifEqual() {
+  c = compiledTestClass();
+  i = c.newInstance(constructorDesc([]),[]);
+  
+  int tester = 32;
+  
+  // call method which returns a string which should contain "not" because 32 != 42;
+  result1 = i.invoke(methodDesc(\string(), "ifEqual", [integer()]), [integer(tester)]);
+  
+  // change the field to 32
+  i.invoke(methodDesc(\void(), "setField", [integer()]), [integer(32)]);
+  
+  // call method which returns a string which should contain "not" because 32 != 42;
+  result2 = i.invoke(methodDesc(\string(), "lessThan", [integer()]), [integer(tester)]);
+  
+  return /not/ := result1.toValue(#str) && /not/ !:= result2.toValue(#str); 
+}  
+
+test bool lessThan() {
+  c = compiledTestClass();
+  i = c.newInstance(constructorDesc([]),[]);
+  
+  int tester = 32;
+  
+  // change the field to 42
+  i.invoke(methodDesc(\void(), "setField", [integer()]), [integer(42)]);
+  
+  // call method which returns a string which should contain "not" because 32 < 42;
+  result1 = i.invoke(methodDesc(\string(), "lessThan", [integer()]), [integer(tester)]);
+  
+  // change the field to 12
+  i.invoke(methodDesc(\void(), "setField", [integer()]), [integer(12)]);
+  
+  // call method which returns a string which should contain "not" because 32 != 12;
+  result2 = i.invoke(methodDesc(\string(), "lessThan", [integer()]), [integer(tester)]);
+  
+  return  result1.toValue(#bool) && !result2.toValue(#bool); 
+}  

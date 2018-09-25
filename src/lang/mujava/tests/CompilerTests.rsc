@@ -79,7 +79,7 @@ public Class testClass() =
       //    return i < field;
       // }
       method(\public(), \string(), "ifEqual", [var(integer(), "i")], [
-         \if (eq(load("i"), getStatic(integer(), "staticField")), [
+         \if (eq(integer(), load("i"), getStatic(integer(), "staticField")), [
            \return(string(), const(string(), "parameter is equal to the static field"))         
          ],[
            \return(string(), const(string(), "parameter is not equal to the static field"))
@@ -177,7 +177,7 @@ Class binOpClass(Type t, BinOp op) {
   return class(classType(name),
       methods=[
         staticMethod(\public(), boolean(), "op", [var(t,"i"), var(t,"j"), var(t,"a")], [
-           \return(boolean(), eq(expr, load("a")))
+           \return(boolean(), eq(t, expr, load("a")))
         ])
         ,
         staticMethod(\public(), t, "result", [var(t,"i"), var(t,"j")], [

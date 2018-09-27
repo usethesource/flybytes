@@ -104,6 +104,7 @@ data Variable = var(Type \type, str name);
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Statement(loc src = |unknown:///|)
   = \store(str name, Expression \value)
+  | \aastore(Type \type, Expression array, Expression index, Expression arg)
   | \do(Type \type, Expression exp) // pops the result of the expression when needed
   | \return()
   | \return(Type \type, Expression arg)
@@ -143,7 +144,7 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | \false()
   | load(str name)
   | aaload(Expression array, Expression index)
-  | astore(Type \type, Expression array, Expression index, Expression arg)
+  
   | \const(Type \type, value constant)
   | block(list[Statement] statements, Expression arg)
   | invokeStatic(str class, Signature desc, list[Expression] args)
@@ -284,4 +285,16 @@ Statement putField(Type \type, str name, Expression arg)
 // Store a static field in the currently defined class
 Statement putStatic(Type \type, str name, Expression arg)
   = putStatic("\<current\>", name, \type, arg);
+ 
+Expression invokeStatic(Signature desc, list[Expression] args) 
+  = invokeStatic("\<current\>", desc, args);
   
+Expression invokeSpecial(Expression receiver, Signature desc, list[Expression] args)
+  = invokeSpecial("\<current\>", receiver, desc, args);
+
+Expression invokeVirtual(Expression receiver, Signature desc, list[Expression] args)
+  = invokeVirtual("\<current\>", receiver, desc, args);
+  
+Expression invokeInterface(Expression receiver, Signature desc, list[Expression] args)
+  = invokeVirtual("\<current\>", receiver, desc, args);
+   

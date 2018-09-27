@@ -13,4 +13,4 @@ Expression hashCode(Expression obj)
 
 // call equals(Object a) on an object   
 Expression equals(Expression obj, Expression compared) 
-   = invokeVirtual("\<current\>", obj, methodDesc(boolean(), "equals", [object()]), [compared]);
+   = invokeVirtual("java.lang.Object", obj, methodDesc(boolean(), "equals", [object()]), [compared]);

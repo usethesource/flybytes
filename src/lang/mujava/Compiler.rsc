@@ -77,7 +77,7 @@ public Class helloWorld = class(classType("HelloWorld"),
   );
   
 void main() {
-  compile(helloWorld, |home:///HelloWorld.class|);
+  compileClass(helloWorld, |home:///HelloWorld.class|);
 }
 
 

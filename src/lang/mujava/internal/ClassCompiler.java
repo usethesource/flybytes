@@ -122,7 +122,7 @@ public class ClassCompiler {
 		private static final Builder DONE = () -> {};
 		private final ClassVisitor cw;
 		private final int version;
-		private final PrintWriter out;
+//		private final PrintWriter out;
 		private IConstructor[] variableTypes;
 		private String[] variableNames;
 		private int variableCounter;
@@ -135,7 +135,7 @@ public class ClassCompiler {
 		public Compile(ClassVisitor cw, int version, PrintWriter out) {
 			this.cw = cw;
 			this.version = version;
-			this.out = out;
+//			this.out = out;
 		}
 
 		public void compileClass(IConstructor o) {
@@ -146,8 +146,6 @@ public class ClassCompiler {
 			classNode.version = version;
 			classNode.signature = null; /* anything else leads to the class extending itself! */
 			classNode.name = AST.$getName(classType);
-
-			out.println("Compiling " + classNode.name + " with JVM version " + version);
 
 			if (kws.hasParameter("modifiers")) {
 				classNode.access = compileAccessCode(AST.$getModifiers(o));
@@ -187,8 +185,6 @@ public class ClassCompiler {
 			}
 
 			classNode.accept(cw);
-
-			out.println("done.");
 		}
 
 		private void compileFields(ClassNode classNode, IList fields) {
@@ -389,6 +385,10 @@ public class ClassCompiler {
 				compileStat_Store(stat); 
 				continuation.build();
 				break;
+			case "aastore" :
+				compileStat_AAStore(AST.$getType(stat), AST.$getArray(stat), AST.$getIndex(stat), AST.$getArg(stat));
+				continuation.build();
+				break;
 			case "putField":
 				compileStat_PutField(AST.$getClass(stat, classNode.name), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
 				continuation.build();
@@ -432,6 +432,14 @@ public class ClassCompiler {
 			// there are special jump instructions for these operators on the JVM and we don't want to push
 			// a boolean on the stack and then conditionally have to jump on that boolean again:
 			switch (cond.getConstructorType().getName()) {
+			case "true":
+				thenBuilder.build();
+				continuation.build();
+				break;
+			case "false":
+				elseBuilder.build();
+				continuation.build();
+				break;
 			case "eq":
 				compileEq(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				break;
@@ -571,10 +579,10 @@ public class ClassCompiler {
 				break;
 			case "newArray":
 				if (exp.get(1) instanceof IList) {
-					compileExpression_NewArraySize(AST.$getType(exp), AST.$getSize(exp));
+					compileExpression_NewArray(AST.$getType(exp), AST.$getArgs(exp));
 				}
 				else {
-					compileExpression_NewArray(AST.$getType(exp), AST.$getArgs(exp));
+					compileExpression_NewArraySize(AST.$getType(exp), AST.$getSize(exp));
 				}
 				continuation.build();
 				break;
@@ -590,10 +598,7 @@ public class ClassCompiler {
 				compileExpression_AALoad(AST.$getArray(exp), AST.$getIndex(exp));
 				continuation.build();
 				break;
-			case "astore" :
-				compileExpression_AStore(AST.$getType(exp), AST.$getArray(exp), AST.$getIndex(exp), AST.$getArg(exp));
-				continuation.build();
-				break;
+		
 			case "getStatic":
 				compileGetStatic(AST.$getClass(exp, classNode.name), AST.$getType(exp), AST.$getName(exp));
 				continuation.build();
@@ -967,7 +972,7 @@ public class ClassCompiler {
 		method.visitMethodInsn(Opcodes.INVOKESPECIAL, superclass, "<init>", Signature.constructor(sig), false);
 	}
 
-	private void compileExpression_AStore(IConstructor type, IConstructor array, IConstructor index,
+	private void compileStat_AAStore(IConstructor type, IConstructor array, IConstructor index,
 			IConstructor arg) {
 		// passing continuations make this look complex.
 		//   * first compile array, 
@@ -1703,7 +1708,7 @@ public class ClassCompiler {
 
 	private void compileExpression_Const(IConstructor type, IValue constant) {
 		Switch.type0(type, 
-				(z) -> booleanConstant(AST.$getBoolean(constant)), 
+				(z) -> booleanConstant(AST.$getBooleanConstant(constant)), 
 				(i) -> intConstant(AST.$getIntegerConstant(constant)), 
 				(s) -> intConstant(AST.$getIntegerConstant(constant)), 
 				(b) -> intConstant(AST.$getIntegerConstant(constant)), 
@@ -2127,6 +2132,10 @@ public static class AST {
 		return (IConstructor) exp.get("type");
 	}
 
+	public static boolean $getBooleanConstant(IValue parameter) {
+		return ((IBool) parameter).getValue();
+	}
+	
 	public static int $getIntegerConstant(IValue parameter) {
 		return ((IInteger) parameter).intValue();
 	}

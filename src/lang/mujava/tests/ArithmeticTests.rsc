@@ -24,10 +24,23 @@ Class binOpClass(Type t, BinOp op) {
       ]
     );
 }
+
+Class unOpClass(Type t, UnOp op) {
+  expr = op(t, load("i"));
+  name = "Operator_<getName(expr)>_<getName(t)>";
+  
+  return class(classType(name),
+      methods=[
+        staticMethod(\public(), t, "op", [var(t,"i")], [
+           \return(t, expr)
+        ])
+      ]
+    );
+}
   
 @memo  
 private Mirror compileLoadClass(Class c) {
-  compileClass(c, |project://mujava/generated| + "<c.\type.name>.class"); 
+  //compileClass(c, |project://mujava/generated| + "<c.\type.name>.class"); 
   return loadClass(c);
 }
 
@@ -43,11 +56,35 @@ bool testBinOp(Class c, Type t, num lhs, num rhs, num answer) {
   return true;
 }
 
+bool testUnOp(Class c, Type t, num arg, num answer) { 
+  m = compileLoadClass(c);
+  reply = val(t, m.invokeStatic(methodDesc(t, "op", [t]), [prim(t, arg)]));
+  
+  if (answer != reply) {
+    println("op(<arg>) == <round(t, answer)> != <round(t,reply)>");
+    return false;
+  }
+  
+  return true;
+}
+
 bool testBinOpRange(Class c, Type t, num lhs, num rhs, real answer) { 
   m = compileLoadClass(c);
   real reply = val(t, m.invokeStatic(methodDesc(t, "op", [t, t]), [prim(t, lhs), prim(t,rhs)]));
   
-  if (abs(answer - reply) > 0.5) {
+  if (abs(answer - reply) > 0.1) {
+    println("op(<lhs>,<rhs>) == <answer> != <reply> (diff: <abs(answer - reply)>)");
+    return false;
+  }
+  
+  return true;
+}
+
+bool testUnOpRange(Class c, Type t, num arg, real answer) { 
+  m = compileLoadClass(c);
+  real reply = val(t, m.invokeStatic(methodDesc(t, "op", [t]), [prim(t, arg)]));
+  
+  if (abs(answer - reply) > 0.1) {
     println("op(<lhs>,<rhs>) == <answer> != <reply> (diff: <abs(answer - reply)>)");
     return false;
   }
@@ -57,6 +94,10 @@ bool testBinOpRange(Class c, Type t, num lhs, num rhs, real answer) {
 
 list[Type] exactArithmeticTypes = [integer(), short(), byte(), long()];
 
+test bool testNeg(int i)
+  = all(t <- exactArithmeticTypes,
+        I := i % maxValue(t), testUnOp(unOpClass(t, neg), t, I, -1 * I));
+        
 test bool testAdd(int i, int j) 
   = all (t <- exactArithmeticTypes,
          I := (i % maxValue(t)) / 2,
@@ -113,6 +154,10 @@ test bool testDiv(real i, real j)
          J := abs(fit(t, (1. / (j + .1)) + 1.)), // // stick with numbers in [1,2] we can manage 
          testBinOpRange(binOpClass(t, div), t, I, J, fit(t, I / J)));
          
+test bool testNeg(real i)
+  = all(t <- floatingPointTypes,
+        I := fit(t, 1. / (i + .1)), // stick with numbers in [0,1] we can manage, 
+        testUnOpRange(unOpClass(t, neg), t, I, -1 * I));         
 
 // UTILITIES FOR ROUNDING
 

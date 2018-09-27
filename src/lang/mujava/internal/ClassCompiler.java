@@ -570,7 +570,12 @@ public class ClassCompiler {
 				continuation.build();
 				break;
 			case "newArray":
-				compileExpression_NewArray(AST.$getType(exp), AST.$getSize(exp));
+				if (exp.get(1) instanceof IList) {
+					compileExpression_NewArraySize(AST.$getType(exp), AST.$getSize(exp));
+				}
+				else {
+					compileExpression_NewArray(AST.$getType(exp), AST.$getArgs(exp));
+				}
 				continuation.build();
 				break;
 			case "alength":
@@ -945,9 +950,9 @@ public class ClassCompiler {
 				(s) -> method.visitInsn(Opcodes.INEG), 
 				(b) -> method.visitInsn(Opcodes.INEG), 
 				(c) -> method.visitInsn(Opcodes.INEG), 
-				(f) -> { throw new IllegalArgumentException("neg on void"); },
-				(d) -> { throw new IllegalArgumentException("neg on void"); },
-				(l) -> { throw new IllegalArgumentException("neg on void"); },
+				(f) -> method.visitInsn(Opcodes.FNEG),
+				(d) -> method.visitInsn(Opcodes.DNEG),
+				(l) -> method.visitInsn(Opcodes.LNEG),
 				(v) -> { throw new IllegalArgumentException("neg on void"); }, 
 				(c) -> { throw new IllegalArgumentException("neg on object"); },
 				(a) -> { throw new IllegalArgumentException("neg on array"); },
@@ -1015,8 +1020,21 @@ public class ClassCompiler {
 		method.visitInsn(Opcodes.ARRAYLENGTH);
 	}
 
-	private void compileExpression_NewArray(IConstructor type, IConstructor size) {
+	private void compileExpression_NewArraySize(IConstructor type, IConstructor size) {
 		compileExpression(size, () -> compileNewArrayWithSizeOnStack(type));
+	}
+	
+	private void compileExpression_NewArray(IConstructor type, IList elems) {
+		intConstant(elems.length());
+		compileNewArrayWithSizeOnStack(type);
+		
+		int i = 0;
+		for (IValue elem : elems) {
+			dup();
+			intConstant(i++);
+			compileExpression((IConstructor) elem, DONE);
+			compileArrayStoreWithArrayIndexValueOnStack(type);
+		}
 	}
 
 	private void compileNewArrayWithSizeOnStack(IConstructor type) {

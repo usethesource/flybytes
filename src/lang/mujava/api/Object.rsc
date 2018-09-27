@@ -4,13 +4,13 @@ import lang::mujava::Syntax;
 
 
 // call toString() on an object      
-Expression toString(Expression object) 
-   = invokeVirtual("java.lang.Object", object, methodDesc(string(), "toString", []), []);
+Expression toString(Expression obj) 
+   = invokeVirtual("java.lang.Object", obj, methodDesc(string(), "toString", []), []);
 
 // call hashCode() on an object
-Expression hashCode(Expression object) 
-   = invokeVirtual("java.lang.Object", object, methodDesc(integer(), "hashCode", []), []);
+Expression hashCode(Expression obj) 
+   = invokeVirtual("java.lang.Object", obj, methodDesc(integer(), "hashCode", []), []);
 
 // call equals(Object a) on an object   
-Expression equals(Expression object, Expression compared) 
-   = invokeVirtual("\<current\>", object, methodDesc(boolean(), "equals", [object()]), [compared]);
+Expression equals(Expression obj, Expression compared) 
+   = invokeVirtual("\<current\>", obj, methodDesc(boolean(), "equals", [object()]), [compared]);

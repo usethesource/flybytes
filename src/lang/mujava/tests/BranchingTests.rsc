@@ -1,0 +1,133 @@
+module lang::mujava::tests::BranchingTests
+
+import lang::mujava::Compiler;
+import lang::mujava::Mirror;
+import lang::mujava::api::JavaLang;
+import lang::mujava::api::Object;
+import Node;
+import String;
+import IO;
+import util::Math;
+
+public Class ifClass(Expression cond) {
+  name = "IfCmp_<getName(cond)>";
+  
+  return class(classType(name),
+      methods=[
+        staticMethod(\public(), boolean(), "ifTest", [], [
+           \if (cond, [\return(boolean(), \true())]),
+           \return(boolean(), \false())
+        ]),
+        staticMethod(\public(), boolean(), "ifElseTest", [], [
+           \if (cond, [\return(boolean(), \true())], [\return(boolean(), \false())])
+        ]),
+        staticMethod(\public(), boolean(), "methodTrue", [], [
+           \return(boolean(), \true())
+        ]),
+        staticMethod(\public(), boolean(), "methodFalse", [], [
+           \return(boolean(), \false())
+        ])
+      ]
+    );
+}
+
+bool testIf(Class c, bool answer) { 
+  m = loadClass(c);
+  ifReply = m.invokeStatic(methodDesc(boolean(), "ifTest", []), []).toValue(#bool);
+  ifElseReply = m.invokeStatic(methodDesc(boolean(), "ifElseTest", []), []).toValue(#bool);
+  
+  return answer == ifReply && answer == ifElseReply;
+}
+
+test bool testIfTrue() = testIf(ifClass(\true()), true);
+test bool testIfFalse() = testIf(ifClass(\false()), false);
+
+test bool testIfMethodTrue() = testIf(ifClass(invokeStatic(methodDesc(boolean(),"methodTrue",[]),[])), true);
+test bool testIfMethodFalse() = testIf(ifClass(invokeStatic(methodDesc(boolean(),"methodFalse",[]),[])), false);
+
+test bool testIfEqTrue() = testIf(ifClass(eq(integer(), const(integer(),1),const(integer(),1))), true);
+test bool testIfEqFalse() = testIf(ifClass(eq(integer(), const(integer(),2),const(integer(),1))), false);
+
+// now some special tests to see if `if(eq(a,b))` which is optimized to `ifeq(a,b)`,
+// and also for the other comparison operators, is compiled correctly:
+private alias BinOp = Expression (Type, Expression, Expression);
+
+private Class ifCmpClass(Type t, BinOp op) {
+  expr = op(t, load("i"), load("j"));
+  name = "IfCmp_<getName(expr)>_<getName(t)>";
+  
+  return class(classType(name),
+      methods=[
+        staticMethod(\public(), boolean(), "ifThenTest", [var(t,"i"), var(t,"j")], [
+           \if (expr /* should be short-cut to IFCMP internally */, [
+             \return(\boolean(), \true())         
+           ]),
+           \return(\boolean(), \false())
+        ])
+        ,
+        staticMethod(\public(), boolean(), "ifThenElseTest", [var(t,"i"), var(t,"j")], [
+           \if (expr /* should be short-cut to IFCMP internally */, [
+             \return(\boolean(), \true())         
+           ],[
+             \return(\boolean(), \false())
+           ])   
+        ])
+      ]
+    );
+}
+
+bool testIf(Class c, Type t, str mn, Mirror lhs, Mirror rhs, bool answer) { 
+  m = loadClass(c);
+  reply = m.invokeStatic(methodDesc(boolean(), mn, [t, t]), [lhs, rhs]).toValue(#bool);
+  
+  return answer == reply;
+}
+
+list[Type] intTypes = [integer(), short(), byte(), long()];
+list[str] condTypes = ["ifThenTest", "ifThenElseTest"];
+
+test bool testEqTrue(int i) 
+  = all (t <- intTypes, 
+         I := prim(t, abs(i) % maxValue(t)), cl <- condTypes,
+         testIf(ifCmpClass(t, eq), t, cl, I, I, true));
+
+test bool testEqFalse(int i) 
+  = all (t <- intTypes, 
+         I := abs(i) % maxValue(t), cl <- condTypes,
+         testIf(ifCmpClass(t, eq), t, cl, prim(t, I), prim(t, I - 1), false));  
+         
+test bool testNEqTrue(int i) 
+  = all (t <- intTypes, 
+         I := abs(i) % maxValue(t), cl <- condTypes,
+         testIf(ifCmpClass(t, ne), t, cl, prim(t, I), prim(t, I - 1), true));
+
+test bool testNEqFalse(int i) 
+  = all (t <- intTypes, 
+         I := prim(t, abs(i) % maxValue(t)), cl <- condTypes,
+         testIf(ifCmpClass(t, ne), t, cl, I, I, false));                
+         
+test bool testLt(int i, int j) 
+  = all (t <- intTypes, 
+         I := (i % maxValue(t)),
+         J := (j % maxValue(t)), cl <- condTypes,
+         testIf(ifCmpClass(t, lt), t, cl, prim(t, I), prim(t, J), I < J));
+         
+test bool testGt(int i, int j) 
+  = all (t <- intTypes, 
+         I := (i % maxValue(t)),
+         J := (j % maxValue(t)), cl <- condTypes,
+         testIf(ifCmpClass(t, gt), t, cl, prim(t, I), prim(t, J), I > J)); 
+         
+test bool testGe(int i, int j) 
+  = all (t <- intTypes, 
+         I := (i % maxValue(t)),
+         J := (j % maxValue(t)), cl <- condTypes,
+         testIf(ifCmpClass(t, ge), t, cl, prim(t, I), prim(t, J), I >= J));           
+
+test bool testLe(int i, int j) 
+  = all (t <- intTypes, 
+         I := (i % maxValue(t)),
+         J := (j % maxValue(t)), cl <- condTypes,
+         testIf(ifCmpClass(t, le), t, cl, prim(t, I), prim(t, J), I <= J));
+
+         

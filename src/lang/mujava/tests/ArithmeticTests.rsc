@@ -38,14 +38,8 @@ Class unOpClass(Type t, UnOp op) {
     );
 }
   
-@memo  
-private Mirror compileLoadClass(Class c) {
-  //compileClass(c, |project://mujava/generated| + "<c.\type.name>.class"); 
-  return loadClass(c);
-}
-
 bool testBinOp(Class c, Type t, num lhs, num rhs, num answer) { 
-  m = compileLoadClass(c);
+  m = loadClass(c);
   reply = val(t, m.invokeStatic(methodDesc(t, "op", [t, t]), [prim(t, lhs), prim(t,rhs)]));
   
   if (answer != reply) {
@@ -57,7 +51,7 @@ bool testBinOp(Class c, Type t, num lhs, num rhs, num answer) {
 }
 
 bool testUnOp(Class c, Type t, num arg, num answer) { 
-  m = compileLoadClass(c);
+  m = loadClass(c);
   reply = val(t, m.invokeStatic(methodDesc(t, "op", [t]), [prim(t, arg)]));
   
   if (answer != reply) {
@@ -69,7 +63,7 @@ bool testUnOp(Class c, Type t, num arg, num answer) {
 }
 
 bool testBinOpRange(Class c, Type t, num lhs, num rhs, real answer) { 
-  m = compileLoadClass(c);
+  m = loadClass(c);
   real reply = val(t, m.invokeStatic(methodDesc(t, "op", [t, t]), [prim(t, lhs), prim(t,rhs)]));
   
   if (abs(answer - reply) > 0.1) {
@@ -81,7 +75,7 @@ bool testBinOpRange(Class c, Type t, num lhs, num rhs, real answer) {
 }
 
 bool testUnOpRange(Class c, Type t, num arg, real answer) { 
-  m = compileLoadClass(c);
+  m = loadClass(c);
   real reply = val(t, m.invokeStatic(methodDesc(t, "op", [t]), [prim(t, arg)]));
   
   if (abs(answer - reply) > 0.1) {

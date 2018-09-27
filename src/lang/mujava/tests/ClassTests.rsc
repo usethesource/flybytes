@@ -93,7 +93,7 @@ public Class testClass() =
     ]
   );
   
-Mirror compiledTestClass() = compileLoadClass(testClass());
+Mirror compiledTestClass() = loadClass(testClass());
  
 test bool newInstanceGetUnitializedInteger() {
   c = compiledTestClass();

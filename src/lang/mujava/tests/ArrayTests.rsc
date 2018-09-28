@@ -17,10 +17,10 @@ Class primArrayTestClass(Type t, int len) {
           store("tmp", newArray(t, const(integer(), len))),
            
           // fail if tmp.length != len
-          //\if(ne(t, const(integer(), len), alength(load("tmp"))), [rf]),
+          \if(ne(t, const(integer(), len), alength(load("tmp"))), [rf]),
            
           // fail if (tmp[0] != def)
-          //\if(ne(t, defVal(t), aaload(load("tmp"), const(integer(), 0))),[rf]),
+          \if(ne(t, defVal(t), aaload(integer(), load("tmp"), const(integer(), 0))),[rf]),
            
           // generate `len` store instructions: tmp[i] = i;
           *[aastore(t, load("tmp"), const(integer(), I), const(integer(), I)) | I <- [0..len]],

@@ -70,13 +70,13 @@ Class objVarTestClass(Type t, Expression v) {
   rf = \return(boolean(), \false());
   rt = \return(boolean(), \true());
   
-  return class(classType("PrimVarTestClass_<getName(t)>"),
+  return class(classType("ObjVarTestClass_<getName(t)>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         block([var(t, "tmp")],
         [
           // fail if (tmp != def)
-          //\if(equals(load("tmp"), defVal(t)),[rf]),
+          \if(equals(load("tmp"), defVal(t)),[rf]),
            
           // tmp = v;
           \store("tmp", v),

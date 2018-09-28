@@ -64,9 +64,9 @@ public Class helloWorld = class(classType("HelloWorld"),
        
        // print the 3 elements of the argument list:
        \if(gt(integer(), load("i"), load("m")), [
-         stdout(aaload(load("s"), const(integer(), 0))),
-         stdout(aaload(load("s"), const(integer(), 1))),
-         stdout(aaload(load("s"), const(integer(), 2)))
+         stdout(aaload(string(), load("s"), const(integer(), 0))),
+         stdout(aaload(string(), load("s"), const(integer(), 1))),
+         stdout(aaload(string(), load("s"), const(integer(), 2)))
        ]),
        
        

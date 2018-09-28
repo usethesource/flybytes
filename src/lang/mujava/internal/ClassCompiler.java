@@ -595,7 +595,7 @@ public class ClassCompiler {
 				continuation.build();
 				break;
 			case "aaload" :
-				compileExpression_AALoad(AST.$getArray(exp), AST.$getIndex(exp));
+				compileExpression_AALoad(AST.$getType(exp), AST.$getArray(exp), AST.$getIndex(exp));
 				continuation.build();
 				break;
 		
@@ -1570,10 +1570,23 @@ public class ClassCompiler {
 		method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", desc, false);
 	}
 
-	private void compileExpression_AALoad(IConstructor array, IConstructor index) {
+	private void compileExpression_AALoad(IConstructor type, IConstructor array, IConstructor index) {
 		compileExpression(array, DONE);
 		compileExpression(index, DONE);
-		method.visitInsn(Opcodes.AALOAD);
+		Switch.type0(type, 
+				(b) -> method.visitInsn(Opcodes.IALOAD), 
+				(i) -> method.visitInsn(Opcodes.IALOAD), 
+				(s) -> method.visitInsn(Opcodes.IALOAD), 
+				(b) -> method.visitInsn(Opcodes.IALOAD), 
+				(c) -> method.visitInsn(Opcodes.IALOAD), 
+				(f) -> method.visitInsn(Opcodes.FALOAD), 
+				(d) -> method.visitInsn(Opcodes.DALOAD), 
+				(j) -> method.visitInsn(Opcodes.LALOAD), 
+				(v) -> { throw new IllegalArgumentException("loading into a void array"); }, 
+				(L) -> method.visitInsn(Opcodes.AALOAD), 
+				(a) -> method.visitInsn(Opcodes.AALOAD), 
+				(s) -> method.visitInsn(Opcodes.AALOAD))
+		;
 	}
 
 	private void compileGetStatic(String cls, IConstructor type, String name) {

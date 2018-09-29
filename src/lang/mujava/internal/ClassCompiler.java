@@ -989,11 +989,11 @@ public class ClassCompiler {
 
 	private void compileArrayStoreWithArrayIndexValueOnStack(IConstructor type) {
 		Switch.type0(type, 
-				(z) -> method.visitInsn(Opcodes.IASTORE),
+				(z) -> method.visitInsn(Opcodes.BASTORE),
 				(i) -> method.visitInsn(Opcodes.IASTORE),
-				(s) -> method.visitInsn(Opcodes.IASTORE),
-				(b) -> method.visitInsn(Opcodes.IASTORE),
-				(c) -> method.visitInsn(Opcodes.IASTORE),
+				(s) -> method.visitInsn(Opcodes.SASTORE),
+				(b) -> method.visitInsn(Opcodes.BASTORE),
+				(c) -> method.visitInsn(Opcodes.CASTORE),
 				(f) -> method.visitInsn(Opcodes.FASTORE),
 				(d) -> method.visitInsn(Opcodes.DASTORE),
 				(l) -> method.visitInsn(Opcodes.LASTORE),
@@ -1574,11 +1574,11 @@ public class ClassCompiler {
 		compileExpression(array, DONE);
 		compileExpression(index, DONE);
 		Switch.type0(type, 
-				(b) -> method.visitInsn(Opcodes.IALOAD), 
+				(b) -> method.visitInsn(Opcodes.BALOAD), 
 				(i) -> method.visitInsn(Opcodes.IALOAD), 
-				(s) -> method.visitInsn(Opcodes.IALOAD), 
-				(b) -> method.visitInsn(Opcodes.IALOAD), 
-				(c) -> method.visitInsn(Opcodes.IALOAD), 
+				(s) -> method.visitInsn(Opcodes.SALOAD), 
+				(b) -> method.visitInsn(Opcodes.BALOAD), 
+				(c) -> method.visitInsn(Opcodes.CALOAD), 
 				(f) -> method.visitInsn(Opcodes.FALOAD), 
 				(d) -> method.visitInsn(Opcodes.DALOAD), 
 				(j) -> method.visitInsn(Opcodes.LALOAD), 

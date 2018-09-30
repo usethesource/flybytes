@@ -17,7 +17,7 @@ Class primArrayTestClass(Type t, int len) {
           store("tmp", newArray(t, const(integer(), len))),
            
           // fail if tmp.length != len
-          \if(ne(t, const(integer(), len), alength(load("tmp"))), [rf]),
+          \if(ne(integer(), const(integer(), len), alength(load("tmp"))), [rf]),
            
           // fail if (tmp[0] != def)
           *[\if(ne(t, defVal(t), aaload(t, load("tmp"), const(integer(), 0))),[rf]) | len > 0, _ <- [0..1]],
@@ -45,22 +45,59 @@ Expression defVal(array(Type _)) = null();
 Expression defVal(string()) = null();
 Expression defVal(boolean()) = const(boolean(), false);
 
-list[Type] primTypes = [long()];
+list[Type] primTypes = [integer(), short(), byte(), character(), long()];
 
 bool testArrayClass(Class c) { 
-  m = loadClass(c);
-  compileClass(c, |project://mujava/generated/<c.\type.name>.class|);
+  m = loadClass(c, file=just(|project://mujava/generated/<c.\type.name>.class|));
   return m.invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#bool);
 } 
 
-//test bool primitiveArrays10() 
-//  = all( t <- primTypes, testArrayClass(primArrayTestClass(t, 10)));
+test bool primitiveArrays10() 
+  = all( t <- primTypes, testArrayClass(primArrayTestClass(t, 10)));
   
-//test bool primitiveArrays0() 
-  //= all( t <- primTypes, testArrayClass(primArrayTestClass(t, 0)));
+test bool primitiveArrays0() 
+  = all( t <- primTypes, testArrayClass(primArrayTestClass(t, 0)));
  
 test bool primitiveArrays1() 
   = all( t <- primTypes, testArrayClass(primArrayTestClass(t, 1)));
   
+Class valArrayTestClass(Type t, int len, Expression val) {
+  rf = \return(boolean(), \false());
+  rt = \return(boolean(), \true());
   
+  return class(classType("ValArrayTestClass_<getName(t)>_<len>"),
+      methods=[
+        staticMethod(\public(), boolean(), "testMethod", [],
+        block([var(array(t), "tmp")],
+        [
+          // tmp = new Type[len];
+          store("tmp", newArray(t, const(integer(), len))),
+           
+          // fail if tmp.length != len
+          \if(ne(integer(), const(integer(), len), alength(load("tmp"))), [rf]),
+           
+          // fail if (tmp[0] != def)
+          *[\if(ne(t, defVal(t), aaload(t, load("tmp"), const(integer(), 0))),[rf]) | len > 0, _ <- [0..1]],
+           
+          // generate `len` store instructions: tmp[i] = i;
+          *[aastore(t, load("tmp"), const(integer(), I), val) | I <- [0..len]],
+           
+          // see if that worked by indexing into the array: if (tmp[i] != i)
+          *[\if(ne(t, aaload(t, load("tmp"), const(integer(), I)), val), [rf]) | I <- [0..len]],
+          
+          // return true; 
+          rt
+        ]))
+      ]
+    );
+}  
+
+test bool boolArrayTrue1() 
+  = testArrayClass(valArrayTestClass(boolean(), 1, \true()));
+  
+test bool boolArrayFalse1() 
+  = testArrayClass(valArrayTestClass(boolean(), 1, \false()));  
+
+test bool boolArrayFalse10() 
+  = testArrayClass(valArrayTestClass(boolean(), 10, \false()));
  

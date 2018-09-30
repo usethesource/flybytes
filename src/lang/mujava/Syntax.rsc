@@ -193,7 +193,6 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
  Expression ne(nonnull(), Expression arg) = null(arg);
  Expression ne(Expression arg, nonnull()) = null(arg);
  
- 
  // Below popular some convenience macros for
  // generating methods and constructors:
  

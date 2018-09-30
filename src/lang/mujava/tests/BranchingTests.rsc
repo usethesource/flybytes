@@ -48,6 +48,9 @@ test bool testIfMethodFalse() = testIf(ifClass(invokeStatic(methodDesc(boolean()
 test bool testIfEqTrue() = testIf(ifClass(eq(integer(), const(integer(),1),const(integer(),1))), true);
 test bool testIfEqFalse() = testIf(ifClass(eq(integer(), const(integer(),2),const(integer(),1))), false);
 
+test bool testIfEqBoolTrue() = testIf(ifClass(eq(integer(), \true(), \true())), true);
+test bool testIfEqBoolFalse() = testIf(ifClass(eq(integer(),\true(), \false())), false);
+
 // now some special tests to see if `if(eq(a,b))` which is optimized to `ifeq(a,b)`,
 // and also for the other comparison operators, is compiled correctly:
 private alias BinOp = Expression (Type, Expression, Expression);

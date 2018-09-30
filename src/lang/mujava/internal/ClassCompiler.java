@@ -1,5 +1,6 @@
 package lang.mujava.internal;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.lang.reflect.Array;
@@ -16,6 +17,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.rascalmpl.interpreter.IEvaluatorContext;
+import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.uri.URIResolverRegistry;
 
 import io.usethesource.vallang.IBool;
@@ -59,7 +61,7 @@ public class ClassCompiler {
 		}
 	}
 
-	public IValue loadClass(IConstructor cls, IList classpath, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
+	public IValue loadClass(IConstructor cls, IConstructor output, IList classpath, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
 		this.out = ctx.getStdOut();
 
 		try {
@@ -71,6 +73,16 @@ public class ClassCompiler {
 
 			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
 
+			if (output.getConstructorType().getName() == "just") {
+				ISourceLocation classFile = (ISourceLocation) output.get("val");
+				try (OutputStream out = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
+					out.write(cw.toByteArray());
+				}
+				catch (IOException e) {
+					RuntimeExceptionFactory.io(vf.string(e.getMessage()), null, null);
+				}
+			}
+			
 			return m.mirrorClass(className, loaded);
 		} 
 		catch (Throwable e) {
@@ -122,7 +134,7 @@ public class ClassCompiler {
 		private static final Builder DONE = () -> {};
 		private final ClassVisitor cw;
 		private final int version;
-//		private final PrintWriter out;
+		private final PrintWriter out;
 		private IConstructor[] variableTypes;
 		private String[] variableNames;
 		private int variableCounter;
@@ -135,7 +147,7 @@ public class ClassCompiler {
 		public Compile(ClassVisitor cw, int version, PrintWriter out) {
 			this.cw = cw;
 			this.version = version;
-//			this.out = out;
+			this.out = out;
 		}
 
 		public void compileClass(IConstructor o) {
@@ -1026,6 +1038,7 @@ public class ClassCompiler {
 	}
 
 	private void compileExpression_NewArraySize(IConstructor type, IConstructor size) {
+		out.println("size = " + size);
 		compileExpression(size, () -> compileNewArrayWithSizeOnStack(type));
 	}
 	
@@ -1219,7 +1232,7 @@ public class ClassCompiler {
 				(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFEQ, lhs, rhs, thenPart, elsePart, continuation),
 				(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFEQ, lhs, rhs, thenPart, elsePart, continuation),
 				(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFEQ, lhs, rhs, thenPart, elsePart, continuation),
-				(v) -> { throw new IllegalArgumentException(">= on void"); }, 
+				(v) -> { throw new IllegalArgumentException("!= on void"); }, 
 				(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
 				(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, lhs, rhs, thenPart, elsePart, continuation),
 				(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, lhs, rhs, thenPart, elsePart, continuation)

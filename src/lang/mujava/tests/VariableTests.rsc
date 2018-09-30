@@ -45,8 +45,7 @@ Expression defVal(array(Type _)) = null();
 Expression defVal(string()) = null();
  
 bool testVarClass(Class c) { 
-  m = loadClass(c);
-  compileClass(c, |project://mujava/generated/<c.\type.name>.class|);
+  m = loadClass(c, file=just(|project://mujava/generated/<c.\type.name>.class|));
   return m.invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#bool);
 } 
 

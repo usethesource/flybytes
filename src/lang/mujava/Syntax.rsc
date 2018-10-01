@@ -166,8 +166,6 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | alength(Expression arg)
   | checkcast(Expression arg, Type \type)
   | coerce(Type from, Type to, Expression arg)
-  | nonnull(Expression arg)
-  | null(Expression arg)
   | shr(Expression lhs, Expression shift)
   | shl(Expression lhs, Expression shift)
   | ushr(Expression lhs, Expression shift)
@@ -182,16 +180,6 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | neg(Expression arg)
   | inc(str name, int inc)
   ;
- 
- // for run-time efficiency we simplify all null checks:
- Expression eq(null(), Expression arg) = null(arg);
- Expression eq(Expression arg, null()) = null(arg);
- Expression eq(nonnull(), Expression arg) = nonnull(arg);
- Expression eq(Expression arg, nonnull()) = nonnull(arg);
- Expression ne(null(), Expression arg) = nonnull(arg);
- Expression ne(Expression arg, null()) = nonnull(arg);
- Expression ne(nonnull(), Expression arg) = null(arg);
- Expression ne(Expression arg, nonnull()) = null(arg);
  
  // Below popular some convenience macros for
  // generating methods and constructors:

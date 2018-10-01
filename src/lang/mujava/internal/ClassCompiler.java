@@ -463,7 +463,7 @@ public class ClassCompiler {
 				compileEq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				return;
 			case "ne":
-				compileNeq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				compileNe(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				return;
 			case "le":
 				compileLe(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
@@ -641,7 +641,7 @@ public class ClassCompiler {
 			case "eq":
 				return compileEq(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
 			case "ne":
-				return compileNeq(AST.$getLhs(exp), AST.$getRhs(exp), (Builder<?>) pushTrue, (Builder<?>) pushFalse, DONE);
+				return compileNe(AST.$getLhs(exp), AST.$getRhs(exp), (Builder<?>) pushTrue, (Builder<?>) pushFalse, DONE);
 			case "le":
 				return compileLe(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
 			case "gt":
@@ -1116,6 +1116,13 @@ public class ClassCompiler {
 		}
 
 		private IConstructor compileEq(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			if (lhs.getConstructorType().getName().equals("null")) {
+				return compileNull(rhs, thenPart, elsePart, continuation);
+			}
+			else if (rhs.getConstructorType().getName().equals("null")) {
+				return compileNull(lhs, thenPart, elsePart, continuation);
+			}
+			
 			IConstructor type = prepareArguments(lhs, rhs);
 			
 			Switch.type0(type, 
@@ -1190,7 +1197,14 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor compileNeq(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+		private IConstructor compileNe(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			if (lhs.getConstructorType().getName().equals("null")) {
+				return compileNonNull(rhs, thenPart, elsePart, continuation);
+			}
+			else if (rhs.getConstructorType().getName().equals("null")) {
+				return compileNonNull(lhs, thenPart, elsePart, continuation);
+			}
+			
 			IConstructor type = prepareArguments(lhs, rhs);
 			
 			Switch.type0(type, 

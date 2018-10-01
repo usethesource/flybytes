@@ -15,17 +15,17 @@ public Class ifClass(Expression cond) {
   return class(classType(name),
       methods=[
         staticMethod(\public(), boolean(), "ifTest", [], block([], [
-           \if (cond, [\return(boolean(), \true())]),
-           \return(boolean(), \false())
+           \if (cond, [\return(\true())]),
+           \return(\false())
         ])),
         staticMethod(\public(), boolean(), "ifElseTest", [], [
-           \if (cond, [\return(boolean(), \true())], [\return(boolean(), \false())])
+           \if (cond, [\return(\true())], [\return(\false())])
         ]),
         staticMethod(\public(), boolean(), "methodTrue", [], [
-           \return(boolean(), \true())
+           \return(\true())
         ]),
         staticMethod(\public(), boolean(), "methodFalse", [], [
-           \return(boolean(), \false())
+           \return(\false())
         ])
       ]
     );
@@ -45,34 +45,34 @@ test bool testIfFalse() = testIf(ifClass(\false()), false);
 test bool testIfMethodTrue() = testIf(ifClass(invokeStatic(methodDesc(boolean(),"methodTrue",[]),[])), true);
 test bool testIfMethodFalse() = testIf(ifClass(invokeStatic(methodDesc(boolean(),"methodFalse",[]),[])), false);
 
-test bool testIfEqTrue() = testIf(ifClass(eq(integer(), const(integer(),1),const(integer(),1))), true);
-test bool testIfEqFalse() = testIf(ifClass(eq(integer(), const(integer(),2),const(integer(),1))), false);
+test bool testIfEqTrue() = testIf(ifClass(eq(const(integer(),1),const(integer(),1))), true);
+test bool testIfEqFalse() = testIf(ifClass(eq(const(integer(),2),const(integer(),1))), false);
 
-test bool testIfEqBoolTrue() = testIf(ifClass(eq(boolean(), \true(), \true())), true);
-test bool testIfEqBoolFalse() = testIf(ifClass(eq(boolean(),\true(), \false())), false);
+test bool testIfEqBoolTrue() = testIf(ifClass(eq(\true(), \true())), true);
+test bool testIfEqBoolFalse() = testIf(ifClass(eq(\true(), \false())), false);
 
 // now some special tests to see if `if(eq(a,b))` which is optimized to `ifeq(a,b)`,
 // and also for the other comparison operators, is compiled correctly:
-private alias BinOp = Expression (Type, Expression, Expression);
+private alias BinOp = Expression (Expression, Expression);
 
 private Class ifCmpClass(Type t, BinOp op) {
-  expr = op(t, load("i"), load("j"));
+  expr = op(load("i"), load("j"));
   name = "IfCmp_<getName(expr)>_<getName(t)>";
   
   return class(classType(name),
       methods=[
         staticMethod(\public(), boolean(), "ifThenTest", [var(t,"i"), var(t,"j")], [
            \if (expr /* should be short-cut to IFCMP internally */, [
-             \return(\boolean(), \true())         
+             \return(\true())         
            ]),
-           \return(\boolean(), \false())
+           \return(\false())
         ])
         ,
         staticMethod(\public(), boolean(), "ifThenElseTest", [var(t,"i"), var(t,"j")], [
            \if (expr /* should be short-cut to IFCMP internally */, [
-             \return(\boolean(), \true())         
+             \return(\true())         
            ],[
-             \return(\boolean(), \false())
+             \return( \false())
            ])   
         ])
       ]

@@ -5,10 +5,10 @@ import lang::mujava::Compiler;
 import lang::mujava::api::JavaLang;
 import util::Math;
 
-test bool intId(int v) = v % intMax() == integer(integer(v % intMax()));
-test bool longId(int v) = v % longMax() == long(long(v % longMax()));
-test bool byteId(int v) = v % byteMax() == byte(byte(v % byteMax()));
-test bool shortId(int v) = v % shortMax() == short(short(v % shortMax()));  
+test bool intId(int v) = v % maxValue(integer()) == integer(integer(v % maxValue(integer())));
+test bool longId(int v) = v % maxValue(long()) == long(long(v % maxValue(long())));
+test bool byteId(int v) = v % maxValue(byte()) == byte(byte(v % maxValue(byte())));
+test bool shortId(int v) = v % maxValue(short()) == short(short(v % maxValue(short())));  
 test bool stringId(str x) = x == string(string(x));
 
 // due to loss of precision we can not have a general isomorphism between reals and doubles
@@ -86,7 +86,7 @@ test bool arrayLoadInteger()
   = array(integer(), [integer(1331)]).load(0).toValue(#int) == 1331;
   
 test bool arrayLoadLong()
-  = array(long(), [long(longMax())]).load(0).toValue(#int) == longMax(); 
+  = array(long(), [long(maxValue(long()))]).load(0).toValue(#int) == maxValue(long()); 
   
 test bool arrayLoadObjectNull()
   = array(object(), 10).load(0) == null(); 

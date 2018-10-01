@@ -8,8 +8,8 @@ import Node;
 import util::Math;
   
 Class primVarTestClass(Type t, value v) {
-  rf = \return(boolean(), \false());
-  rt = \return(boolean(), \true());
+  rf = \return(\false());
+  rt = \return(\true());
   
   return class(classType("PrimVarTestClass_<getName(t)>"),
       methods=[
@@ -17,13 +17,13 @@ Class primVarTestClass(Type t, value v) {
         block([var(t, "tmp")],
         [
           // fail if (tmp != def)
-          \if(ne(t, defVal(t), load("tmp")),[rf]),
+          \if(ne(defVal(t), load("tmp")),[rf]),
            
           // tmp = v;
           \store("tmp", const(t, v)),
            
           // if (tmp != v) return false; 
-          \if(ne(t, load("tmp"), const(t, v)), [rf]),
+          \if(ne(load("tmp"), const(t, v)), [rf]),
           
           // return true; 
           rt
@@ -66,8 +66,8 @@ test bool boolVariableTrue() = testVarClass(primVarTestClass(boolean(), true));
 test bool boolVariableFalse() = testVarClass(primVarTestClass(boolean(), false));
 
 Class objVarTestClass(Type t, Expression v) {
-  rf = \return(boolean(), \false());
-  rt = \return(boolean(), \true());
+  rf = \return(\false());
+  rt = \return(\true());
   
   return class(classType("ObjVarTestClass_<getName(t)>"),
       methods=[
@@ -81,7 +81,7 @@ Class objVarTestClass(Type t, Expression v) {
           \store("tmp", v),
            
           // if (!equals(tmp, v)) return false; 
-          \if(neg(boolean(), equals(load("tmp"), v)), [rf]),
+          \if(neg(equals(load("tmp"), v)), [rf]),
           
           // return true; 
           rt

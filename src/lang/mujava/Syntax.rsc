@@ -104,12 +104,12 @@ data Variable = var(Type \type, str name);
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Statement(loc src = |unknown:///|)
   = \store(str name, Expression \value)
-  | \aastore(Type \type, Expression array, Expression index, Expression arg)
-  | \do(Type \type, Expression exp) // pops the result of the expression when needed
+  | \aastore(Expression array, Expression index, Expression arg)
+  | \do(Expression exp) // pops the result of the expression when needed
   | \return()
-  | \return(Type \type, Expression arg)
-  | \putField(str class, Expression receiver, Type \type, str name, Expression arg)
-  | \putStatic(str class, str name, Type \type, Expression arg)
+  | \return(Expression arg)
+  | \putField(Type class, Expression receiver, Type \type, str name, Expression arg)
+  | \putStatic(Type class, str name, Type \type, Expression arg)
   | \if(Expression condition, list[Statement] thenBlock)
   | \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
   
@@ -143,24 +143,24 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | \true()
   | \false()
   | load(str name)
-  | aaload(Type \type, Expression array, Expression index)
+  | aaload(Expression array, Expression index)
   | \const(Type \type, value constant)
   | block(list[Statement] statements, Expression arg)
-  | invokeStatic(str class, Signature desc, list[Expression] args)
-  | invokeSpecial(str class, Expression receiver, Signature desc, list[Expression] args)
-  | invokeVirtual(str class, Expression receiver, Signature desc, list[Expression] args)
-  | invokeInterface(str class, Expression receiver, Signature desc, list[Expression] args)
+  | invokeStatic(Type class, Signature desc, list[Expression] args)
+  | invokeSpecial(Type class, Expression receiver, Signature desc, list[Expression] args)
+  | invokeVirtual(Type class, Expression receiver, Signature desc, list[Expression] args)
+  | invokeInterface(Type class, Expression receiver, Signature desc, list[Expression] args)
   | invokeSuper(Signature desc, list[Expression] args)
-  | newInstance(str class, Signature desc, list[Expression] args)
-  | getField(str class, Expression receiver, Type \type, str name)
-  | getStatic(str class, Type \type, str name)
-  | instanceof(Expression arg, str class)
-  | eq(Type \type, Expression lhs, Expression rhs)
-  | ne(Type \type, Expression lhs, Expression rhs)
-  | le(Type \type, Expression lhs, Expression rhs)
-  | gt(Type \type, Expression lhs, Expression rhs)
-  | ge(Type \type, Expression lhs, Expression rhs)
-  | lt(Type \type, Expression lhs, Expression rhs)
+  | newInstance(Type class, Signature desc, list[Expression] args)
+  | getField(Type class, Expression receiver, Type \type, str name)
+  | getStatic(Type class, Type \type, str name)
+  | instanceof(Expression arg, Type class)
+  | eq(Expression lhs, Expression rhs)
+  | ne(Expression lhs, Expression rhs)
+  | le(Expression lhs, Expression rhs)
+  | gt(Expression lhs, Expression rhs)
+  | ge(Expression lhs, Expression rhs)
+  | lt(Expression lhs, Expression rhs)
   | newArray(Type \type, Expression size)
   | newArray(Type \type, list[Expression] args)
   | alength(Expression arg)
@@ -168,18 +168,18 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | coerce(Type from, Type to, Expression arg)
   | nonnull(Expression arg)
   | null(Expression arg)
-  | shr(Type \type, Expression lhs, Expression shift)
-  | shl(Type \type, Expression lhs, Expression shift)
-  | ushr(Type \type, Expression lhs, Expression shift)
-  | and(Type \type, Expression lhs, Expression rhs)
-  | or(Type \type, Expression lhs, Expression rhs)
-  | xor(Type \type, Expression lhs, Expression rhs)
-  | add(Type \type, Expression lhs, Expression rhs)
-  | sub(Type \type, Expression lhs, Expression rhs)
-  | div(Type \type, Expression lhs, Expression rhs)
-  | rem(Type \type, Expression lhs, Expression rhs)
-  | mul(Type \type, Expression lhs, Expression rhs)
-  | neg(Type \type, Expression arg)
+  | shr(Expression lhs, Expression shift)
+  | shl(Expression lhs, Expression shift)
+  | ushr(Expression lhs, Expression shift)
+  | and(Expression lhs, Expression rhs)
+  | or(Expression lhs, Expression rhs)
+  | xor(Expression lhs, Expression rhs)
+  | add(Expression lhs, Expression rhs)
+  | sub(Expression lhs, Expression rhs)
+  | div(Expression lhs, Expression rhs)
+  | rem(Expression lhs, Expression rhs)
+  | mul(Expression lhs, Expression rhs)
+  | neg(Expression arg)
   | inc(str name, int inc)
   ;
  
@@ -199,7 +199,7 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
 Type object() = classType("java.lang.Object");
 
 Statement invokeSuper(list[Type] formals, list[Expression] args)
-  = do(\void(), invokeSuper(constructorDesc(formals), args));
+  = do(invokeSuper(constructorDesc(formals), args));
   
 Statement invokeSuper()
   = invokeSuper([], []);
@@ -257,42 +257,44 @@ Method constructor(Modifier access, list[Variable] formals, list[Statement] stat
 
 // allocate a new object using the constructor with the given argument types,
 // and passing the given actual parameters      
-Expression new(str class, list[Type] argTypes, list[Expression] args)
+Expression new(Type class, list[Type] argTypes, list[Expression] args)
   = newInstance(class, constructorDesc(argTypes), args);
   
 // allocate a new object via its nullary constructor  
-Expression new(str class)
+Expression new(Type class)
   = new(class, [], []);
      
 // Load the standard "this" reference for every object. 
 // NB! This works only inside non-static methods and inside constructors 
 Expression this() = load("this");
 
+private Type CURRENT = classType("\<current\>");
+
 // Load a field from the currently defined class
 Expression getField(Type \type, str name)
-  = getField("\<current\>", this(), \type, name);
+  = getField(CURRENT, this(), \type, name);
  
 // Load a static field from the currently defined class  
 Expression getStatic(Type \type, str name)
-  = getStatic("\<current\>", \type, name);
+  = getStatic(CURRENT, \type, name);
   
 // Store a field in the currently defined class  
 Statement putField(Type \type, str name, Expression arg)
-  = putField("\<current\>", this(), \type, name, arg);  
+  = putField(CURRENT, this(), \type, name, arg);  
 
 // Store a static field in the currently defined class
 Statement putStatic(Type \type, str name, Expression arg)
-  = putStatic("\<current\>", name, \type, arg);
+  = putStatic(CURRENT, name, \type, arg);
  
 Expression invokeStatic(Signature desc, list[Expression] args) 
-  = invokeStatic("\<current\>", desc, args);
+  = invokeStatic(CURRENT, desc, args);
   
 Expression invokeSpecial(Expression receiver, Signature desc, list[Expression] args)
-  = invokeSpecial("\<current\>", receiver, desc, args);
+  = invokeSpecial(CURRENT, receiver, desc, args);
 
 Expression invokeVirtual(Expression receiver, Signature desc, list[Expression] args)
-  = invokeVirtual("\<current\>", receiver, desc, args);
+  = invokeVirtual(CURRENT, receiver, desc, args);
   
 Expression invokeInterface(Expression receiver, Signature desc, list[Expression] args)
-  = invokeVirtual("\<current\>", receiver, desc, args);
+  = invokeVirtual(CURRENT, receiver, desc, args);
    

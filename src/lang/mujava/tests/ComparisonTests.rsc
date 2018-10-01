@@ -9,32 +9,24 @@ import String;
 import IO;
 import util::Math;
 
-alias CompOp = Expression (Type, Expression, Expression);
+alias CompOp = Expression (Expression, Expression);
 
 Class cmpOpClass(Type t, CompOp op) {
-  expr = op(t, load("i"), load("j"));
+  expr = op(load("i"), load("j"));
   name = "Comparison_<getName(expr)>_<getName(t)>";
   
   return class(classType(name),
       methods=[
         staticMethod(\public(), boolean(), "op", [var(t,"i"), var(t,"j")], [
-           \return(boolean(), expr)
+           \return(expr)
         ])
       ]
     );
 }
 
-bool DEBUG = false;
-
-@memo
-Mirror lc(Class c) { 
-  if (DEBUG) 
-    compileClass(c, |project://mujava/generated| + "<c.\type.name>.class"); 
-  return loadClass(c); 
-}
 
 bool testCmpOp(Class c, Type t, Mirror lhs, Mirror rhs, bool answer) { 
-  m = lc(c);
+  m = loadClass(c);
   reply = m.invokeStatic(methodDesc(t, "op", [t, t]), [lhs, rhs]).toValue(#bool);
   return reply == answer;
 }

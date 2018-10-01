@@ -5,8 +5,8 @@ import lang::mujava::Compiler;
 import Node;
   
 Class primArrayTestClass(Type t, int len) {
-  rf = \return(boolean(), \false());
-  rt = \return(boolean(), \true());
+  rf = \return(\false());
+  rt = \return(\true());
   
   return class(classType("PrimArrayTestClass_<getName(t)>_<len>"),
       methods=[
@@ -14,19 +14,19 @@ Class primArrayTestClass(Type t, int len) {
         block([var(array(t), "tmp")],
         [
           // tmp = new Type[len];
-          store("tmp", newArray(t, const(integer(), len))),
+          store("tmp", newArray(array(t), const(integer(), len))),
            
           // fail if tmp.length != len
-          \if(ne(integer(), const(integer(), len), alength(load("tmp"))), [rf]),
+          \if(ne(const(integer(), len), alength(load("tmp"))), [rf]),
            
           // fail if (tmp[0] != def)
-          *[\if(ne(t, defVal(t), aaload(t, load("tmp"), const(integer(), 0))),[rf]) | len > 0, _ <- [0..1]],
+          *[\if(ne(defVal(t), aaload(load("tmp"), const(integer(), 0))),[rf]) | len > 0, _ <- [0..1]],
            
           // generate `len` store instructions: tmp[i] = i;
-          *[aastore(t, load("tmp"), const(integer(), I), const(t, I)) | I <- [0..len]],
+          *[aastore(load("tmp"), const(integer(), I), const(t, I)) | I <- [0..len]],
            
           // see if that worked by indexing into the array: if (tmp[i] != i)
-          *[\if(ne(t, aaload(t, load("tmp"), const(integer(), I)), const(t, I)), [rf]) | I <- [0..len]],
+          *[\if(ne(aaload(load("tmp"), const(integer(), I)), const(t, I)), [rf]) | I <- [0..len]],
           
           // return true; 
           rt
@@ -62,8 +62,8 @@ test bool primitiveArrays1()
   = all( t <- primTypes, testArrayClass(primArrayTestClass(t, 1)));
   
 Class valArrayTestClass(Type t, int len, Expression val) {
-  rf = \return(boolean(), \false());
-  rt = \return(boolean(), \true());
+  rf = \return(\false());
+  rt = \return(\true());
   
   return class(classType("ValArrayTestClass_<getName(t)>_<len>"),
       methods=[
@@ -71,19 +71,19 @@ Class valArrayTestClass(Type t, int len, Expression val) {
         block([var(array(t), "tmp")],
         [
           // tmp = new Type[len];
-          store("tmp", newArray(t, const(integer(), len))),
+          store("tmp", newArray(array(t), const(integer(), len))),
            
           // fail if tmp.length != len
-          \if(ne(integer(), const(integer(), len), alength(load("tmp"))), [rf]),
+          \if(ne(const(integer(), len), alength(load("tmp"))), [rf]),
            
           // fail if (tmp[0] != def)
-          *[\if(ne(t, defVal(t), aaload(t, load("tmp"), const(integer(), 0))),[rf]) | len > 0, _ <- [0..1]],
+          *[\if(ne(defVal(t), aaload(load("tmp"), const(integer(), 0))),[rf]) | len > 0, _ <- [0..1]],
            
           // generate `len` store instructions: tmp[i] = i;
-          *[aastore(t, load("tmp"), const(integer(), I), val) | I <- [0..len]],
+          *[aastore(load("tmp"), const(integer(), I), val) | I <- [0..len]],
            
           // see if that worked by indexing into the array: if (tmp[i] != i)
-          *[\if(ne(t, aaload(t, load("tmp"), const(integer(), I)), val), [rf]) | I <- [0..len]],
+          *[\if(ne(aaload(load("tmp"), const(integer(), I)), val), [rf]) | I <- [0..len]],
           
           // return true; 
           rt

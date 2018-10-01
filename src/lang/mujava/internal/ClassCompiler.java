@@ -16,11 +16,10 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.util.CheckClassAdapter;
-import org.objectweb.asm.util.TraceClassVisitor;
 import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.uri.URIResolverRegistry;
+import org.rascalmpl.values.ValueFactoryFactory;
 
 import io.usethesource.vallang.IBool;
 import io.usethesource.vallang.IConstructor;
@@ -36,6 +35,8 @@ import io.usethesource.vallang.IValueFactory;
 import io.usethesource.vallang.IWithKeywordParameters;
 import io.usethesource.vallang.type.ITypeVisitor;
 import io.usethesource.vallang.type.Type;
+import io.usethesource.vallang.type.TypeFactory;
+import io.usethesource.vallang.type.TypeStore;
 
 /**
  * Translates muJava ASTs (see lang::mujava::Syntax.rsc) directly down to JVM bytecode,
@@ -84,7 +85,7 @@ public class ClassCompiler {
 					RuntimeExceptionFactory.io(vf.string(e.getMessage()), null, null);
 				}
 			}
-			
+
 			return m.mirrorClass(className, loaded);
 		} 
 		catch (Throwable e) {
@@ -133,9 +134,10 @@ public class ClassCompiler {
 	 * for a single Class definition.
 	 */
 	private static class Compile {
-		private static final Builder DONE = () -> {};
+		private static final Builder<?> DONE = () -> { return null; };
 		private final ClassVisitor cw;
 		private final int version;
+		@SuppressWarnings("unused")
 		private final PrintWriter out;
 		private IConstructor[] variableTypes;
 		private String[] variableNames;
@@ -145,6 +147,8 @@ public class ClassCompiler {
 		private MethodNode method;
 		private IConstructor classType;
 		private ClassNode classNode;
+		private final Builder<?> pushTrue = () -> compileTrue();
+		private final Builder<?> pushFalse = () -> compileFalse();
 
 		public Compile(ClassVisitor cw, int version, PrintWriter out) {
 			this.cw = cw;
@@ -377,7 +381,7 @@ public class ClassCompiler {
 		 * code is generated we can generate the right code in the right place 
 		 * without superfluous additional labels and gotos.
 		 */
-		private void compileStatements(IList statements, Builder continuation) {
+		private Void compileStatements(IList statements, Builder<?> continuation) {
 			if (statements.length() == 0) {
 				continuation.build();
 			}
@@ -387,12 +391,13 @@ public class ClassCompiler {
 						() -> compileStatements(statements.delete(0), continuation)
 						);
 			}
+			return null;
 		}
 
-		private void compileStatement(IConstructor stat, Builder continuation) {
+		private void compileStatement(IConstructor stat, Builder<?> continuation) {
 			switch (stat.getConstructorType().getName()) {
 			case "do" : 
-				compileStat_Do(AST.$getType(stat), (IConstructor) stat.get("exp"));
+				compileStat_Do((IConstructor) stat.get("exp"));
 				continuation.build();
 				break;
 			case "store" : 
@@ -400,15 +405,15 @@ public class ClassCompiler {
 				continuation.build();
 				break;
 			case "aastore" :
-				compileStat_AAStore(AST.$getType(stat), AST.$getArray(stat), AST.$getIndex(stat), AST.$getArg(stat));
+				compileStat_AAStore(AST.$getArray(stat), AST.$getIndex(stat), AST.$getArg(stat));
 				continuation.build();
 				break;
 			case "putField":
-				compileStat_PutField(AST.$getClass(stat, classNode.name), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
+				compileStat_PutField(AST.$getClassFromType(AST.$getClass(stat), classNode.name), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
 				continuation.build();
 				break;
 			case "putStatic":
-				compileStat_PutStatic(AST.$getClass(stat, classNode.name), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
+				compileStat_PutStatic(AST.$getClassFromType(AST.$getClass(stat), classNode.name), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
 				continuation.build();
 				break;
 			case "return" : 
@@ -430,17 +435,17 @@ public class ClassCompiler {
 			}
 		}
 
-		private void compileStat_For(IList $getInit, IConstructor $getCondition, IConstructor $getNext, IList $getStatements, Builder continuation) {
+		private void compileStat_For(IList $getInit, IConstructor $getCondition, IConstructor $getNext, IList $getStatements, Builder<?> continuation) {
 			throw new UnsupportedOperationException();
 		}
 
-		private void compileStat_If(IConstructor cond, IList thenBlock, Builder continuation) {
+		private void compileStat_If(IConstructor cond, IList thenBlock, Builder<?> continuation) {
 			compileStat_IfThenElse(cond, thenBlock, null, continuation);
 		}
 
-		private void compileStat_IfThenElse(IConstructor cond, IList thenBlock, IList elseBlock, Builder continuation) {
-			Builder thenBuilder = () -> compileStatements(thenBlock, DONE);
-			Builder elseBuilder = elseBlock != null ? () -> compileStatements(elseBlock, DONE) : DONE;
+		private void compileStat_IfThenElse(IConstructor cond, IList thenBlock, IList elseBlock, Builder<?> continuation) {
+			Builder<?> thenBuilder = () -> compileStatements(thenBlock, DONE);
+			Builder<?> elseBuilder = elseBlock != null ? () -> compileStatements(elseBlock, DONE) : DONE;
 
 			// here we special case for !=, ==, <=, >=, < and >, null, nonnull, because
 			// there are special jump instructions for these operators on the JVM and we don't want to push
@@ -455,22 +460,22 @@ public class ClassCompiler {
 				continuation.build();
 				break;
 			case "eq":
-				compileEq(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				compileEq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				break;
 			case "ne":
-				compileNeq(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				compileNeq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				break;
 			case "le":
-				compileLe(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				compileLe(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				break;
 			case "gt":
-				compileGt(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				compileGt(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				break;
 			case "ge":
-				compileGe(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				compileGe(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				break;
 			case "lt":
-				compileLt(AST.$getType(cond), AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				compileLt(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
 				break;
 			case "null":
 				if (cond.getConstructorType().getArity() != 1) {
@@ -485,31 +490,26 @@ public class ClassCompiler {
 				compileNull(AST.$getArg(cond), thenBuilder, elseBuilder, continuation);
 				break;
 			default:
-				compileConditionalInverted(
-						() -> compileExpression(cond, DONE),
-						0, 
-						Opcodes.IFEQ, 
-						thenBuilder,
-						elseBuilder,
-						continuation
-						);
+				compileExpression(cond);
+				compileConditionalInverted(0, Opcodes.IFEQ, thenBuilder, elseBuilder, continuation);
 			}
 		}
 
 		private void compileStat_PutStatic(String cls, IConstructor type, String name, IConstructor arg) {
-			compileExpression(arg, DONE);
+			compileExpression(arg);
 			method.visitFieldInsn(Opcodes.PUTSTATIC, cls, name, Signature.type(type));
 		}
 
 		private void compileStat_PutField(String cls, IConstructor receiver, IConstructor type, String name, IConstructor arg) {
-			compileExpression(receiver, () -> compileExpression(arg, DONE));
+			compileExpression(receiver);
+			compileExpression(arg);
 			method.visitFieldInsn(Opcodes.PUTFIELD, cls, name, Signature.type(type));
 		}
 
 		private void compileStat_Store(IConstructor stat) {
 			String name = AST.$getName(stat);
 			int pos = positionOf(name);
-			compileExpression(AST.$getValue(stat), DONE);
+			compileExpression(AST.$getValue(stat));
 
 			Switch.type0(variableTypes[pos],
 					(z) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
@@ -532,9 +532,9 @@ public class ClassCompiler {
 				method.visitInsn(Opcodes.RETURN);
 			}
 			else {
-				compileExpression(AST.$getArg(stat), DONE);
+				IConstructor type = compileExpression(AST.$getArg(stat));
 
-				Switch.type0(AST.$getType(stat),
+				Switch.type0(type,
 						(z) -> { method.visitInsn(Opcodes.IRETURN); },
 						(i) -> { method.visitInsn(Opcodes.IRETURN); },
 						(s) -> { method.visitInsn(Opcodes.IRETURN); },
@@ -551,8 +551,8 @@ public class ClassCompiler {
 			}
 		}
 
-		private void compileStat_Do(IConstructor type, IConstructor exp) {
-			compileExpression(exp, () -> 
+		private Void compileStat_Do(IConstructor exp) {
+			IConstructor type = compileExpression(exp); 
 			Switch.type0(type, 
 					(z) -> pop(), 
 					(i) -> pop(), 
@@ -566,7 +566,8 @@ public class ClassCompiler {
 					(c) -> pop(), 
 					(a) -> pop(),
 					(S) -> pop()
-					));
+					);
+			return null;
 		}
 
 		private void pop() {
@@ -577,182 +578,107 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.POP2);
 		}
 
-		private void compileExpression(IConstructor exp, Builder continuation) {
+		private IConstructor compileExpression(IConstructor exp) {
 			switch (exp.getConstructorType().getName()) {
 			case "const" : 
-				compileExpression_Const(AST.$getType(exp), AST.$getConstant(exp)); 
-				continuation.build();
-				break;
+				return compileExpression_Const(AST.$getType(exp), AST.$getConstant(exp)); 
 			case "this" : 
-				compileExpression_Load("this");
-				continuation.build();
-				break;
+				return compileExpression_Load("this");
 			case "newInstance":
-				compileExpression_NewInstance(exp);
-				continuation.build();
-				break;
+				return compileExpression_NewInstance(exp);
 			case "newArray":
 				if (exp.get(1) instanceof IList) {
-					compileExpression_NewArray(AST.$getType(exp), AST.$getArgs(exp));
+					return compileExpression_NewArray(AST.$getType(exp), AST.$getArgs(exp));
 				}
 				else {
-					compileExpression_NewArraySize(AST.$getType(exp), AST.$getSize(exp));
+					return compileExpression_NewArraySize(AST.$getType(exp), AST.$getSize(exp));
 				}
-				continuation.build();
-				break;
 			case "alength":
-				compileExpression_ALength(AST.$getArg(exp));
-				continuation.build();
-				break;
+				return compileExpression_ALength(AST.$getArg(exp));
 			case "load" : 
-				compileExpression_Load(AST.$getName(exp)); 
-				continuation.build();
-				break;
+				return compileExpression_Load(AST.$getName(exp)); 
 			case "aaload" :
-				compileExpression_AALoad(AST.$getType(exp), AST.$getArray(exp), AST.$getIndex(exp));
-				continuation.build();
-				break;
+				return compileExpression_AALoad(AST.$getArray(exp), AST.$getIndex(exp));
 			case "getStatic":
-				compileGetStatic(AST.$getClass(exp, classNode.name), AST.$getType(exp), AST.$getName(exp));
-				continuation.build();
-				break;
+				return compileGetStatic(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));
 			case "invokeVirtual" : 
-				compileInvokeVirtual(AST.$getClass(exp, classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
-				continuation.build();
-				break;
+				return compileInvokeVirtual(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 			case "invokeInterface" : 
-				compileInvokeInterface(AST.$getClass(exp, classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
-				continuation.build();
-				break;
+				return compileInvokeInterface(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 			case "invokeSpecial" : 
-				compileInvokeSpecial(AST.$getClass(exp, classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
-				continuation.build();
-				break;
+				return compileInvokeSpecial(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 			case "invokeSuper" : 
-				compileInvokeSuper(classNode.superName, AST.$getDesc(exp), AST.$getArgs(exp));
-				continuation.build();
-				break;
+				return compileInvokeSuper(classNode.superName, AST.$getDesc(exp), AST.$getArgs(exp));
 			case "invokeStatic" : 
-				compileInvokeStatic(AST.$getClass(exp, classNode.name), AST.$getDesc(exp), AST.$getArgs(exp));
-				continuation.build();
-				break;
+				return compileInvokeStatic(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getArgs(exp));
 			case "getField":
-				compileGetField(AST.$getReceiver(exp), AST.$getClass(exp, classNode.name), AST.$getType(exp), AST.$getName(exp));
-				continuation.build();
-				break;
+				return compileGetField(AST.$getReceiver(exp), AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));
 			case "instanceof":
-				compileInstanceof(AST.$getArg(exp), AST.$getClass(exp, classNode.name));
-				continuation.build();
-				break;
+				return compileInstanceof(AST.$getArg(exp), AST.$getClassFromType(exp, classNode.name));
 			case "block":
-				compileBlock(AST.$getStatements(exp), AST.$getArg(exp), continuation);
-				break;
+				return compileBlock(AST.$getStatements(exp), AST.$getArg(exp));
 			case "null":
 				if (exp.getConstructorType().getArity() == 0) {
-					compileNull();  // null constant
-					continuation.build();
+					return compileNull();  // null constant
 				}
 				else { 
-					compileNull(AST.$getArg(exp), () -> compileTrue(), () -> compileFalse(), continuation); // null check 
+					return compileNull(AST.$getArg(exp), pushTrue, pushFalse, DONE); // null check 
 				}
-				break;
 			case "nonnull":
-				compileNonNull(AST.$getArg(exp), () -> compileTrue(), () -> compileFalse(), continuation); // null check 
-				break;
+				return compileNonNull(AST.$getArg(exp), pushTrue, pushFalse, DONE); // null check 
 			case "true":
-				compileTrue();
-				continuation.build();
-				break;
+				return compileTrue();
 			case "false":
-				compileFalse();
-				continuation.build();
-				break;
+				return compileFalse();
 			case "coerce":
-				compileCoerce(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
-				continuation.build();
-				break;
+				return compileCoerce(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
 			case "eq":
-				compileEq(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
-				break;
+				return compileEq(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
 			case "ne":
-				compileNeq(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
-				break;
+				return compileNeq(AST.$getLhs(exp), AST.$getRhs(exp), (Builder<?>) pushTrue, (Builder<?>) pushFalse, DONE);
 			case "le":
-				compileLe(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
-				break;
+				return compileLe(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
 			case "gt":
-				compileGt(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
-				break;
+				return compileGt(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
 			case "ge":
-				compileGe(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
-				break;
+				return compileGe(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
 			case "lt":
-				compileLt(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(),continuation);
-				break;
+				return compileLt(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
 			case "add":
-				compileAdd(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileAdd(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "div":
-				compileDiv(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileDiv(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "rem":
-				compileRem(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileRem(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "sub":
-				compileSub(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileSub(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "mul":
-				compileMul(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileMul(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "and":
-				compileAnd(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileAnd(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "or":
-				compileOr(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileOr(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "xor":
-				compileXor(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileXor(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "neg":
-				compileNeg(AST.$getType(exp), AST.$getArg(exp));
-				continuation.build();
-				break;
+				return compileNeg(AST.$getArg(exp));
 			case "inc":
-				compileInc(AST.$getName(exp), AST.$getInc(exp));
-				continuation.build();
-				break;
+				return compileInc(AST.$getName(exp), AST.$getInc(exp));
 			case "shr":
-				compileShr(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileShr(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "shl":
-				compileShl(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileShl(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "ushr":
-				compileUShr(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp));
-				continuation.build();
-				break;
+				return compileUShr(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "checkcast":
-				compileCheckCast(AST.$getArg(exp), AST.$getType(exp));
-				continuation.build();
-				break;
+				return compileCheckCast(AST.$getArg(exp), AST.$getType(exp));
 			default: 
 				throw new IllegalArgumentException("unknown expression: " + exp);                                     
 			}
 		}
 
-		private void compileShl(IConstructor type, IConstructor lhs, IConstructor rhs) {
-			compileExpression(lhs, DONE);
-			compileExpression(rhs, DONE);
+		private IConstructor compileShl(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareShiftArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.ISHL),
 					(i) -> method.visitInsn(Opcodes.ISHL), 
@@ -767,11 +693,19 @@ public class ClassCompiler {
 					(a) -> { throw new IllegalArgumentException("shl on array"); },
 					(S) -> { throw new IllegalArgumentException("shl on string"); }
 					);
+			return type;
 		}
 
-		private void compileUShr(IConstructor type, IConstructor lhs, IConstructor rhs) {
-			compileExpression(lhs, DONE);
-			compileExpression(rhs, DONE);
+		private IConstructor prepareShiftArguments(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = compileExpression(lhs);
+			if (compileExpression(rhs).getConstructorType() != Types.integerType().getConstructorType()) {
+				throw new IllegalArgumentException("shift should get an integer as second parameter");
+			}
+			return type;
+		}
+
+		private IConstructor compileUShr(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareShiftArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IUSHR),
 					(i) -> method.visitInsn(Opcodes.IUSHR), 
@@ -786,11 +720,11 @@ public class ClassCompiler {
 					(a) -> { throw new IllegalArgumentException("ushr on array"); },
 					(S) -> { throw new IllegalArgumentException("ushr on string"); }
 					);
+			return type;
 		}
 
-		private void compileShr(IConstructor type, IConstructor lhs, IConstructor rhs) {
-			compileExpression(lhs, DONE);
-			compileExpression(rhs, DONE);
+		private IConstructor compileShr(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareShiftArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.ISHR),
 					(i) -> method.visitInsn(Opcodes.ISHR), 
@@ -805,1598 +739,1755 @@ public class ClassCompiler {
 					(a) -> { throw new IllegalArgumentException("shr on array"); },
 					(S) -> { throw new IllegalArgumentException("shr on string"); }
 					);
+			return type;
 		}
 
-	private void compileInc(String name, int inc) {
-		method.visitIincInsn(positionOf(name), inc); 
-	}
-
-	private void compileAdd(IConstructor type, IConstructor lhs, IConstructor rhs) {
-		compileExpression(lhs, DONE);
-		compileExpression(rhs, DONE);
-		Switch.type0(type, 
-				(z) -> method.visitInsn(Opcodes.IOR),
-				(i) -> method.visitInsn(Opcodes.IADD), 
-				(s) -> method.visitInsn(Opcodes.IADD), 
-				(b) -> method.visitInsn(Opcodes.IADD), 
-				(c) -> method.visitInsn(Opcodes.IADD), 
-				(f) -> method.visitInsn(Opcodes.FADD),
-				(d) -> method.visitInsn(Opcodes.DADD),
-				(l) -> method.visitInsn(Opcodes.LADD),
-				(v) -> { throw new IllegalArgumentException("add on void"); }, 
-				(c) -> { throw new IllegalArgumentException("add on object"); },
-				(a) -> { throw new IllegalArgumentException("add on array"); },
-				(S) -> { throw new IllegalArgumentException("add on string"); }
-				);
-	}
-
-	private void compileSub(IConstructor type, IConstructor lhs, IConstructor rhs) {
-		compileExpression(lhs, DONE);
-		compileExpression(rhs, DONE);
-		Switch.type0(type, 
-				(z) -> { throw new IllegalArgumentException("sub on bool"); },
-				(i) -> method.visitInsn(Opcodes.ISUB), 
-				(s) -> method.visitInsn(Opcodes.ISUB), 
-				(b) -> method.visitInsn(Opcodes.ISUB), 
-				(c) -> method.visitInsn(Opcodes.ISUB), 
-				(f) -> method.visitInsn(Opcodes.FSUB),
-				(d) -> method.visitInsn(Opcodes.DSUB),
-				(l) -> method.visitInsn(Opcodes.LSUB),
-				(v) -> { throw new IllegalArgumentException("add on void"); }, 
-				(c) -> { throw new IllegalArgumentException("add on object"); },
-				(a) -> { throw new IllegalArgumentException("add on array"); },
-				(S) -> { throw new IllegalArgumentException("add on string"); }
-				);
-	}
-
-	private void compileRem(IConstructor type, IConstructor lhs, IConstructor rhs) {
-		compileExpression(lhs, DONE);
-		compileExpression(rhs, DONE);
-		Switch.type0(type, 
-				(z) -> { throw new IllegalArgumentException("rem on bool"); },
-				(i) -> method.visitInsn(Opcodes.IREM), 
-				(s) -> method.visitInsn(Opcodes.IREM), 
-				(b) -> method.visitInsn(Opcodes.IREM), 
-				(c) -> method.visitInsn(Opcodes.IREM), 
-				(f) -> method.visitInsn(Opcodes.FREM),
-				(d) -> method.visitInsn(Opcodes.DREM),
-				(l) -> method.visitInsn(Opcodes.LREM),
-				(v) -> { throw new IllegalArgumentException("add on void"); }, 
-				(c) -> { throw new IllegalArgumentException("add on object"); },
-				(a) -> { throw new IllegalArgumentException("add on array"); },
-				(S) -> { throw new IllegalArgumentException("add on string"); }
-				);
-	}
-
-	private void compileDiv(IConstructor type, IConstructor lhs, IConstructor rhs) {
-		compileExpression(lhs, DONE);
-		compileExpression(rhs, DONE);
-		Switch.type0(type, 
-				(z) -> { throw new IllegalArgumentException("div on bool"); },
-				(i) -> method.visitInsn(Opcodes.IDIV), 
-				(s) -> method.visitInsn(Opcodes.IDIV), 
-				(b) -> method.visitInsn(Opcodes.IDIV), 
-				(c) -> method.visitInsn(Opcodes.IDIV), 
-				(f) -> method.visitInsn(Opcodes.FDIV),
-				(d) -> method.visitInsn(Opcodes.DDIV),
-				(l) -> method.visitInsn(Opcodes.LDIV),
-				(v) -> { throw new IllegalArgumentException("div on void"); }, 
-				(c) -> { throw new IllegalArgumentException("div on object"); },
-				(a) -> { throw new IllegalArgumentException("div on array"); },
-				(S) -> { throw new IllegalArgumentException("div on string"); }
-				);
-	}
-
-	private void compileMul(IConstructor type, IConstructor lhs, IConstructor rhs) {
-		compileExpression(lhs, DONE);
-		compileExpression(rhs, DONE);
-		Switch.type0(type, 
-				(z) -> method.visitInsn(Opcodes.IAND),
-				(i) -> method.visitInsn(Opcodes.IMUL), 
-				(s) -> method.visitInsn(Opcodes.IMUL), 
-				(b) -> method.visitInsn(Opcodes.IMUL), 
-				(c) -> method.visitInsn(Opcodes.IMUL), 
-				(f) -> method.visitInsn(Opcodes.FMUL),
-				(d) -> method.visitInsn(Opcodes.DMUL),
-				(l) -> method.visitInsn(Opcodes.LMUL),
-				(v) -> { throw new IllegalArgumentException("add on void"); }, 
-				(c) -> { throw new IllegalArgumentException("add on object"); },
-				(a) -> { throw new IllegalArgumentException("add on array"); },
-				(S) -> { throw new IllegalArgumentException("add on string"); }
-				);
-	}
-
-	private void compileAnd(IConstructor type, IConstructor lhs, IConstructor rhs) {
-		compileExpression(lhs, DONE);
-		compileExpression(rhs, DONE);
-		Switch.type0(type, 
-				(z) -> method.visitInsn(Opcodes.IAND),
-				(i) -> method.visitInsn(Opcodes.IAND), 
-				(s) -> method.visitInsn(Opcodes.IAND), 
-				(b) -> method.visitInsn(Opcodes.IAND), 
-				(c) -> method.visitInsn(Opcodes.IAND), 
-				(f) -> { throw new IllegalArgumentException("and on void"); },
-				(d) -> { throw new IllegalArgumentException("and on void"); },
-				(l) -> { throw new IllegalArgumentException("and on void"); },
-				(v) -> { throw new IllegalArgumentException("and on void"); }, 
-				(c) -> { throw new IllegalArgumentException("and on object"); },
-				(a) -> { throw new IllegalArgumentException("and on array"); },
-				(S) -> { throw new IllegalArgumentException("and on string"); }
-				);
-	}
-
-	private void compileOr(IConstructor type, IConstructor lhs, IConstructor rhs) {
-		compileExpression(lhs, DONE);
-		compileExpression(rhs, DONE);
-		Switch.type0(type, 
-				(z) -> method.visitInsn(Opcodes.IOR),
-				(i) -> method.visitInsn(Opcodes.IOR), 
-				(s) -> method.visitInsn(Opcodes.IOR), 
-				(b) -> method.visitInsn(Opcodes.IOR), 
-				(c) -> method.visitInsn(Opcodes.IOR), 
-				(f) -> { throw new IllegalArgumentException("or on void"); },
-				(d) -> { throw new IllegalArgumentException("or on void"); },
-				(l) -> { throw new IllegalArgumentException("or on void"); },
-				(v) -> { throw new IllegalArgumentException("or on void"); }, 
-				(c) -> { throw new IllegalArgumentException("or on object"); },
-				(a) -> { throw new IllegalArgumentException("or on array"); },
-				(S) -> { throw new IllegalArgumentException("or on string"); }
-				);
-	}
-
-	private void compileXor(IConstructor type, IConstructor lhs, IConstructor rhs) {
-		compileExpression(lhs, DONE);
-		compileExpression(rhs, DONE);
-		Switch.type0(type, 
-				(z) -> method.visitInsn(Opcodes.IXOR),
-				(i) -> method.visitInsn(Opcodes.IXOR), 
-				(s) -> method.visitInsn(Opcodes.IXOR), 
-				(b) -> method.visitInsn(Opcodes.IXOR), 
-				(c) -> method.visitInsn(Opcodes.IXOR), 
-				(f) -> { throw new IllegalArgumentException("xor on void"); },
-				(d) -> { throw new IllegalArgumentException("xor on void"); },
-				(l) -> { throw new IllegalArgumentException("xor on void"); },
-				(v) -> { throw new IllegalArgumentException("xor on void"); }, 
-				(c) -> { throw new IllegalArgumentException("xor on object"); },
-				(a) -> { throw new IllegalArgumentException("xor on array"); },
-				(S) -> { throw new IllegalArgumentException("xor on string"); }
-				);
-	}
-
-	private void compileNeg(IConstructor type, IConstructor arg) {
-		compileExpression(arg, DONE);
-		Switch.type0(type, 
-				(z) -> method.visitInsn(Opcodes.INEG),
-				(i) -> method.visitInsn(Opcodes.INEG), 
-				(s) -> method.visitInsn(Opcodes.INEG), 
-				(b) -> method.visitInsn(Opcodes.INEG), 
-				(c) -> method.visitInsn(Opcodes.INEG), 
-				(f) -> method.visitInsn(Opcodes.FNEG),
-				(d) -> method.visitInsn(Opcodes.DNEG),
-				(l) -> method.visitInsn(Opcodes.LNEG),
-				(v) -> { throw new IllegalArgumentException("neg on void"); }, 
-				(c) -> { throw new IllegalArgumentException("neg on object"); },
-				(a) -> { throw new IllegalArgumentException("neg on array"); },
-				(S) -> { throw new IllegalArgumentException("neg on string"); }
-				);
-	}
-
-
-	private void compileInvokeSuper(String superclass, IConstructor sig, IList args) {
-		compileExpression_Load("this");
-		compileExpressionList(args, DONE);
-		method.visitMethodInsn(Opcodes.INVOKESPECIAL, superclass, "<init>", Signature.constructor(sig), false);
-	}
-
-	private void compileStat_AAStore(IConstructor type, IConstructor array, IConstructor index,
-			IConstructor arg) {
-		// passing continuations make this look complex.
-		//   * first compile array, 
-		//   * then the index, 
-		//   * then the store instruction:
-		compileExpression(array, 
-				() -> compileExpression(index, 
-						() -> compileExpression(arg,
-								() -> compileArrayStoreWithArrayIndexValueOnStack(type)
-								)
-						)
-				);
-	}
-
-	private void compileArrayStoreWithArrayIndexValueOnStack(IConstructor type) {
-		Switch.type0(type, 
-				(z) -> method.visitInsn(Opcodes.BASTORE),
-				(i) -> method.visitInsn(Opcodes.IASTORE),
-				(s) -> method.visitInsn(Opcodes.SASTORE),
-				(b) -> method.visitInsn(Opcodes.BASTORE),
-				(c) -> method.visitInsn(Opcodes.CASTORE),
-				(f) -> method.visitInsn(Opcodes.FASTORE),
-				(d) -> method.visitInsn(Opcodes.DASTORE),
-				(l) -> method.visitInsn(Opcodes.LASTORE),
-				(v) -> { throw new IllegalArgumentException("store void in array"); },
-				(c) -> method.visitInsn(Opcodes.AASTORE),
-				(a) -> method.visitInsn(Opcodes.AASTORE),
-				(S) -> method.visitInsn(Opcodes.AASTORE)
-				);
-	}
-
-	private void compileCheckCast(IConstructor arg, IConstructor type) {
-		compileExpression(arg, DONE);
-		String cons = type.getConstructorType().getName();
-
-		// weird inconsistency in CHECKCAST instruction?
-		if (cons == "classType") {
-			method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type));
+		private IConstructor compileInc(String name, int inc) {
+			method.visitIincInsn(positionOf(name), inc);
+			return Types.integerType();
 		}
-		else if (cons == "array") {
-			method.visitTypeInsn(Opcodes.CHECKCAST, Signature.type(type));
+
+		private IConstructor compileAdd(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			Switch.type0(type, 
+					(z) -> method.visitInsn(Opcodes.IOR),
+					(i) -> method.visitInsn(Opcodes.IADD), 
+					(s) -> method.visitInsn(Opcodes.IADD), 
+					(b) -> method.visitInsn(Opcodes.IADD), 
+					(c) -> method.visitInsn(Opcodes.IADD), 
+					(f) -> method.visitInsn(Opcodes.FADD),
+					(d) -> method.visitInsn(Opcodes.DADD),
+					(l) -> method.visitInsn(Opcodes.LADD),
+					(v) -> { throw new IllegalArgumentException("add on void"); }, 
+					(c) -> { throw new IllegalArgumentException("add on object"); },
+					(a) -> { throw new IllegalArgumentException("add on array"); },
+					(S) -> { throw new IllegalArgumentException("add on string"); }
+					);
+			return type;
 		}
-		else {
-			throw new IllegalArgumentException("can not check cast to " + type);
+
+		private IConstructor compileSub(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			Switch.type0(type, 
+					(z) -> { throw new IllegalArgumentException("sub on bool"); },
+					(i) -> method.visitInsn(Opcodes.ISUB), 
+					(s) -> method.visitInsn(Opcodes.ISUB), 
+					(b) -> method.visitInsn(Opcodes.ISUB), 
+					(c) -> method.visitInsn(Opcodes.ISUB), 
+					(f) -> method.visitInsn(Opcodes.FSUB),
+					(d) -> method.visitInsn(Opcodes.DSUB),
+					(l) -> method.visitInsn(Opcodes.LSUB),
+					(v) -> { throw new IllegalArgumentException("add on void"); }, 
+					(c) -> { throw new IllegalArgumentException("add on object"); },
+					(a) -> { throw new IllegalArgumentException("add on array"); },
+					(S) -> { throw new IllegalArgumentException("add on string"); }
+					);
+			return type;
 		}
-	}
 
-	private void compileExpression_ALength(IConstructor arg) {
-		compileExpression(arg, DONE);
-		method.visitInsn(Opcodes.ARRAYLENGTH);
-	}
-
-	private void compileExpression_NewArraySize(IConstructor type, IConstructor size) {
-		compileExpression(size, () -> compileNewArrayWithSizeOnStack(type));
-	}
-	
-	private void compileExpression_NewArray(IConstructor type, IList elems) {
-		intConstant(elems.length());
-		compileNewArrayWithSizeOnStack(type);
-		
-		int i = 0;
-		for (IValue elem : elems) {
-			dup();
-			intConstant(i++);
-			compileExpression((IConstructor) elem, DONE);
-			compileArrayStoreWithArrayIndexValueOnStack(type);
+		private IConstructor compileRem(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			Switch.type0(type, 
+					(z) -> { throw new IllegalArgumentException("rem on bool"); },
+					(i) -> method.visitInsn(Opcodes.IREM), 
+					(s) -> method.visitInsn(Opcodes.IREM), 
+					(b) -> method.visitInsn(Opcodes.IREM), 
+					(c) -> method.visitInsn(Opcodes.IREM), 
+					(f) -> method.visitInsn(Opcodes.FREM),
+					(d) -> method.visitInsn(Opcodes.DREM),
+					(l) -> method.visitInsn(Opcodes.LREM),
+					(v) -> { throw new IllegalArgumentException("add on void"); }, 
+					(c) -> { throw new IllegalArgumentException("add on object"); },
+					(a) -> { throw new IllegalArgumentException("add on array"); },
+					(S) -> { throw new IllegalArgumentException("add on string"); }
+					);
+			return type;
 		}
-	}
 
-	private void compileNewArrayWithSizeOnStack(IConstructor type) {
-		Switch.type0(type,
-				(z) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BOOLEAN) ,
-				(i) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_INT) , 
-				(s) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_SHORT) , 
-				(b) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BYTE) , 
-				(c) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_CHAR) ,
-				(f) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_FLOAT) ,
-				(d) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_DOUBLE) ,
-				(j) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_LONG) , 
-				(v) -> { throw new IllegalArgumentException("void array"); }, 
-				(c) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type))), 
-				(a) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type))),
-				(S) -> method.visitTypeInsn(Opcodes.ANEWARRAY, Signature.stringType)
-				);
-	}
-
-	private void compileLt(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
-		Switch.type0(type, 
-				(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, thenPart, elsePart, continuation),
-				(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, thenPart, elsePart, continuation), 
-				(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, thenPart, elsePart, continuation), 
-				(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, thenPart, elsePart, continuation), 
-				(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, lhs, rhs, thenPart, elsePart, continuation), 
-				(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGE, lhs, rhs, thenPart, elsePart, continuation),
-				(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGE, lhs, rhs, thenPart, elsePart, continuation),
-				(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGE, lhs, rhs, thenPart, elsePart, continuation),
-				(v) -> { throw new IllegalArgumentException("< on void"); }, 
-				(c) -> { throw new IllegalArgumentException("< on class"); }, 
-				(a) -> { throw new IllegalArgumentException("< on array"); },
-				(S) -> { throw new IllegalArgumentException("< on string"); }
-				);
-	}
-
-	private void compileLe(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
-		Switch.type0(type, 
-				(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, thenPart, elsePart, continuation),
-				(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, thenPart, elsePart, continuation), 
-				(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, thenPart, elsePart, continuation), 
-				(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, thenPart, elsePart, continuation), 
-				(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, lhs, rhs, thenPart, elsePart, continuation), 
-				(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGT, lhs, rhs, thenPart, elsePart, continuation),
-				(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGT, lhs, rhs, thenPart, elsePart, continuation),
-				(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGT, lhs, rhs, thenPart, elsePart, continuation),
-				(v) -> { throw new IllegalArgumentException("<= on void"); }, 
-				(c) -> { throw new IllegalArgumentException("<= on class"); }, 
-				(a) -> { throw new IllegalArgumentException("<= on array"); },
-				(a) -> { throw new IllegalArgumentException("<= on string"); }
-				);
-	}
-
-	private void compileGt(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
-		Switch.type0(type, 
-				(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, thenPart, elsePart, continuation),
-				(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, thenPart, elsePart, continuation), 
-				(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, thenPart, elsePart, continuation), 
-				(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, thenPart, elsePart, continuation), 
-				(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, lhs, rhs, thenPart, elsePart, continuation), 
-				(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLE, lhs, rhs, thenPart, elsePart, continuation),
-				(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLE, lhs, rhs, thenPart, elsePart, continuation),
-				(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLE, lhs, rhs, thenPart, elsePart, continuation),
-				(v) -> { throw new IllegalArgumentException("> on void"); }, 
-				(c) -> { throw new IllegalArgumentException("> on class"); }, 
-				(a) -> { throw new IllegalArgumentException("> on array"); },
-				(S) -> { throw new IllegalArgumentException("> on array"); }
-				);
-	}
-
-	private void compileGe(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
-		Switch.type0(type, 
-				(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, thenPart, elsePart, continuation),
-				(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, thenPart, elsePart, continuation), 
-				(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, thenPart, elsePart, continuation), 
-				(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, thenPart, elsePart, continuation), 
-				(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, lhs, rhs, thenPart, elsePart, continuation), 
-				(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLT, lhs, rhs, thenPart, elsePart, continuation),
-				(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLT, lhs, rhs, thenPart, elsePart, continuation),
-				(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLT, lhs, rhs, thenPart, elsePart, continuation),
-				(v) -> { throw new IllegalArgumentException(">= on void"); }, 
-				(c) -> { throw new IllegalArgumentException(">= on class"); }, 
-				(a) -> { throw new IllegalArgumentException(">= on array"); },
-				(S) -> { throw new IllegalArgumentException(">= on array"); }
-				);
-	}
-
-	private void compileEq(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
-		Switch.type0(type, 
-				(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation),
-				(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation), 
-				(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation), 
-				(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation), 
-				(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, lhs, rhs, thenPart, elsePart, continuation), 
-				(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFNE, lhs, rhs, thenPart, elsePart, continuation),
-				(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFNE, lhs, rhs, thenPart, elsePart, continuation),
-				(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFNE, lhs, rhs, thenPart, elsePart, continuation),
-				(v) -> { throw new IllegalArgumentException(">= on void"); }, 
-				(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, lhs, rhs, thenPart, elsePart, continuation), 
-				(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, lhs, rhs, thenPart, elsePart, continuation),
-				(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, lhs, rhs, thenPart, elsePart, continuation)
-				);
-	}
-
-	@FunctionalInterface
-	private static interface Builder { 
-		void build();
-	}
-
-	/**
-	 * The branching work horse compileCondition generates the pattern for conditional
-	 * code execution.
-	 * 
-	 * @param args         first compile the code for the arguments of the condition
-	 * @param compare      then decide how to compare the result 
-	 * @param opcode       the conditional jump instruction; NB! inverted condition (if you are generating code for EQ then choose NE here!).
-	 * @param thenPart     emit code for the thenPart
-	 * @param elsePart     emit code for the elsePart
-	 * @param continuation emit code for what runs after this conditional
-	 */
-	private void compileConditionalInverted(Builder args, int compare, int opcode, Builder thenPart, Builder elsePart, Builder continuation) {
-		args.build();
-		
-		// TODO: is this the most efficient encoding? probably not. 
-		Label jump = new Label();
-		Label join = new Label();
-
-		if (compare != 0) {
-			method.visitInsn(compare);
+		private IConstructor compileDiv(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			Switch.type0(type, 
+					(z) -> { throw new IllegalArgumentException("div on bool"); },
+					(i) -> method.visitInsn(Opcodes.IDIV), 
+					(s) -> method.visitInsn(Opcodes.IDIV), 
+					(b) -> method.visitInsn(Opcodes.IDIV), 
+					(c) -> method.visitInsn(Opcodes.IDIV), 
+					(f) -> method.visitInsn(Opcodes.FDIV),
+					(d) -> method.visitInsn(Opcodes.DDIV),
+					(l) -> method.visitInsn(Opcodes.LDIV),
+					(v) -> { throw new IllegalArgumentException("div on void"); }, 
+					(c) -> { throw new IllegalArgumentException("div on object"); },
+					(a) -> { throw new IllegalArgumentException("div on array"); },
+					(S) -> { throw new IllegalArgumentException("div on string"); }
+					);
+			return type;
 		}
-		method.visitJumpInsn(opcode, jump);
-		thenPart.build();
-		method.visitJumpInsn(Opcodes.GOTO, join);
-		method.visitLabel(jump);
-		method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-		elsePart.build();
-		method.visitLabel(join);
-		method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-		continuation.build();
-	}
 
-	private void compileConditionalInverted(int compare, int opcode, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
-		compileConditionalInverted(
-				() -> compileExpression(lhs, 
-						() -> compileExpression(rhs, DONE)), 
-				compare, 
-				opcode, 
-				thenPart, 
-				elsePart, 
-				continuation);
-	}
+		private IConstructor compileMul(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			Switch.type0(type, 
+					(z) -> method.visitInsn(Opcodes.IAND),
+					(i) -> method.visitInsn(Opcodes.IMUL), 
+					(s) -> method.visitInsn(Opcodes.IMUL), 
+					(b) -> method.visitInsn(Opcodes.IMUL), 
+					(c) -> method.visitInsn(Opcodes.IMUL), 
+					(f) -> method.visitInsn(Opcodes.FMUL),
+					(d) -> method.visitInsn(Opcodes.DMUL),
+					(l) -> method.visitInsn(Opcodes.LMUL),
+					(v) -> { throw new IllegalArgumentException("add on void"); }, 
+					(c) -> { throw new IllegalArgumentException("add on object"); },
+					(a) -> { throw new IllegalArgumentException("add on array"); },
+					(S) -> { throw new IllegalArgumentException("add on string"); }
+					);
+			return type;
+		}
 
-	private void compileConditionalInverted(int compare, int opcode, IConstructor arg, Builder thenPart, Builder elsePart, Builder continuation) {
-		compileConditionalInverted(
-				() -> compileExpression(arg, DONE),
-				compare, 
-				opcode, 
-				thenPart, 
-				elsePart, 
-				continuation);
-	}
+		private IConstructor compileAnd(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			Switch.type0(type, 
+					(z) -> method.visitInsn(Opcodes.IAND),
+					(i) -> method.visitInsn(Opcodes.IAND), 
+					(s) -> method.visitInsn(Opcodes.IAND), 
+					(b) -> method.visitInsn(Opcodes.IAND), 
+					(c) -> method.visitInsn(Opcodes.IAND), 
+					(f) -> { throw new IllegalArgumentException("and on float"); },
+					(d) -> { throw new IllegalArgumentException("and on double"); },
+					(l) -> { throw new IllegalArgumentException("and on long"); },
+					(v) -> { throw new IllegalArgumentException("and on void"); }, 
+					(c) -> { throw new IllegalArgumentException("and on object"); },
+					(a) -> { throw new IllegalArgumentException("and on array"); },
+					(S) -> { throw new IllegalArgumentException("and on string"); }
+					);
+			return type;
+		}
 
-	private void compileNull(IConstructor arg, Builder thenPart, Builder elsePart, Builder continuation) {
-		compileConditionalInverted(0, Opcodes.IFNONNULL, arg, thenPart, elsePart, continuation);
-	}
+		private IConstructor compileOr(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			Switch.type0(type, 
+					(z) -> method.visitInsn(Opcodes.IOR),
+					(i) -> method.visitInsn(Opcodes.IOR), 
+					(s) -> method.visitInsn(Opcodes.IOR), 
+					(b) -> method.visitInsn(Opcodes.IOR), 
+					(c) -> method.visitInsn(Opcodes.IOR), 
+					(f) -> { throw new IllegalArgumentException("or on float"); },
+					(d) -> { throw new IllegalArgumentException("or on double"); },
+					(l) -> { throw new IllegalArgumentException("or on long"); },
+					(v) -> { throw new IllegalArgumentException("or on void"); }, 
+					(c) -> { throw new IllegalArgumentException("or on object"); },
+					(a) -> { throw new IllegalArgumentException("or on array"); },
+					(S) -> { throw new IllegalArgumentException("or on string"); }
+					);
+			return type;
+		}
 
-	private void compileNonNull(IConstructor arg, Builder thenPart, Builder elsePart, Builder continuation) {
-		compileConditionalInverted(0, Opcodes.IFNULL, arg, thenPart, elsePart, continuation);
-	}
+		private IConstructor compileXor(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			Switch.type0(type, 
+					(z) -> method.visitInsn(Opcodes.IXOR),
+					(i) -> method.visitInsn(Opcodes.IXOR), 
+					(s) -> method.visitInsn(Opcodes.IXOR), 
+					(b) -> method.visitInsn(Opcodes.IXOR), 
+					(c) -> method.visitInsn(Opcodes.IXOR), 
+					(f) -> { throw new IllegalArgumentException("xor on void"); },
+					(d) -> { throw new IllegalArgumentException("xor on void"); },
+					(l) -> { throw new IllegalArgumentException("xor on void"); },
+					(v) -> { throw new IllegalArgumentException("xor on void"); }, 
+					(c) -> { throw new IllegalArgumentException("xor on object"); },
+					(a) -> { throw new IllegalArgumentException("xor on array"); },
+					(S) -> { throw new IllegalArgumentException("xor on string"); }
+					);
+			return type;
+		}
 
-	private void compileNeq(IConstructor type, IConstructor lhs, IConstructor rhs, Builder thenPart, Builder elsePart, Builder continuation) {
-		Switch.type0(type, 
-				(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation),
-				(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
-				(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
-				(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
-				(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
-				(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFEQ, lhs, rhs, thenPart, elsePart, continuation),
-				(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFEQ, lhs, rhs, thenPart, elsePart, continuation),
-				(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFEQ, lhs, rhs, thenPart, elsePart, continuation),
-				(v) -> { throw new IllegalArgumentException("!= on void"); }, 
-				(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, lhs, rhs, thenPart, elsePart, continuation), 
-				(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, lhs, rhs, thenPart, elsePart, continuation),
-				(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, lhs, rhs, thenPart, elsePart, continuation)
-				);
-	}
+		private IConstructor compileNeg(IConstructor arg) {
+			IConstructor type = compileExpression(arg);
+			Switch.type0(type, 
+					(z) -> { 
+						// TODO: is there really not a better way to negate a boolean on the JVM?
+						Label zeroLabel = new Label();
+						Label contLabel = new Label();
+						method.visitJumpInsn(Opcodes.IFEQ, zeroLabel);
+						compileFalse();
+						method.visitJumpInsn(Opcodes.GOTO, contLabel);
+						method.visitLabel(zeroLabel);
+						compileTrue();
+						method.visitLabel(contLabel);
+					},
+					(i) -> method.visitInsn(Opcodes.INEG), 
+					(s) -> method.visitInsn(Opcodes.INEG), 
+					(b) -> method.visitInsn(Opcodes.INEG), 
+					(c) -> method.visitInsn(Opcodes.INEG), 
+					(f) -> method.visitInsn(Opcodes.FNEG),
+					(d) -> method.visitInsn(Opcodes.DNEG),
+					(l) -> method.visitInsn(Opcodes.LNEG),
+					(v) -> { throw new IllegalArgumentException("neg on void"); }, 
+					(c) -> { throw new IllegalArgumentException("neg on object"); },
+					(a) -> { throw new IllegalArgumentException("neg on array"); },
+					(S) -> { throw new IllegalArgumentException("neg on string"); }
+					);
+			return type;
+		}
 
-	private void compileCoerce(IConstructor from, IConstructor to, IConstructor arg) {
-		Switch.type0(from,
-				(z) -> coerceFromBool(to, arg),
-				(i) -> coerceFromInt(to, arg),
-				(s) -> coerceFromShort(to, arg),
-				(b) -> coerceFromByte(to, arg),
-				(c) -> coerceFromChar(to, arg),
-				(f) -> coerceFromFloat(to, arg),
-				(d) -> coerceFromDouble(to, arg),
-				(l) -> coerceFromLong(to, arg),
-				(v) -> failedCoercion("void", to),
-				(c) -> coerceFromClass(from, to, arg),
-				(a) -> coerceFromArray(from, to, arg), 
-				(S) -> coerceFromString(from, to, arg) 
-				);
-	}
 
-	private void coerceFromString(IConstructor from, IConstructor to, IConstructor arg) {
-		Switch.type0(to, 
-				(z) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "parseBoolean", Signature.stringType, false);
-				}, 
-				(i) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Integer", "parseInt", "I", false);
-				}, 
-				(s) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Short", "parseShort", "S", false);
-				},
-				(b) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Byte", "parseByte", "B", false);
-				}, 
-				(c) -> failedCoercion("string", to), 
-				(f) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Float", "parseFloat", "F", false);
-				}, 
-				(d) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Double", "parseDouble", "D", false);
-				}, 
-				(j) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "parseLong", "J", false);
-				}, 
-				(v) -> failedCoercion("string", to), 
-				(a) -> failedCoercion("string", to),
-				(c) -> failedCoercion("class", to),
-				(S) -> { /* identity */ }
-				);
-	}
+		private IConstructor compileInvokeSuper(String superclass, IConstructor sig, IList args) {
+			compileExpression_Load("this");
+			compileExpressionList(args);
+			method.visitMethodInsn(Opcodes.INVOKESPECIAL, superclass, "<init>", Signature.constructor(sig), false);
+			return Types.voidType();
+		}
 
-	private void coerceFromBool(IConstructor to, IConstructor arg) {
-		throw new IllegalArgumentException("Can not coerce " + "bool" + " to " + to.getConstructorType().getName());
-	}
+		private void compileStat_AAStore(IConstructor array, IConstructor index,
+				IConstructor arg) {
+			IConstructor type = compileExpression(array);
+			compileExpression(index);
+			compileExpression(arg);
+			compileArrayStoreWithArrayIndexValueOnStack(AST.$getArg(type));
+		}
 
-	private void failedCoercion(String from, IConstructor to) {
-		throw new IllegalArgumentException("Can not coerce " + from + " to " + to.getConstructorType().getName());
-	}
+		private void compileArrayStoreWithArrayIndexValueOnStack(IConstructor type) {
+			Switch.type0(type, 
+					(z) -> method.visitInsn(Opcodes.BASTORE),
+					(i) -> method.visitInsn(Opcodes.IASTORE),
+					(s) -> method.visitInsn(Opcodes.SASTORE),
+					(b) -> method.visitInsn(Opcodes.BASTORE),
+					(c) -> method.visitInsn(Opcodes.CASTORE),
+					(f) -> method.visitInsn(Opcodes.FASTORE),
+					(d) -> method.visitInsn(Opcodes.DASTORE),
+					(l) -> method.visitInsn(Opcodes.LASTORE),
+					(v) -> { throw new IllegalArgumentException("store void in array"); },
+					(c) -> method.visitInsn(Opcodes.AASTORE),
+					(a) -> method.visitInsn(Opcodes.AASTORE),
+					(S) -> method.visitInsn(Opcodes.AASTORE)
+					);
+		}
 
-	private void coerceFromArray(IConstructor from, IConstructor to, IConstructor arg) {
-		Switch.type0(to,
-				(z) -> failedCoercion("int", to),
-				(i) -> failedCoercion("int", to),
-				(s) -> failedCoercion("short", to),
-				(b) -> failedCoercion("boolean", to),
-				(c) -> failedCoercion("char", to),
-				(f) -> failedCoercion("float", to),
-				(d) -> failedCoercion("double", to),
-				(l) -> failedCoercion("long", to),
-				(v) -> failedCoercion("void", to),
-				(c) -> failedCoercion("class", to),
-				(a) -> coerceArrayToArray(from, to, arg),
-				(S) -> failedCoercion("string", to) // TODO byteArray?
-				);
-	}
+		private IConstructor compileCheckCast(IConstructor arg, IConstructor type) {
+			String cons = type.getConstructorType().getName();
 
-	private void coerceArrayToArray(IConstructor from, IConstructor to, IConstructor arg) {
+			// weird inconsistency in CHECKCAST instruction?
+			if (cons == "classType") {
+				method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type));
+			}
+			else if (cons == "array") {
+				method.visitTypeInsn(Opcodes.CHECKCAST, Signature.type(type));
+			}
+			else {
+				throw new IllegalArgumentException("can not check cast to " + type);
+			}
+			
+			return type;
+		}
 
-	}
+		private IConstructor compileExpression_ALength(IConstructor arg) {
+			compileExpression(arg);
+			method.visitInsn(Opcodes.ARRAYLENGTH);
+			return Types.integerType();
+		}
 
-	private void coerceFromLong(IConstructor to, IConstructor arg) {
-		Switch.type0(to,
-				(z) -> failedCoercion("boolean", to),
-				(i) -> { method.visitInsn(Opcodes.L2I); },
-				(s) -> { method.visitInsn(Opcodes.L2I); },
-				(b) -> { method.visitInsn(Opcodes.L2I); },
-				(c) -> { method.visitInsn(Opcodes.L2I); },
-				(f) -> { method.visitInsn(Opcodes.L2F); },
-				(d) -> { method.visitInsn(Opcodes.L2D); },
-				(l) -> { /* do nothing */ },
-				(v) -> { pop(); compileNull(); },
-				(c) -> failedCoercion("class", to),
-				(a) -> failedCoercion("array", to),
-				(S) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
-				}
-				);
-	}
+		private IConstructor compileExpression_NewArraySize(IConstructor type, IConstructor size) {
+			compileExpression(size);
+			
+			if (type.getConstructorType() != Types.ARRAY) {
+				throw new IllegalArgumentException("arg should be an array type");
+			}
+			compileNewArrayWithSizeOnStack(AST.$getArg(type));
+			return type;
+		}
 
-	private void coerceFromClass(IConstructor from, IConstructor to, IConstructor arg) {
-		String cls = AST.$getName(from);
+		private IConstructor compileExpression_NewArray(IConstructor type, IList elems) {
+			intConstant(elems.length());
+			if (type.getConstructorType() != Types.ARRAY) {
+				throw new IllegalArgumentException("arg should be an array type");
+			}
+			
+			compileNewArrayWithSizeOnStack(AST.$getArg(type));
 
-		Switch.type0(to,
-				(z) -> {
-					if (cls.equals("java/lang/Boolean")) {
-						compileExpression(from, DONE);
-						method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "booleanValue", "()Z", false);
-					}
-					else {
-						failedCoercion(cls, to);
-					}
-				},
-				(i) -> {
-					if (cls.equals("java/lang/Integer")) {
-						compileExpression(from, DONE);
-						method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "intValue", "()I", false);
-					}
-					else {
-						failedCoercion(cls, to);
-					}
-				},
-				(s) -> {
-					if (cls.equals("java/lang/Integer")) {
-						compileExpression(from, DONE);
-						method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "shortValue", "()S", false);
-					}
-					else {
-						failedCoercion(cls, to);
-					}
-				},
-				(b) -> {
-					if (cls.equals("java/lang/Integer")) {
-						compileExpression(from, DONE);
-						method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "byteValue", "()B", false);
-					}
-					else {
-						failedCoercion(cls, to);
-					}
-				},
-				(c) -> failedCoercion(cls, arg),
-				(f) -> {
-					if (cls.equals("java/lang/Float")) {
-						compileExpression(from, DONE);
-						method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Float", "floatValue", "()F", false);
-					}
-					else {
-						failedCoercion(cls, to);
-					}
-				},
-				(d) -> {
-					if (cls.equals("java/lang/Double")) {
-						compileExpression(from, DONE);
-						method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Double", "doubleValue", "()D", false);
-					}
-					else {
-						failedCoercion(cls, to);
-					}
-				},
-				(l) -> {
-					if (cls.equals("java/lang/Long")) {
-						compileExpression(from, DONE);
-						method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Long", "longValue", "()L", false);
-					}
-					else {
-						failedCoercion(cls, to);
-					}
-				},
-				(v) -> { pop(); compileNull(); },
-				(c) -> {
-					if (cls.equals(AST.$getName(to))) {
-						/* do nothing */
-					}
-					else {
-						failedCoercion("class", to);
-					}
-				},
-				(a) -> failedCoercion("array", to),
-				(S) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
-				}
-				);
-	}
+			int i = 0;
+			for (IValue elem : elems) {
+				dup();
+				intConstant(i++);
+				compileExpression((IConstructor) elem);
+				compileArrayStoreWithArrayIndexValueOnStack(type);
+			}
+			
+			return type;
+		}
 
-	private void coerceFromDouble(IConstructor to, IConstructor arg) {
-		Switch.type0(to,
-				(z) -> failedCoercion("boolean", to),
-				(i) -> { method.visitInsn(Opcodes.D2I); },
-				(s) -> { method.visitInsn(Opcodes.D2I); },
-				(b) -> { method.visitInsn(Opcodes.D2I); },
-				(c) -> { method.visitInsn(Opcodes.D2I); },
-				(f) -> { method.visitInsn(Opcodes.D2F); },
-				(d) -> { /* do nothing */ },
-				(l) -> { method.visitInsn(Opcodes.D2L); } ,
-				(v) -> { pop(); compileNull(); },
-				(c) -> failedCoercion("class", to),
-				(a) -> failedCoercion("array", to),
-				(S) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
-				}
-				);
-	}
+		private void compileNewArrayWithSizeOnStack(IConstructor type) {
+			Switch.type0(type,
+					(z) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BOOLEAN) ,
+					(i) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_INT) , 
+					(s) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_SHORT) , 
+					(b) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BYTE) , 
+					(c) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_CHAR) ,
+					(f) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_FLOAT) ,
+					(d) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_DOUBLE) ,
+					(j) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_LONG) , 
+					(v) -> { throw new IllegalArgumentException("void array"); }, 
+					(c) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type))), 
+					(a) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type))),
+					(S) -> method.visitTypeInsn(Opcodes.ANEWARRAY, Signature.stringType)
+					);
+		}
 
-	private void coerceFromFloat(IConstructor to, IConstructor arg) {
-		Switch.type0(to,
-				(z) -> failedCoercion("boolean", to),
-				(i) -> { method.visitInsn(Opcodes.F2I); },
-				(s) -> { method.visitInsn(Opcodes.F2I); },
-				(b) -> { method.visitInsn(Opcodes.F2I); },
-				(c) -> { method.visitInsn(Opcodes.F2I); },
-				(f) -> { /* do nothing */ },
-				(d) -> { method.visitInsn(Opcodes.F2D); },
-				(l) -> { method.visitInsn(Opcodes.F2L); },
-				(v) -> { pop(); compileNull(); },
-				(c) -> failedCoercion("class", to),
-				(a) -> failedCoercion("array", to),
-				(S) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
-				}
-				);
-	}
+		private IConstructor compileLt(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			
+			Switch.type0(type, 
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGE, thenPart, elsePart, continuation),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGE, thenPart, elsePart, continuation),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGE, thenPart, elsePart, continuation),
+					(v) -> { throw new IllegalArgumentException("< on void"); }, 
+					(c) -> { throw new IllegalArgumentException("< on class"); }, 
+					(a) -> { throw new IllegalArgumentException("< on array"); },
+					(S) -> { throw new IllegalArgumentException("< on string"); }
+					);
+			return Types.booleanType();
+		}
 
-	private void coerceFromChar(IConstructor to, IConstructor arg) {
-		Switch.type0(to,
-				(z) -> failedCoercion("boolean", to),
-				(i) -> { /* do nothing */ },
-				(s) -> { /* do nothing */ },
-				(b) -> { /* do nothing */ },
-				(c) -> { /* do nothing */ },
-				(f) -> { method.visitInsn(Opcodes.I2F); },
-				(d) -> { method.visitInsn(Opcodes.I2D); },
-				(l) -> { method.visitInsn(Opcodes.I2L); },
-				(v) -> { pop(); compileNull(); },
-				(c) -> failedCoercion("class", to),
-				(a) -> failedCoercion("array", to),
-				(S) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
-				}
-				);
-	}
+		private IConstructor compileLe(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			Switch.type0(type, 
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, continuation),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, continuation), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, continuation), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, continuation), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, continuation), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGT, thenPart, elsePart, continuation),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGT, thenPart, elsePart, continuation),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGT, thenPart, elsePart, continuation),
+					(v) -> { throw new IllegalArgumentException("<= on void"); }, 
+					(c) -> { throw new IllegalArgumentException("<= on class"); }, 
+					(a) -> { throw new IllegalArgumentException("<= on array"); },
+					(a) -> { throw new IllegalArgumentException("<= on string"); }
+					);
+			return Types.booleanType();
+		}
 
-	private void coerceFromByte(IConstructor to, IConstructor arg) {
-		Switch.type0(to,
-				(z) -> failedCoercion("boolean", to),
-				(i) -> { /* do nothing */ },
-				(s) -> { /* do nothing */ },
-				(b) -> { /* do nothing */ },
-				(c) -> { /* do nothing */ },
-				(f) -> { method.visitInsn(Opcodes.I2F); },
-				(d) -> { method.visitInsn(Opcodes.I2D); },
-				(l) -> { method.visitInsn(Opcodes.I2L); },
-				(v) -> { pop(); compileNull(); },
-				(c) -> failedCoercion("class", to),
-				(a) -> failedCoercion("array", to),
-				(S) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
-				}
-				);
-	}
+		private IConstructor compileGt(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			
+			Switch.type0(type, 
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLE, thenPart, elsePart, continuation),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLE, thenPart, elsePart, continuation),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLE, thenPart, elsePart, continuation),
+					(v) -> { throw new IllegalArgumentException("> on void"); }, 
+					(c) -> { throw new IllegalArgumentException("> on class"); }, 
+					(a) -> { throw new IllegalArgumentException("> on array"); },
+					(S) -> { throw new IllegalArgumentException("> on array"); }
+					);
+			return Types.booleanType();
+		}
 
-	private void coerceFromShort(IConstructor to, IConstructor arg) {
-		Switch.type0(to,
-				(z) -> failedCoercion("boolean", to),
-				(i) -> { /* do nothing */ },
-				(s) -> { /* do nothing */ },
-				(b) -> { /* do nothing */ },
-				(c) -> { /* do nothing */ },
-				(f) -> { method.visitInsn(Opcodes.I2F); },
-				(d) -> { method.visitInsn(Opcodes.I2D); },
-				(l) -> { method.visitInsn(Opcodes.I2L); },
-				(v) -> { pop(); compileNull(); },
-				(c) -> failedCoercion("class", to),
-				(a) -> failedCoercion("array", to),
-				(S) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
-				}
-				);
-	}
+		private IConstructor compileGe(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			
+			Switch.type0(type, 
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLT, thenPart, elsePart, continuation),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLT, thenPart, elsePart, continuation),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLT, thenPart, elsePart, continuation),
+					(v) -> { throw new IllegalArgumentException(">= on void"); }, 
+					(c) -> { throw new IllegalArgumentException(">= on class"); }, 
+					(a) -> { throw new IllegalArgumentException(">= on array"); },
+					(S) -> { throw new IllegalArgumentException(">= on array"); }
+					);
+			return Types.booleanType();
+		}
 
-	private void coerceFromInt(IConstructor to, IConstructor arg) {
-		Switch.type0(to,
-				(z) -> failedCoercion("boolean", to),
-				(i) -> { /* do nothing */ },
-				(s) -> { /* do nothing */ },
-				(b) -> { /* do nothing */ },
-				(c) -> { /* do nothing */ },
-				(f) -> { method.visitInsn(Opcodes.I2F); },
-				(d) -> { method.visitInsn(Opcodes.I2D); },
-				(l) -> { method.visitInsn(Opcodes.I2L); },
-				(v) -> { pop(); compileNull(); },
-				(c) -> failedCoercion("class", to),
-				(a) -> failedCoercion("array", to),
-				(S) -> {
-					compileExpression(arg, DONE);
-					method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
-				}
-				);
-	}
+		private IConstructor compileEq(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			
+			Switch.type0(type, 
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFNE, thenPart, elsePart, continuation),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFNE, thenPart, elsePart, continuation),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFNE, thenPart, elsePart, continuation),
+					(v) -> { throw new IllegalArgumentException(">= on void"); }, 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, thenPart, elsePart, continuation), 
+					(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, thenPart, elsePart, continuation),
+					(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, thenPart, elsePart, continuation)
+					);
+			return Types.booleanType();
+		}
 
-	private void compileFalse() {
-		method.visitInsn(Opcodes.ICONST_0);
-	}
+		private IConstructor prepareArguments(IConstructor lhs, IConstructor rhs) {
+			IConstructor type = compileExpression(lhs);
+			if (type.getConstructorType() != compileExpression(rhs).getConstructorType()) {
+				throw new IllegalArgumentException("incomparable types for operator");
+			}
+			return type;
+		}
 
-	private void compileTrue() {
-		method.visitInsn(Opcodes.ICONST_1);
-	}
+		@FunctionalInterface
+		private static interface Builder<T> { 
+			T build();
+		}
 
-	private void compileNull() {
-		method.visitInsn(Opcodes.ACONST_NULL);
-	}
+		/**
+		 * The branching work horse compileCondition generates the pattern for conditional
+		 * code execution.
+		 * 
+		 * @param args         first compile the code for the arguments of the condition
+		 * @param compare      then decide how to compare the result 
+		 * @param opcode       the conditional jump instruction; NB! inverted condition (if you are generating code for EQ then choose NE here!).
+		 * @param thenPart     emit code for the thenPart
+		 * @param elsePart     emit code for the elsePart
+		 * @param continuation emit code for what runs after this conditional
+		 */
+		private void compileConditionalInverted(int compare, int opcode, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			// TODO: is this the most efficient encoding? probably not. 
+			Label jump = new Label();
+			Label join = new Label();
 
-	private void compileBlock(IList block, IConstructor arg, Builder continuation) {
-		compileStatements(block, () -> compileExpression(arg, continuation));
-	}
-
-	private void compileInstanceof(IConstructor arg, String cls) {
-		compileExpression(arg, DONE);
-		method.visitTypeInsn(Opcodes.INSTANCEOF, cls);
-	}
-
-	private void compileGetField(IConstructor receiver, String cls, IConstructor type, String name) {
-		compileExpression(receiver, DONE);
-		method.visitFieldInsn(Opcodes.GETFIELD, cls, name, Signature.type(type));
-	}
-
-	private void compileExpression_NewInstance(IConstructor exp) {
-		compileExpressionList(AST.$getArgs(exp), DONE);
-		String cls = AST.$getClass(exp, classNode.name);
-		String desc = Signature.constructor(AST.$getDesc(exp));
-		method.visitTypeInsn(Opcodes.NEW, cls);
-		dup();
-		method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", desc, false);
-	}
-
-	private void compileExpression_AALoad(IConstructor type, IConstructor array, IConstructor index) {
-		compileExpression(array, DONE);
-		compileExpression(index, DONE);
-		Switch.type0(type, 
-				(b) -> method.visitInsn(Opcodes.BALOAD), 
-				(i) -> method.visitInsn(Opcodes.IALOAD), 
-				(s) -> method.visitInsn(Opcodes.SALOAD), 
-				(b) -> method.visitInsn(Opcodes.BALOAD), 
-				(c) -> method.visitInsn(Opcodes.CALOAD), 
-				(f) -> method.visitInsn(Opcodes.FALOAD), 
-				(d) -> method.visitInsn(Opcodes.DALOAD), 
-				(j) -> method.visitInsn(Opcodes.LALOAD), 
-				(v) -> { throw new IllegalArgumentException("loading into a void array"); }, 
-				(L) -> method.visitInsn(Opcodes.AALOAD), 
-				(a) -> method.visitInsn(Opcodes.AALOAD), 
-				(s) -> method.visitInsn(Opcodes.AALOAD))
-		;
-	}
-
-	private void compileGetStatic(String cls, IConstructor type, String name) {
-		method.visitFieldInsn(Opcodes.GETSTATIC, cls, name, Signature.type(type));
-	}
-
-	private void compileInvokeSpecial(String cls, IConstructor sig, IConstructor receiver, IList args) {
-		compileExpression(receiver, () -> compileExpressionList(args, DONE));
-
-		method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, AST.$getName(sig), Signature.method(sig), false);
-	}
-
-	private void compileInvokeVirtual(String cls, IConstructor sig, IConstructor receiver, IList args) {
-		compileExpression(receiver, () -> compileExpressionList(args, DONE));
-
-		method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, cls, AST.$getName(sig), Signature.method(sig), false);
-	}
-
-	private void compileInvokeInterface(String interf, IConstructor sig, IConstructor receiver, IList args) {
-		compileExpression(receiver, () -> compileExpressionList(args, DONE));
-
-		method.visitMethodInsn(Opcodes.INVOKEINTERFACE, interf, AST.$getName(sig), Signature.method(sig), false);
-	}
-
-	private void compileExpressionList(IList args, Builder continuation) {
-		if (args.length() == 0) {
+			if (compare != 0) {
+				method.visitInsn(compare);
+			}
+			method.visitJumpInsn(opcode, jump);
+			thenPart.build();
+			method.visitJumpInsn(Opcodes.GOTO, join);
+			method.visitLabel(jump);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+			elsePart.build();
+			method.visitLabel(join);
+			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			continuation.build();
 		}
-		else {
-			compileExpression((IConstructor) args.get(0), () -> compileExpressionList(args.delete(0), continuation));
-		}
-	}
 
-	private void compileInvokeStatic(String cls, IConstructor sig, IList args) {
-		compileExpressionList(args, DONE);
-
-		method.visitMethodInsn(Opcodes.INVOKESTATIC, cls, AST.$getName(sig), Signature.method(sig), false);
-	}
-
-	private void compileExpression_Load(String name) {
-		int pos = positionOf(name);
-
-		Switch.type(variableTypes[pos], pos,
-				(z,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
-				(i,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
-				(s,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
-				(b,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
-				(c,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
-				(f,p) -> method.visitVarInsn(Opcodes.FLOAD, p),
-				(d,p) -> method.visitVarInsn(Opcodes.DLOAD, p),
-				(l,p) -> method.visitVarInsn(Opcodes.LLOAD, p),
-				(v,p) -> { /* void */ },
-				(c,p) -> method.visitVarInsn(Opcodes.ALOAD, p),
-				(a,p) -> method.visitVarInsn(Opcodes.ALOAD, p),
-				(S,p) -> method.visitVarInsn(Opcodes.ALOAD, p)
-				);
-	}
-
-	private void intConstant(int constant) {
-		switch (constant) {
-		case 0: method.visitInsn(Opcodes.ICONST_0); return;
-		case 1: method.visitInsn(Opcodes.ICONST_1); return;
-		case 2: method.visitInsn(Opcodes.ICONST_2); return;
-		case 3: method.visitInsn(Opcodes.ICONST_3); return;
-		case 4: method.visitInsn(Opcodes.ICONST_4); return;
-		case 5: method.visitInsn(Opcodes.ICONST_5); return;
+		private IConstructor compileNull(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			compileExpression(arg);
+			compileConditionalInverted(0, Opcodes.IFNONNULL, thenPart, elsePart, continuation);
+			return Types.booleanType();
 		}
 
-		if (constant < Byte.MAX_VALUE) {
-			method.visitIntInsn(Opcodes.BIPUSH, constant);
-		}
-		else if (constant < Short.MAX_VALUE) {
-			method.visitIntInsn(Opcodes.SIPUSH, constant);
-		}
-		else {
-			method.visitLdcInsn(new Integer(constant));
-		}
-	}
-
-	private void longConstant(long constant) {
-		if (constant == 0) {
-			method.visitInsn(Opcodes.LCONST_0); 
-		}
-		else if (constant == 1) {
-			method.visitInsn(Opcodes.LCONST_1);
-		}
-		else {
-			method.visitLdcInsn(new Long(constant));
-		}
-	}
-
-	private void stringConstant(String constant) {
-		method.visitLdcInsn(constant);
-	}
-
-	private void floatConstant(float constant) {
-		if (constant == 0) {
-			method.visitInsn(Opcodes.FCONST_0); 
-		}
-		else if (constant == 1) {
-			method.visitInsn(Opcodes.FCONST_1);
-		}
-		else if (constant == 2) { // float has a 2 constant, double does not.
-			method.visitInsn(Opcodes.FCONST_2);
-		}
-		else {
-			method.visitLdcInsn(new Float(Float.toString(constant)));
-		}
-	}
-
-	private void doubleConstant(double constant) {
-		if (constant == 0) {
-			method.visitInsn(Opcodes.DCONST_0);
-		}
-		else if (constant == 1) {
-			method.visitInsn(Opcodes.DCONST_1);
-		}
-		else {
-			method.visitLdcInsn(new Double(Double.toString(constant)));
-		}
-	}
-
-	private int positionOf(String name) {
-		for (int pos = 0; pos < variableNames.length; pos++) {
-			if (name.equals(variableNames[pos])) {
-				return pos;
-			}
+		private IConstructor compileNonNull(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			compileExpression(arg);
+			compileConditionalInverted(0, Opcodes.IFNULL, thenPart, elsePart, continuation);
+			return Types.booleanType();
 		}
 
-		throw new IllegalArgumentException("name not found: " + name);
-	}
+		private IConstructor compileNeq(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+			IConstructor type = prepareArguments(lhs, rhs);
+			
+			Switch.type0(type, 
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFEQ, thenPart, elsePart, continuation),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFEQ, thenPart, elsePart, continuation),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFEQ, thenPart, elsePart, continuation),
+					(v) -> { throw new IllegalArgumentException("!= on void"); }, 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, continuation), 
+					(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, continuation),
+					(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, continuation)
+					);
+			
+			return Types.booleanType();
+		}
 
-	private void compileExpression_Const(IConstructor type, IValue constant) {
-		Switch.type0(type, 
-				(z) -> booleanConstant(AST.$getBooleanConstant(constant)), 
-				(i) -> intConstant(AST.$getIntegerConstant(constant)), 
-				(s) -> intConstant(AST.$getIntegerConstant(constant)), 
-				(b) -> intConstant(AST.$getIntegerConstant(constant)), 
-				(c) -> intConstant(AST.$getIntegerConstant(constant)), 
-				(f) -> floatConstant(AST.$getFloatConstant(constant)), 
-				(d) -> doubleConstant(AST.$getDoubleConstant(constant)), 
-				(j) -> longConstant(AST.$getLongConstant(constant)), 
-				(v) -> { throw new IllegalArgumentException("void constant"); }, 
-				(c) -> { throw new IllegalArgumentException("object constant"); }, 
-				(a) -> {
-					if (constant instanceof IList) {
-						constantArray(AST.$getArg(type), (IList) constant);
+		private IConstructor compileCoerce(IConstructor from, IConstructor to, IConstructor arg) {
+			Switch.type0(from,
+					(z) -> coerceFromBool(to, arg),
+					(i) -> coerceFromInt(to, arg),
+					(s) -> coerceFromShort(to, arg),
+					(b) -> coerceFromByte(to, arg),
+					(c) -> coerceFromChar(to, arg),
+					(f) -> coerceFromFloat(to, arg),
+					(d) -> coerceFromDouble(to, arg),
+					(l) -> coerceFromLong(to, arg),
+					(v) -> failedCoercion("void", to),
+					(c) -> coerceFromClass(from, to, arg),
+					(a) -> coerceFromArray(from, to, arg), 
+					(S) -> coerceFromString(from, to, arg) 
+					);
+			return to;
+		}
+
+		private void coerceFromString(IConstructor from, IConstructor to, IConstructor arg) {
+			Switch.type0(to, 
+					(z) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "parseBoolean", Signature.stringType, false);
+					}, 
+					(i) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Integer", "parseInt", "I", false);
+					}, 
+					(s) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Short", "parseShort", "S", false);
+					},
+					(b) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Byte", "parseByte", "B", false);
+					}, 
+					(c) -> failedCoercion("string", to), 
+					(f) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Float", "parseFloat", "F", false);
+					}, 
+					(d) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Double", "parseDouble", "D", false);
+					}, 
+					(j) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "parseLong", "J", false);
+					}, 
+					(v) -> failedCoercion("string", to), 
+					(a) -> failedCoercion("string", to),
+					(c) -> failedCoercion("class", to),
+					(S) -> { /* identity */ }
+					);
+		}
+
+		private void coerceFromBool(IConstructor to, IConstructor arg) {
+			throw new IllegalArgumentException("Can not coerce " + "bool" + " to " + to.getConstructorType().getName());
+		}
+
+		private void failedCoercion(String from, IConstructor to) {
+			throw new IllegalArgumentException("Can not coerce " + from + " to " + to.getConstructorType().getName());
+		}
+
+		private void coerceFromArray(IConstructor from, IConstructor to, IConstructor arg) {
+			Switch.type0(to,
+					(z) -> failedCoercion("int", to),
+					(i) -> failedCoercion("int", to),
+					(s) -> failedCoercion("short", to),
+					(b) -> failedCoercion("boolean", to),
+					(c) -> failedCoercion("char", to),
+					(f) -> failedCoercion("float", to),
+					(d) -> failedCoercion("double", to),
+					(l) -> failedCoercion("long", to),
+					(v) -> failedCoercion("void", to),
+					(c) -> failedCoercion("class", to),
+					(a) -> coerceArrayToArray(from, to, arg),
+					(S) -> failedCoercion("string", to) // TODO byteArray?
+					);
+		}
+
+		private void coerceArrayToArray(IConstructor from, IConstructor to, IConstructor arg) {
+
+		}
+
+		private void coerceFromLong(IConstructor to, IConstructor arg) {
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
+					(i) -> { method.visitInsn(Opcodes.L2I); },
+					(s) -> { method.visitInsn(Opcodes.L2I); },
+					(b) -> { method.visitInsn(Opcodes.L2I); },
+					(c) -> { method.visitInsn(Opcodes.L2I); },
+					(f) -> { method.visitInsn(Opcodes.L2F); },
+					(d) -> { method.visitInsn(Opcodes.L2D); },
+					(l) -> { /* do nothing */ },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
-					else {
-						{ throw new IllegalArgumentException("array constant without list input"); }	
+					);
+		}
+
+		private void coerceFromClass(IConstructor from, IConstructor to, IConstructor arg) {
+			String cls = AST.$getName(from);
+
+			Switch.type0(to,
+					(z) -> {
+						if (cls.equals("java/lang/Boolean")) {
+							compileExpression(from);
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "booleanValue", "()Z", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(i) -> {
+						if (cls.equals("java/lang/Integer")) {
+							compileExpression(from);
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "intValue", "()I", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(s) -> {
+						if (cls.equals("java/lang/Integer")) {
+							compileExpression(from);
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "shortValue", "()S", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(b) -> {
+						if (cls.equals("java/lang/Integer")) {
+							compileExpression(from);
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "byteValue", "()B", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(c) -> failedCoercion(cls, arg),
+					(f) -> {
+						if (cls.equals("java/lang/Float")) {
+							compileExpression(from);
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Float", "floatValue", "()F", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(d) -> {
+						if (cls.equals("java/lang/Double")) {
+							compileExpression(from);
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Double", "doubleValue", "()D", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(l) -> {
+						if (cls.equals("java/lang/Long")) {
+							compileExpression(from);
+							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Long", "longValue", "()L", false);
+						}
+						else {
+							failedCoercion(cls, to);
+						}
+					},
+					(v) -> { pop(); compileNull(); },
+					(c) -> {
+						if (cls.equals(AST.$getName(to))) {
+							/* do nothing */
+						}
+						else {
+							failedCoercion("class", to);
+						}
+					},
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
-				}, 
-				(S) -> stringConstant(AST.$getStringConstant(constant))
-				);
-	}
+					);
+		}
 
-	private void constantArray(IConstructor type, IList constant) {
-		intConstant(constant.length());
-		compileNewArrayWithSizeOnStack(type);
-		int index = 0;
+		private void coerceFromDouble(IConstructor to, IConstructor arg) {
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
+					(i) -> { method.visitInsn(Opcodes.D2I); },
+					(s) -> { method.visitInsn(Opcodes.D2I); },
+					(b) -> { method.visitInsn(Opcodes.D2I); },
+					(c) -> { method.visitInsn(Opcodes.D2I); },
+					(f) -> { method.visitInsn(Opcodes.D2F); },
+					(d) -> { /* do nothing */ },
+					(l) -> { method.visitInsn(Opcodes.D2L); } ,
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
+					);
+		}
 
-		for (IValue elem : constant) {
+		private void coerceFromFloat(IConstructor to, IConstructor arg) {
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
+					(i) -> { method.visitInsn(Opcodes.F2I); },
+					(s) -> { method.visitInsn(Opcodes.F2I); },
+					(b) -> { method.visitInsn(Opcodes.F2I); },
+					(c) -> { method.visitInsn(Opcodes.F2I); },
+					(f) -> { /* do nothing */ },
+					(d) -> { method.visitInsn(Opcodes.F2D); },
+					(l) -> { method.visitInsn(Opcodes.F2L); },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
+					);
+		}
+
+		private void coerceFromChar(IConstructor to, IConstructor arg) {
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
+					(i) -> { /* do nothing */ },
+					(s) -> { /* do nothing */ },
+					(b) -> { /* do nothing */ },
+					(c) -> { /* do nothing */ },
+					(f) -> { method.visitInsn(Opcodes.I2F); },
+					(d) -> { method.visitInsn(Opcodes.I2D); },
+					(l) -> { method.visitInsn(Opcodes.I2L); },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
+					);
+		}
+
+		private void coerceFromByte(IConstructor to, IConstructor arg) {
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
+					(i) -> { /* do nothing */ },
+					(s) -> { /* do nothing */ },
+					(b) -> { /* do nothing */ },
+					(c) -> { /* do nothing */ },
+					(f) -> { method.visitInsn(Opcodes.I2F); },
+					(d) -> { method.visitInsn(Opcodes.I2D); },
+					(l) -> { method.visitInsn(Opcodes.I2L); },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
+					);
+		}
+
+		private void coerceFromShort(IConstructor to, IConstructor arg) {
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
+					(i) -> { /* do nothing */ },
+					(s) -> { /* do nothing */ },
+					(b) -> { /* do nothing */ },
+					(c) -> { /* do nothing */ },
+					(f) -> { method.visitInsn(Opcodes.I2F); },
+					(d) -> { method.visitInsn(Opcodes.I2D); },
+					(l) -> { method.visitInsn(Opcodes.I2L); },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
+					);
+		}
+
+		private void coerceFromInt(IConstructor to, IConstructor arg) {
+			Switch.type0(to,
+					(z) -> failedCoercion("boolean", to),
+					(i) -> { /* do nothing */ },
+					(s) -> { /* do nothing */ },
+					(b) -> { /* do nothing */ },
+					(c) -> { /* do nothing */ },
+					(f) -> { method.visitInsn(Opcodes.I2F); },
+					(d) -> { method.visitInsn(Opcodes.I2D); },
+					(l) -> { method.visitInsn(Opcodes.I2L); },
+					(v) -> { pop(); compileNull(); },
+					(c) -> failedCoercion("class", to),
+					(a) -> failedCoercion("array", to),
+					(S) -> {
+						compileExpression(arg);
+						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
+					}
+					);
+		}
+
+		private IConstructor compileFalse() {
+			method.visitInsn(Opcodes.ICONST_0);
+			return Types.booleanType();
+		}
+
+		private IConstructor compileTrue() {
+			method.visitInsn(Opcodes.ICONST_1);
+			return Types.booleanType();
+		}
+
+		private IConstructor compileNull() {
+			method.visitInsn(Opcodes.ACONST_NULL);
+			return Types.voidType();
+		}
+
+		private IConstructor compileBlock(IList block, IConstructor arg) {
+			compileStatements(block, DONE);
+			IConstructor type = compileExpression(arg);
+			return type;
+		}
+
+		private IConstructor compileInstanceof(IConstructor arg, String cls) {
+			compileExpression(arg);
+			method.visitTypeInsn(Opcodes.INSTANCEOF, cls);
+			return Types.booleanType();
+		}
+
+		private IConstructor compileGetField(IConstructor receiver, String cls, IConstructor type, String name) {
+			compileExpression(receiver);
+			method.visitFieldInsn(Opcodes.GETFIELD, cls, name, Signature.type(type));
+			return type;
+		}
+
+		private IConstructor compileExpression_NewInstance(IConstructor exp) {
+			compileExpressionList(AST.$getArgs(exp));
+			IConstructor type = AST.$getClass(exp);
+			String cls = AST.$getClassFromType(type, classNode.name);
+			String desc = Signature.constructor(AST.$getDesc(exp));
+			method.visitTypeInsn(Opcodes.NEW, cls);
 			dup();
-			intConstant(index);
-			compileExpression_Const((IConstructor) elem, elem);
-			compileArrayStoreWithArrayIndexValueOnStack(type);
-		}
-	}
-
-	private void booleanConstant(boolean val) {
-		if (val) {
-			compileTrue();
-		}
-		else {
-			compileFalse();
-		}
-	}
-
-	private void dup() {
-		method.visitInsn(Opcodes.DUP);
-	}
-
-	private void compileField(ClassNode classNode, IConstructor cons) {
-		IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
-		int access = 0;
-
-		if (kws.hasParameter("modifiers")) {
-			access = compileModifiers(AST.$getModifiersParameter(kws));
-		}
-		else {
-			access = Opcodes.ACC_PRIVATE;
+			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", desc, false);
+			return Types.classType(cls);
 		}
 
-		String name = AST.$getName(cons);
-
-		String signature = Signature.type(AST.$getType(cons));
-
-		Object value = null;
-		if (kws.hasParameter("default")) {
-			value = compileValueConstant(AST.$getDefaultParameter(kws));
+		private IConstructor compileExpression_AALoad(IConstructor array, IConstructor index) {
+			IConstructor type = compileExpression(array);
+			compileExpression(index);
+			Switch.type0(AST.$getArg(type), 
+					(b) -> method.visitInsn(Opcodes.BALOAD), 
+					(i) -> method.visitInsn(Opcodes.IALOAD), 
+					(s) -> method.visitInsn(Opcodes.SALOAD), 
+					(b) -> method.visitInsn(Opcodes.BALOAD), 
+					(c) -> method.visitInsn(Opcodes.CALOAD), 
+					(f) -> method.visitInsn(Opcodes.FALOAD), 
+					(d) -> method.visitInsn(Opcodes.DALOAD), 
+					(j) -> method.visitInsn(Opcodes.LALOAD), 
+					(v) -> { throw new IllegalArgumentException("loading into a void array"); }, 
+					(L) -> method.visitInsn(Opcodes.AALOAD), 
+					(a) -> method.visitInsn(Opcodes.AALOAD), 
+					(s) -> method.visitInsn(Opcodes.AALOAD))
+			;
+			return AST.$getArg(type);
 		}
 
-		classNode.fields.add(new FieldNode(access, name, signature, null, value));
-	}
+		private IConstructor compileGetStatic(String cls, IConstructor type, String name) {
+			method.visitFieldInsn(Opcodes.GETSTATIC, cls, name, Signature.type(type));
+			return type;
+		}
 
-	private int compileAccessCode(ISet modifiers) {
-		for (IValue cons : modifiers) {
-			switch (((IConstructor) cons).getName()) {
-			case "public": return Opcodes.ACC_PUBLIC;
-			case "private": return Opcodes.ACC_PRIVATE;
-			case "protected": return Opcodes.ACC_PROTECTED;
+		private IConstructor compileInvokeSpecial(String cls, IConstructor sig, IConstructor receiver, IList args) {
+			compileExpression(receiver);
+			compileExpressionList(args);
+
+			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, AST.$getName(sig), Signature.method(sig), false);
+			return AST.$getReturn(sig);
+		}
+
+		private IConstructor compileInvokeVirtual(String cls, IConstructor sig, IConstructor receiver, IList args) {
+			compileExpression(receiver);
+			compileExpressionList(args);
+
+			method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, cls, AST.$getName(sig), Signature.method(sig), false);
+			return AST.$getReturn(sig);
+		}
+
+		private IConstructor compileInvokeInterface(String interf, IConstructor sig, IConstructor receiver, IList args) {
+			compileExpression(receiver);
+			compileExpressionList(args);
+
+			method.visitMethodInsn(Opcodes.INVOKEINTERFACE, interf, AST.$getName(sig), Signature.method(sig), false);
+			return AST.$getReturn(sig);
+		}
+
+		private Void compileExpressionList(IList args) {
+			if (args.length() == 0) {
+				return null;
+			}
+			else {
+				compileExpression((IConstructor) args.get(0));
+				compileExpressionList(args.delete(0));
+			}
+			return null;
+		}
+
+		private IConstructor compileInvokeStatic(String cls, IConstructor sig, IList args) {
+			compileExpressionList(args);
+
+			method.visitMethodInsn(Opcodes.INVOKESTATIC, cls, AST.$getName(sig), Signature.method(sig), false);
+			return AST.$getReturn(sig);
+		}
+
+		private IConstructor compileExpression_Load(String name) {
+			int pos = positionOf(name);
+			IConstructor type = variableTypes[pos];
+
+			Switch.type(type, pos,
+					(z,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
+					(i,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
+					(s,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
+					(b,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
+					(c,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
+					(f,p) -> method.visitVarInsn(Opcodes.FLOAD, p),
+					(d,p) -> method.visitVarInsn(Opcodes.DLOAD, p),
+					(l,p) -> method.visitVarInsn(Opcodes.LLOAD, p),
+					(v,p) -> { /* void */ },
+					(c,p) -> method.visitVarInsn(Opcodes.ALOAD, p),
+					(a,p) -> method.visitVarInsn(Opcodes.ALOAD, p),
+					(S,p) -> method.visitVarInsn(Opcodes.ALOAD, p)
+					);
+
+			return type;
+		}
+
+		private void intConstant(int constant) {
+			switch (constant) {
+			case 0: method.visitInsn(Opcodes.ICONST_0); return;
+			case 1: method.visitInsn(Opcodes.ICONST_1); return;
+			case 2: method.visitInsn(Opcodes.ICONST_2); return;
+			case 3: method.visitInsn(Opcodes.ICONST_3); return;
+			case 4: method.visitInsn(Opcodes.ICONST_4); return;
+			case 5: method.visitInsn(Opcodes.ICONST_5); return;
+			}
+
+			if (constant < Byte.MAX_VALUE) {
+				method.visitIntInsn(Opcodes.BIPUSH, constant);
+			}
+			else if (constant < Short.MAX_VALUE) {
+				method.visitIntInsn(Opcodes.SIPUSH, constant);
+			}
+			else {
+				method.visitLdcInsn(new Integer(constant));
 			}
 		}
 
-		return 0;
-	}
-
-	private int compileModifiers(ISet modifiers) {
-		int res = 0;
-		for (IValue cons : modifiers) {
-			switch (((IConstructor) cons).getName()) {
-			case "public": 
-				res += Opcodes.ACC_PUBLIC; 
-				break;
-			case "private": 
-				res +=  Opcodes.ACC_PRIVATE; 
-				break;
-			case "protected": 
-				res += Opcodes.ACC_PROTECTED; 
-				break;
-			case "static": 
-				res += Opcodes.ACC_STATIC; 
-				break;
-			case "final": 
-				res += Opcodes.ACC_FINAL; 
-				break;
-			case "abstract": 
-				res += Opcodes.ACC_ABSTRACT; 
-				break;
-			case "interface": 
-				res += Opcodes.ACC_INTERFACE; 
-				break;
+		private void longConstant(long constant) {
+			if (constant == 0) {
+				method.visitInsn(Opcodes.LCONST_0); 
+			}
+			else if (constant == 1) {
+				method.visitInsn(Opcodes.LCONST_1);
+			}
+			else {
+				method.visitLdcInsn(new Long(constant));
 			}
 		}
 
-		return res;
-	}
+		private void stringConstant(String constant) {
+			method.visitLdcInsn(constant);
+		}
 
-	/**
-	 * Converts an arbitary IValue to some arbitrary JVM constant object.
-	 * For integers and reals it does something meaningful, for all the other
-	 * objects it returns the standard string representation of a value. For
-	 * external values it returns 'null';
-	 * @param parameter
-	 * @return Integer, Double or String object
-	 */
-	private Object compileValueConstant(IValue parameter) {
-		return parameter.getType().accept(new ITypeVisitor<Object, RuntimeException>() {
+		private void floatConstant(float constant) {
+			if (constant == 0) {
+				method.visitInsn(Opcodes.FCONST_0); 
+			}
+			else if (constant == 1) {
+				method.visitInsn(Opcodes.FCONST_1);
+			}
+			else if (constant == 2) { // float has a 2 constant, double does not.
+				method.visitInsn(Opcodes.FCONST_2);
+			}
+			else {
+				method.visitLdcInsn(new Float(Float.toString(constant)));
+			}
+		}
 
-			@Override
-			public Object visitAbstractData(Type arg0) throws RuntimeException {
-				if ("null".equals(AST.$getConstructorName(parameter))) {
+		private void doubleConstant(double constant) {
+			if (constant == 0) {
+				method.visitInsn(Opcodes.DCONST_0);
+			}
+			else if (constant == 1) {
+				method.visitInsn(Opcodes.DCONST_1);
+			}
+			else {
+				method.visitLdcInsn(new Double(Double.toString(constant)));
+			}
+		}
+
+		private int positionOf(String name) {
+			for (int pos = 0; pos < variableNames.length; pos++) {
+				if (name.equals(variableNames[pos])) {
+					return pos;
+				}
+			}
+
+			throw new IllegalArgumentException("name not found: " + name);
+		}
+
+		private IConstructor compileExpression_Const(IConstructor type, IValue constant) {
+			Switch.type0(type, 
+					(z) -> booleanConstant(AST.$getBooleanConstant(constant)), 
+					(i) -> intConstant(AST.$getIntegerConstant(constant)), 
+					(s) -> intConstant(AST.$getIntegerConstant(constant)), 
+					(b) -> intConstant(AST.$getIntegerConstant(constant)), 
+					(c) -> intConstant(AST.$getIntegerConstant(constant)), 
+					(f) -> floatConstant(AST.$getFloatConstant(constant)), 
+					(d) -> doubleConstant(AST.$getDoubleConstant(constant)), 
+					(j) -> longConstant(AST.$getLongConstant(constant)), 
+					(v) -> { throw new IllegalArgumentException("void constant"); }, 
+					(c) -> { throw new IllegalArgumentException("object constant"); }, 
+					(a) -> {
+						if (constant instanceof IList) {
+							constantArray(AST.$getArg(type), (IList) constant);
+						}
+						else {
+							{ throw new IllegalArgumentException("array constant without list input"); }	
+						}
+					}, 
+					(S) -> stringConstant(AST.$getStringConstant(constant))
+					);
+
+			return type;
+		}
+
+		private void constantArray(IConstructor type, IList constant) {
+			intConstant(constant.length());
+			compileNewArrayWithSizeOnStack(type);
+			int index = 0;
+
+			for (IValue elem : constant) {
+				dup();
+				intConstant(index);
+				compileExpression_Const((IConstructor) elem, elem);
+				compileArrayStoreWithArrayIndexValueOnStack(type);
+			}
+		}
+
+		private void booleanConstant(boolean val) {
+			if (val) {
+				compileTrue();
+			}
+			else {
+				compileFalse();
+			}
+		}
+
+		private void dup() {
+			method.visitInsn(Opcodes.DUP);
+		}
+
+		private void compileField(ClassNode classNode, IConstructor cons) {
+			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
+			int access = 0;
+
+			if (kws.hasParameter("modifiers")) {
+				access = compileModifiers(AST.$getModifiersParameter(kws));
+			}
+			else {
+				access = Opcodes.ACC_PRIVATE;
+			}
+
+			String name = AST.$getName(cons);
+
+			String signature = Signature.type(AST.$getType(cons));
+
+			Object value = null;
+			if (kws.hasParameter("default")) {
+				value = compileValueConstant(AST.$getDefaultParameter(kws));
+			}
+
+			classNode.fields.add(new FieldNode(access, name, signature, null, value));
+		}
+
+		private int compileAccessCode(ISet modifiers) {
+			for (IValue cons : modifiers) {
+				switch (((IConstructor) cons).getName()) {
+				case "public": return Opcodes.ACC_PUBLIC;
+				case "private": return Opcodes.ACC_PRIVATE;
+				case "protected": return Opcodes.ACC_PROTECTED;
+				}
+			}
+
+			return 0;
+		}
+
+		private int compileModifiers(ISet modifiers) {
+			int res = 0;
+			for (IValue cons : modifiers) {
+				switch (((IConstructor) cons).getName()) {
+				case "public": 
+					res += Opcodes.ACC_PUBLIC; 
+					break;
+				case "private": 
+					res +=  Opcodes.ACC_PRIVATE; 
+					break;
+				case "protected": 
+					res += Opcodes.ACC_PROTECTED; 
+					break;
+				case "static": 
+					res += Opcodes.ACC_STATIC; 
+					break;
+				case "final": 
+					res += Opcodes.ACC_FINAL; 
+					break;
+				case "abstract": 
+					res += Opcodes.ACC_ABSTRACT; 
+					break;
+				case "interface": 
+					res += Opcodes.ACC_INTERFACE; 
+					break;
+				}
+			}
+
+			return res;
+		}
+
+		/**
+		 * Converts an arbitary IValue to some arbitrary JVM constant object.
+		 * For integers and reals it does something meaningful, for all the other
+		 * objects it returns the standard string representation of a value. For
+		 * external values it returns 'null';
+		 * @param parameter
+		 * @return Integer, Double or String object
+		 */
+		private Object compileValueConstant(IValue parameter) {
+			return parameter.getType().accept(new ITypeVisitor<Object, RuntimeException>() {
+
+				@Override
+				public Object visitAbstractData(Type arg0) throws RuntimeException {
+					if ("null".equals(AST.$getConstructorName(parameter))) {
+						return null;
+					}
+
+					return parameter.toString();
+				}
+
+				@Override
+				public Object visitAlias(Type arg0) throws RuntimeException {
+					return arg0.getAliased().accept(this);
+				}
+
+				@Override
+				public Object visitBool(Type arg0) throws RuntimeException {
+					return new Boolean(AST.$getBoolean(parameter));
+				}
+
+				@Override
+				public Object visitConstructor(Type arg0) throws RuntimeException {
+					if ("null".equals(AST.$getConstructorName(parameter))) {
+						return null;
+					}
+					return parameter.toString();
+				}
+
+				@Override
+				public Object visitDateTime(Type arg0) throws RuntimeException {
+					return parameter.toString();
+				}
+
+				@Override
+				public Object visitExternal(Type arg0) throws RuntimeException {
 					return null;
 				}
 
-				return parameter.toString();
-			}
+				@Override
+				public Object visitInteger(Type arg0) throws RuntimeException {
+					return new Integer(AST.$getIntegerConstant(parameter));
+				}
 
-			@Override
-			public Object visitAlias(Type arg0) throws RuntimeException {
-				return arg0.getAliased().accept(this);
-			}
 
-			@Override
-			public Object visitBool(Type arg0) throws RuntimeException {
-				return new Boolean(AST.$getBoolean(parameter));
-			}
+				@Override
+				public Object visitList(Type arg0) throws RuntimeException {
+					return parameter.toString();
+				}
 
-			@Override
-			public Object visitConstructor(Type arg0) throws RuntimeException {
-				if ("null".equals(AST.$getConstructorName(parameter))) {
+				@Override
+				public Object visitMap(Type arg0)  {
+					return parameter.toString();
+				}
+
+				@Override
+				public Object visitNode(Type arg0)  {
+					return parameter.toString();
+				}
+
+				@Override
+				public Object visitNumber(Type arg0)  {
+					return new Double(AST.$getDouble(parameter));
+				}
+
+				@Override
+				public Object visitParameter(Type arg0)  {
 					return null;
 				}
-				return parameter.toString();
-			}
 
-			@Override
-			public Object visitDateTime(Type arg0) throws RuntimeException {
-				return parameter.toString();
-			}
-
-			@Override
-			public Object visitExternal(Type arg0) throws RuntimeException {
-				return null;
-			}
-
-			@Override
-			public Object visitInteger(Type arg0) throws RuntimeException {
-				return new Integer(AST.$getIntegerConstant(parameter));
-			}
-
-
-			@Override
-			public Object visitList(Type arg0) throws RuntimeException {
-				return parameter.toString();
-			}
-
-			@Override
-			public Object visitMap(Type arg0)  {
-				return parameter.toString();
-			}
-
-			@Override
-			public Object visitNode(Type arg0)  {
-				return parameter.toString();
-			}
-
-			@Override
-			public Object visitNumber(Type arg0)  {
-				return new Double(AST.$getDouble(parameter));
-			}
-
-			@Override
-			public Object visitParameter(Type arg0)  {
-				return null;
-			}
-
-			@Override
-			public Object visitRational(Type arg0)  {
-				return new Double(AST.$getDouble(parameter));
-			}
-
-			@Override
-			public Object visitReal(Type arg0)  {
-				return new Double(((IReal) parameter).doubleValue());
-			}
-
-			@Override
-			public Object visitSet(Type arg0)  {
-				return parameter.toString();
-			}
-
-			@Override
-			public Object visitSourceLocation(Type arg0)  {
-				return ((ISourceLocation) parameter).getURI().toASCIIString();
-			}
-
-			@Override
-			public Object visitString(Type arg0)  {
-				return AST.$string(parameter);
-			}
-
-			@Override
-			public Object visitTuple(Type arg0)  {
-				return parameter.toString();
-			}
-
-			@Override
-			public Object visitValue(Type arg0)  {
-				return parameter.toString();
-			}
-
-			@Override
-			public Object visitVoid(Type arg0)  {
-				return null;
-			}
-		});
-	}
-}
-
-/**
- * Building mangled signature names from symbolic types
- */
-public static class Signature {
-	public static final String objectName = "java/lang/Object";
-	public static final String stringName = "java/lang/String";
-	public static final String objectType = "L" + objectName + ";";
-	public static final String stringType = "L" + stringName + ";";
-
-	private static String constructor(IConstructor sig) {
-		StringBuilder val = new StringBuilder();
-		val.append("(");
-		for (IValue formal : AST.$getFormals(sig)) {
-			val.append(type((IConstructor) formal));
-		}
-		val.append(")V");
-		return val.toString();
-	}
-
-	private static String method(IConstructor sig) {
-		StringBuilder val = new StringBuilder();
-		val.append("(");
-		for (IValue formal : AST.$getFormals(sig)) {
-			val.append(type((IConstructor) formal));
-		}
-		val.append(")");
-		val.append(type(AST.$getReturn(sig)));
-		return val.toString();
-	}
-
-	public static String type(IConstructor t) {
-		IConstructor type = (IConstructor) t;
-
-		return Switch.type(type,
-				(z) -> "Z",
-				(i) -> "I",
-				(s) -> "S",
-				(b) -> "B",
-				(c) -> "C",
-				(f) -> "F",
-				(d) -> "D",
-				(j) -> "J",
-				(v) -> "V",
-				(c) -> "L" + AST.$getName(c).replace('.', '/') + ";",
-				(a) -> "[" + type(AST.$getArg(a)),
-				(S) -> "Ljava/lang/String;"
-				);
-	}
-
-	public static Class<?>[] binaryClasses(IList formals, PrintWriter out) throws ClassNotFoundException {
-		Class<?>[] result = new Class<?>[formals.length()];
-		int i = 0;
-		for (IValue elem : formals) {
-			result[i++] = binaryClass((IConstructor) elem);
-		}
-		return result;
-	}
-
-	public static Class<?> binaryClass(IConstructor type) throws ClassNotFoundException {
-		return Switch.type(type,
-				(z) -> boolean.class,
-				(i) -> int.class,
-				(s) -> short.class,
-				(b) -> byte.class,
-				(c) -> char.class,
-				(f) -> float.class,
-				(d) -> double.class,
-				(j) -> long.class,
-				(v) -> void.class,
-				(c) -> forName(AST.$getName(type)),
-				(a) -> arrayClass(AST.$getArg(type)),
-				(S) -> String.class
-				);
-	}
-
-	private static Class<?> arrayClass(IConstructor component) {
-		try {
-			Class<?> elem = binaryClass(component);
-			return Array.newInstance(elem, 0).getClass();
-		} catch (ClassNotFoundException e) {
-			return Object[].class;
-		}
-	}
-
-	private static Class<?> forName(String name) {
-		try {
-			return Class.forName(name);
-		} catch (ClassNotFoundException e) {
-			return Object.class;
-		}
-	}
-}
-
-/**
- * Wrappers to get stuff out of the Class ASTs
- */
-public static class AST {
-
-	public static IValue $getConstant(IConstructor exp) {
-		return exp.get("constant");
-	}
-
-	public static IConstructor $getNext(IConstructor stat) {
-		return (IConstructor) stat.get("next");
-	}
-
-	public static IList $getInit(IConstructor stat) {
-		return (IList) stat.get("init");
-	}
-
-	public static IConstructor $getCondition(IConstructor stat) {
-		return (IConstructor) stat.get("condition");
-	}
-
-	public static IList $getThenBlock(IConstructor stat) {
-		return (IList) stat.get("thenBlock");
-	}
-
-	public static IList $getElseBlock(IConstructor stat) {
-		return (IList) stat.get("elseBlock");
-	}
-
-	public static IConstructor $getSize(IConstructor exp) {
-		return (IConstructor) exp.get("size");
-	}
-
-	public static IConstructor $getLhs(IConstructor exp) {
-		return (IConstructor) exp.get("lhs");
-	}
-
-	public static IConstructor $getRhs(IConstructor exp) {
-		return (IConstructor) exp.get("rhs");
-	}
-
-	public static IConstructor $getFrom(IConstructor exp) {
-		return (IConstructor) exp.get("from");
-	}
-
-	public static IConstructor $getTo(IConstructor exp) {
-		return (IConstructor) exp.get("to");
-	}
-
-	public static IConstructor $getValue(IConstructor stat) {
-		return (IConstructor) stat.get("value");
-	}
-
-	public static IConstructor $getIndex(IConstructor exp) {
-		return (IConstructor) exp.get("index");
-	}
-
-	public static IConstructor $getArray(IConstructor exp) {
-		return (IConstructor) exp.get("array");
-	}
-
-	public static IConstructor $getReceiver(IConstructor exp) {
-		return (IConstructor) exp.get("receiver");
-	}
-
-	public static IConstructor $getReturn(IConstructor sig) {
-		return (IConstructor) sig.get("return");
-	}
-
-	public static IList $getArgs(IConstructor sig) {
-		return (IList) sig.get("args");
-	}
-
-	public static String $getClass(IValue parameter, String currentClass) {
-		String result = ((IString) ((IConstructor) parameter).get("class")).getValue().replace('.', '/');
-
-		if ("<current>".equals(result)) {
-			return currentClass;
-		}
-
-		return result;
-	}
-
-	public static String $getConstructorName(IValue parameter) {
-		return ((IConstructor) parameter).getConstructorType().getName();
-	}
-
-	public static String $getName(IConstructor exp) {
-		return ((IString) exp.get("name")).getValue();
-	}
-
-	public static IConstructor $getType(IConstructor exp) {
-		return (IConstructor) exp.get("type");
-	}
-
-	public static boolean $getBooleanConstant(IValue parameter) {
-		return ((IBool) parameter).getValue();
-	}
-	
-	public static int $getIntegerConstant(IValue parameter) {
-		return ((IInteger) parameter).intValue();
-	}
-
-	public static long $getLongConstant(IValue parameter) {
-		return ((IInteger) parameter).longValue();
-	}
-
-	public static float $getFloatConstant(IValue parameter) {
-		return ((IReal) parameter).floatValue();
-	}
-
-	public static double $getDoubleConstant(IValue parameter) {
-		return ((IReal) parameter).doubleValue();
-	}
-
-	public static String $getStringConstant(IValue parameter) {
-		return ((IString) parameter).getValue();
-	}
-
-	public static boolean $getBoolean(IValue parameter) {
-		return ((IBool) parameter).getValue();
-	}
-
-	public static double $getDouble(IValue parameter) {
-		return ((INumber) parameter).toReal(10).doubleValue();
-	}
-
-	public static IList $getStatements(IConstructor block) {
-		return (IList) block.get("statements");
-	}
-
-	public static IList $getVariables(IConstructor block) {
-		return (IList) block.get("variables");
-	}
-
-	public static ISet $getModifiersParameter(IWithKeywordParameters<? extends IConstructor> kws) {
-		return (ISet) kws.getParameter("modifiers");
-	}
-
-	public static IConstructor $getDesc(IConstructor cons) {
-		return (IConstructor) cons.get("desc");
-	}
-
-	public static IList $getFormals(IConstructor sig) {
-		return (IList) sig.get("formals");
-	}
-
-	public static IConstructor $getBlock(IConstructor cons) {
-		return (IConstructor) cons.get("block");
-	}
-
-	public static IList $getMethodsParameter(IWithKeywordParameters<? extends IConstructor> kws) {
-		return (IList) kws.getParameter("methods");
-	}
-
-	public static IList $getFieldsParameter(IWithKeywordParameters<? extends IConstructor> kws) {
-		return (IList) kws.getParameter("fields");
-	}
-
-	public static String $getSourceParameter(IWithKeywordParameters<? extends IConstructor> kws) {
-		return kws.getParameter("source").toString();
-	}
-
-	public static ISet $getModifiers(IConstructor o) {
-		return (ISet) o.get("modifiers");
-	}
-
-	public static String $getSuper(IWithKeywordParameters<? extends IConstructor> kws) {
-		return ((IString) kws.getParameter("super")).getValue().replace('.','/');
-	}
-
-	public static String $string(IValue v) {
-		return ((IString) v).getValue();
-	}
-
-	public static IValue $getDefaultParameter(IWithKeywordParameters<? extends IConstructor> kws) {
-		return kws.getParameter("default");
-	}
-
-	public static IConstructor $getArg(IConstructor type) {
-		return (IConstructor) type.get("arg");
-	}
-	
-	public static int $getInc(IConstructor type) {
-		return ((IInteger) type.get("inc")).intValue();
-	}
-
-	public static int $getVersionCode(IConstructor version) {
-		switch (version.getConstructorType().getName()) {
-		case "v1_6": return Opcodes.V1_6;
-		case "v1_7": return Opcodes.V1_7;
-		case "v1_8": return Opcodes.V1_8;
-		default:
-			throw new IllegalArgumentException(version.toString());
-		}
-	}
-
-	public static IList $getInterfaces(IWithKeywordParameters<? extends IConstructor> kws) {
-		return (IList) kws.getParameter("interfaces");
-	}
-}
-
-public static class Switch {
-	/**
-	 * Dispatch on a consumer on a type. The idea is to never accidentally forget a type using this higher-order function.
-	 * @param type
-	 */
-	public static void type0(IConstructor type, Consumer<IConstructor> bools, Consumer<IConstructor> ints, Consumer<IConstructor> shorts, Consumer<IConstructor> bytes, Consumer<IConstructor> chars, Consumer<IConstructor> floats, Consumer<IConstructor> doubles, Consumer<IConstructor> longs, Consumer<IConstructor> voids, Consumer<IConstructor> classes, Consumer<IConstructor> arrays, Consumer<IConstructor> strings) {
-		switch (AST.$getConstructorName(type)) {
-		case "boolean": 
-			bools.accept(type);
-			break;
-		case "integer": 
-			ints.accept(type);
-			break;
-		case "short":
-			shorts.accept(type);
-			break;
-		case "byte":
-			bytes.accept(type);
-			break;
-		case "character":
-			chars.accept(type);
-			break;
-		case "float":
-			floats.accept(type);
-			break;
-		case "double":
-			doubles.accept(type);
-			break;
-		case "long":
-			longs.accept(type);
-			break;
-		case "void" :
-			voids.accept(type);
-			break;
-		case "classType" :
-			classes.accept(type);
-			break;
-		case "array" :
-			arrays.accept(type);
-			break;
-		case "string":
-			strings.accept(type);
-			break;
-		default:
-			throw new IllegalArgumentException("type not supported: " + type);
+				@Override
+				public Object visitRational(Type arg0)  {
+					return new Double(AST.$getDouble(parameter));
+				}
+
+				@Override
+				public Object visitReal(Type arg0)  {
+					return new Double(((IReal) parameter).doubleValue());
+				}
+
+				@Override
+				public Object visitSet(Type arg0)  {
+					return parameter.toString();
+				}
+
+				@Override
+				public Object visitSourceLocation(Type arg0)  {
+					return ((ISourceLocation) parameter).getURI().toASCIIString();
+				}
+
+				@Override
+				public Object visitString(Type arg0)  {
+					return AST.$string(parameter);
+				}
+
+				@Override
+				public Object visitTuple(Type arg0)  {
+					return parameter.toString();
+				}
+
+				@Override
+				public Object visitValue(Type arg0)  {
+					return parameter.toString();
+				}
+
+				@Override
+				public Object visitVoid(Type arg0)  {
+					return null;
+				}
+			});
 		}
 	}
 
 	/**
-	 * Dispatch on a function on a type. The idea is to never accidentally forget a type using this higher-order function.
-	 * @param type
+	 * Building mangled signature names from symbolic types
 	 */
-	public static <T> T type(IConstructor type, Function<IConstructor, T> bools, Function<IConstructor, T> ints, Function<IConstructor, T> shorts, Function<IConstructor, T> bytes, Function<IConstructor, T> chars, Function<IConstructor, T> floats, Function<IConstructor, T> doubles, Function<IConstructor, T> longs, Function<IConstructor, T> voids, Function<IConstructor, T> classes, Function<IConstructor, T> arrays, Function<IConstructor, T> strings) {
-		switch (AST.$getConstructorName(type)) {
-		case "boolean" :
-			return bools.apply(type);
-		case "integer": 
-			return ints.apply(type);
-		case "short":
-			return shorts.apply(type);
-		case "byte":
-			return bytes.apply(type);
-		case "character":
-			return chars.apply(type);
-		case "float":
-			return floats.apply(type);
-		case "double":
-			return doubles.apply(type);
-		case "long":
-			return longs.apply(type);
-		case "void" :
-			return voids.apply(type);
-		case "classType" :
-			return classes.apply(type);
-		case "array" :
-			return arrays.apply(type);
-		case "string":
-			return strings.apply(type);
-		default:
-			throw new IllegalArgumentException("type not supported: " + type);
+	public static class Signature {
+		public static final String objectName = "java/lang/Object";
+		public static final String stringName = "java/lang/String";
+		public static final String objectType = "L" + objectName + ";";
+		public static final String stringType = "L" + stringName + ";";
+
+		private static String constructor(IConstructor sig) {
+			StringBuilder val = new StringBuilder();
+			val.append("(");
+			for (IValue formal : AST.$getFormals(sig)) {
+				val.append(type((IConstructor) formal));
+			}
+			val.append(")V");
+			return val.toString();
+		}
+
+		private static String method(IConstructor sig) {
+			StringBuilder val = new StringBuilder();
+			val.append("(");
+			for (IValue formal : AST.$getFormals(sig)) {
+				val.append(type((IConstructor) formal));
+			}
+			val.append(")");
+			val.append(type(AST.$getReturn(sig)));
+			return val.toString();
+		}
+
+		public static String type(IConstructor t) {
+			IConstructor type = (IConstructor) t;
+
+			return Switch.type(type,
+					(z) -> "Z",
+					(i) -> "I",
+					(s) -> "S",
+					(b) -> "B",
+					(c) -> "C",
+					(f) -> "F",
+					(d) -> "D",
+					(j) -> "J",
+					(v) -> "V",
+					(c) -> "L" + AST.$getName(c).replace('.', '/') + ";",
+					(a) -> "[" + type(AST.$getArg(a)),
+					(S) -> "Ljava/lang/String;"
+					);
+		}
+
+		public static Class<?>[] binaryClasses(IList formals, PrintWriter out) throws ClassNotFoundException {
+			Class<?>[] result = new Class<?>[formals.length()];
+			int i = 0;
+			for (IValue elem : formals) {
+				result[i++] = binaryClass((IConstructor) elem);
+			}
+			return result;
+		}
+
+		public static Class<?> binaryClass(IConstructor type) throws ClassNotFoundException {
+			return Switch.type(type,
+					(z) -> boolean.class,
+					(i) -> int.class,
+					(s) -> short.class,
+					(b) -> byte.class,
+					(c) -> char.class,
+					(f) -> float.class,
+					(d) -> double.class,
+					(j) -> long.class,
+					(v) -> void.class,
+					(c) -> forName(AST.$getName(type)),
+					(a) -> arrayClass(AST.$getArg(type)),
+					(S) -> String.class
+					);
+		}
+
+		private static Class<?> arrayClass(IConstructor component) {
+			try {
+				Class<?> elem = binaryClass(component);
+				return Array.newInstance(elem, 0).getClass();
+			} catch (ClassNotFoundException e) {
+				return Object[].class;
+			}
+		}
+
+		private static Class<?> forName(String name) {
+			try {
+				return Class.forName(name);
+			} catch (ClassNotFoundException e) {
+				return Object.class;
+			}
 		}
 	}
 
 	/**
-	 * Dispatch a consumer on a type and pass a parameter
-	 * @param type
+	 * Wrappers to get stuff out of the Class ASTs
 	 */
-	public static <T> void type(IConstructor type, T arg,  BiConsumer<IConstructor,T> bools, BiConsumer<IConstructor,T> ints, BiConsumer<IConstructor,T> shorts, BiConsumer<IConstructor,T> bytes, BiConsumer<IConstructor,T> chars, BiConsumer<IConstructor,T> floats, BiConsumer<IConstructor,T> doubles, BiConsumer<IConstructor,T> longs, BiConsumer<IConstructor,T> voids, BiConsumer<IConstructor,T> classes, BiConsumer<IConstructor,T> arrays, BiConsumer<IConstructor, T> strings) {
-		switch (AST.$getConstructorName(type)) {
-		case "boolean":
-			bools.accept(type, arg);
-			break;
-		case "integer": 
-			ints.accept(type, arg);
-			break;
-		case "short":
-			shorts.accept(type, arg);
-			break;
-		case "byte":
-			bytes.accept(type, arg);
-			break;
-		case "character":
-			chars.accept(type, arg);
-			break;
-		case "float":
-			floats.accept(type, arg);
-			break;
-		case "double":
-			doubles.accept(type, arg);
-			break;
-		case "long":
-			longs.accept(type, arg);
-			break;
-		case "void" :
-			voids.accept(type, arg);
-			break;
-		case "classType" :
-			classes.accept(type, arg);
-			break;
-		case "array" :
-			arrays.accept(type, arg);
-			break;
-		case "string":
-			strings.accept(type, arg);
-			break;
-		default:
-			throw new IllegalArgumentException("type not supported: " + type);
+	public static class AST {
+
+		public static IValue $getConstant(IConstructor exp) {
+			return exp.get("constant");
+		}
+
+		public static IConstructor $getNext(IConstructor stat) {
+			return (IConstructor) stat.get("next");
+		}
+
+		public static IList $getInit(IConstructor stat) {
+			return (IList) stat.get("init");
+		}
+
+		public static IConstructor $getCondition(IConstructor stat) {
+			return (IConstructor) stat.get("condition");
+		}
+
+		public static IList $getThenBlock(IConstructor stat) {
+			return (IList) stat.get("thenBlock");
+		}
+
+		public static IList $getElseBlock(IConstructor stat) {
+			return (IList) stat.get("elseBlock");
+		}
+
+		public static IConstructor $getSize(IConstructor exp) {
+			return (IConstructor) exp.get("size");
+		}
+
+		public static IConstructor $getLhs(IConstructor exp) {
+			return (IConstructor) exp.get("lhs");
+		}
+
+		public static IConstructor $getRhs(IConstructor exp) {
+			return (IConstructor) exp.get("rhs");
+		}
+
+		public static IConstructor $getFrom(IConstructor exp) {
+			return (IConstructor) exp.get("from");
+		}
+
+		public static IConstructor $getTo(IConstructor exp) {
+			return (IConstructor) exp.get("to");
+		}
+
+		public static IConstructor $getValue(IConstructor stat) {
+			return (IConstructor) stat.get("value");
+		}
+
+		public static IConstructor $getIndex(IConstructor exp) {
+			return (IConstructor) exp.get("index");
+		}
+
+		public static IConstructor $getArray(IConstructor exp) {
+			return (IConstructor) exp.get("array");
+		}
+
+		public static IConstructor $getReceiver(IConstructor exp) {
+			return (IConstructor) exp.get("receiver");
+		}
+
+		public static IConstructor $getReturn(IConstructor sig) {
+			return (IConstructor) sig.get("return");
+		}
+
+		public static IList $getArgs(IConstructor sig) {
+			return (IList) sig.get("args");
+		}
+
+		public static IConstructor $getClass(IConstructor parameter) {
+			return (IConstructor) parameter.get("class");
+		}
+		
+		public static String $getClassFromType(IConstructor type, String currentClass) {
+			return Switch.type(type, 
+					(z) -> "java.lang.Boolean", 
+					(i) -> "java.lang.Integer", 
+					(s) -> "java.lang.Short", 
+					(b) -> "java.lang.Byte",
+					(c) -> "java.lang.Character", 
+					(f) -> "java.lang.Float", 
+					(d) -> "java.lang.Double", 
+					(j) -> "java.lang.Long", 
+					(v) -> { throw new IllegalArgumentException("can not instantiate void type"); },
+					(c) -> {
+						String name = AST.$getName(type).replace('.','/');
+						if (name.equals("<current>")) {
+							name = currentClass;
+						}
+						return name;
+					},
+					(a) -> { throw new IllegalArgumentException("can not instantiate array types, use newArray instead of newInstance"); }, 
+					(s) -> "java.lang.String");
+		}
+
+		public static String $getConstructorName(IValue parameter) {
+			return ((IConstructor) parameter).getConstructorType().getName();
+		}
+
+		public static String $getName(IConstructor exp) {
+			return ((IString) exp.get("name")).getValue();
+		}
+
+		public static IConstructor $getType(IConstructor exp) {
+			return (IConstructor) exp.get("type");
+		}
+
+		public static boolean $getBooleanConstant(IValue parameter) {
+			return ((IBool) parameter).getValue();
+		}
+
+		public static int $getIntegerConstant(IValue parameter) {
+			return ((IInteger) parameter).intValue();
+		}
+
+		public static long $getLongConstant(IValue parameter) {
+			return ((IInteger) parameter).longValue();
+		}
+
+		public static float $getFloatConstant(IValue parameter) {
+			return ((IReal) parameter).floatValue();
+		}
+
+		public static double $getDoubleConstant(IValue parameter) {
+			return ((IReal) parameter).doubleValue();
+		}
+
+		public static String $getStringConstant(IValue parameter) {
+			return ((IString) parameter).getValue();
+		}
+
+		public static boolean $getBoolean(IValue parameter) {
+			return ((IBool) parameter).getValue();
+		}
+
+		public static double $getDouble(IValue parameter) {
+			return ((INumber) parameter).toReal(10).doubleValue();
+		}
+
+		public static IList $getStatements(IConstructor block) {
+			return (IList) block.get("statements");
+		}
+
+		public static IList $getVariables(IConstructor block) {
+			return (IList) block.get("variables");
+		}
+
+		public static ISet $getModifiersParameter(IWithKeywordParameters<? extends IConstructor> kws) {
+			return (ISet) kws.getParameter("modifiers");
+		}
+
+		public static IConstructor $getDesc(IConstructor cons) {
+			return (IConstructor) cons.get("desc");
+		}
+
+		public static IList $getFormals(IConstructor sig) {
+			return (IList) sig.get("formals");
+		}
+
+		public static IConstructor $getBlock(IConstructor cons) {
+			return (IConstructor) cons.get("block");
+		}
+
+		public static IList $getMethodsParameter(IWithKeywordParameters<? extends IConstructor> kws) {
+			return (IList) kws.getParameter("methods");
+		}
+
+		public static IList $getFieldsParameter(IWithKeywordParameters<? extends IConstructor> kws) {
+			return (IList) kws.getParameter("fields");
+		}
+
+		public static String $getSourceParameter(IWithKeywordParameters<? extends IConstructor> kws) {
+			return kws.getParameter("source").toString();
+		}
+
+		public static ISet $getModifiers(IConstructor o) {
+			return (ISet) o.get("modifiers");
+		}
+
+		public static String $getSuper(IWithKeywordParameters<? extends IConstructor> kws) {
+			return ((IString) kws.getParameter("super")).getValue().replace('.','/');
+		}
+
+		public static String $string(IValue v) {
+			return ((IString) v).getValue();
+		}
+
+		public static IValue $getDefaultParameter(IWithKeywordParameters<? extends IConstructor> kws) {
+			return kws.getParameter("default");
+		}
+
+		public static IConstructor $getArg(IConstructor type) {
+			return (IConstructor) type.get("arg");
+		}
+
+		public static int $getInc(IConstructor type) {
+			return ((IInteger) type.get("inc")).intValue();
+		}
+
+		public static int $getVersionCode(IConstructor version) {
+			switch (version.getConstructorType().getName()) {
+			case "v1_6": return Opcodes.V1_6;
+			case "v1_7": return Opcodes.V1_7;
+			case "v1_8": return Opcodes.V1_8;
+			default:
+				throw new IllegalArgumentException(version.toString());
+			}
+		}
+
+		public static IList $getInterfaces(IWithKeywordParameters<? extends IConstructor> kws) {
+			return (IList) kws.getParameter("interfaces");
+		}
+	}
+
+	public static class Switch {
+		/**
+		 * Dispatch on a consumer on a type. The idea is to never accidentally forget a type using this higher-order function.
+		 * @param type
+		 */
+		public static void type0(IConstructor type, Consumer<IConstructor> bools, Consumer<IConstructor> ints, Consumer<IConstructor> shorts, Consumer<IConstructor> bytes, Consumer<IConstructor> chars, Consumer<IConstructor> floats, Consumer<IConstructor> doubles, Consumer<IConstructor> longs, Consumer<IConstructor> voids, Consumer<IConstructor> classes, Consumer<IConstructor> arrays, Consumer<IConstructor> strings) {
+			switch (AST.$getConstructorName(type)) {
+			case "boolean": 
+				bools.accept(type);
+				break;
+			case "integer": 
+				ints.accept(type);
+				break;
+			case "short":
+				shorts.accept(type);
+				break;
+			case "byte":
+				bytes.accept(type);
+				break;
+			case "character":
+				chars.accept(type);
+				break;
+			case "float":
+				floats.accept(type);
+				break;
+			case "double":
+				doubles.accept(type);
+				break;
+			case "long":
+				longs.accept(type);
+				break;
+			case "void" :
+				voids.accept(type);
+				break;
+			case "classType" :
+				classes.accept(type);
+				break;
+			case "array" :
+				arrays.accept(type);
+				break;
+			case "string":
+				strings.accept(type);
+				break;
+			default:
+				throw new IllegalArgumentException("type not supported: " + type);
+			}
+		}
+
+		/**
+		 * Dispatch on a function on a type. The idea is to never accidentally forget a type using this higher-order function.
+		 * @param type
+		 */
+		public static <T> T type(IConstructor type, Function<IConstructor, T> bools, Function<IConstructor, T> ints, Function<IConstructor, T> shorts, Function<IConstructor, T> bytes, Function<IConstructor, T> chars, Function<IConstructor, T> floats, Function<IConstructor, T> doubles, Function<IConstructor, T> longs, Function<IConstructor, T> voids, Function<IConstructor, T> classes, Function<IConstructor, T> arrays, Function<IConstructor, T> strings) {
+			switch (AST.$getConstructorName(type)) {
+			case "boolean" :
+				return bools.apply(type);
+			case "integer": 
+				return ints.apply(type);
+			case "short":
+				return shorts.apply(type);
+			case "byte":
+				return bytes.apply(type);
+			case "character":
+				return chars.apply(type);
+			case "float":
+				return floats.apply(type);
+			case "double":
+				return doubles.apply(type);
+			case "long":
+				return longs.apply(type);
+			case "void" :
+				return voids.apply(type);
+			case "classType" :
+				return classes.apply(type);
+			case "array" :
+				return arrays.apply(type);
+			case "string":
+				return strings.apply(type);
+			default:
+				throw new IllegalArgumentException("type not supported: " + type);
+			}
+		}
+
+		/**
+		 * Dispatch a consumer on a type and pass a parameter
+		 * @param type
+		 */
+		public static <T> void type(IConstructor type, T arg,  BiConsumer<IConstructor,T> bools, BiConsumer<IConstructor,T> ints, BiConsumer<IConstructor,T> shorts, BiConsumer<IConstructor,T> bytes, BiConsumer<IConstructor,T> chars, BiConsumer<IConstructor,T> floats, BiConsumer<IConstructor,T> doubles, BiConsumer<IConstructor,T> longs, BiConsumer<IConstructor,T> voids, BiConsumer<IConstructor,T> classes, BiConsumer<IConstructor,T> arrays, BiConsumer<IConstructor, T> strings) {
+			switch (AST.$getConstructorName(type)) {
+			case "boolean":
+				bools.accept(type, arg);
+				break;
+			case "integer": 
+				ints.accept(type, arg);
+				break;
+			case "short":
+				shorts.accept(type, arg);
+				break;
+			case "byte":
+				bytes.accept(type, arg);
+				break;
+			case "character":
+				chars.accept(type, arg);
+				break;
+			case "float":
+				floats.accept(type, arg);
+				break;
+			case "double":
+				doubles.accept(type, arg);
+				break;
+			case "long":
+				longs.accept(type, arg);
+				break;
+			case "void" :
+				voids.accept(type, arg);
+				break;
+			case "classType" :
+				classes.accept(type, arg);
+				break;
+			case "array" :
+				arrays.accept(type, arg);
+				break;
+			case "string":
+				strings.accept(type, arg);
+				break;
+			default:
+				throw new IllegalArgumentException("type not supported: " + type);
+			}
+		}
+	}
+
+	@SuppressWarnings("unused")
+	private static class Types {
+		//	data Type
+		//	  = byte()
+		//	  | boolean()
+		//	  | short()
+		//	  | character()
+		//	  | integer()
+		//	  | float()
+		//	  | double()
+		//	  | long()
+		//	  | classType(str name)
+		//	  | array(Type arg)
+		//	  | \void()
+		//	  | string()
+		//	  ;
+		private static final TypeFactory tf = TypeFactory.getInstance();
+		private static final IValueFactory vf = ValueFactoryFactory.getValueFactory();
+		private static final TypeStore store = new TypeStore();
+		private static final Type TYPE = tf.abstractDataType(store, "Type");
+		private static final Type CLASS = tf.constructor(store, TYPE, "classType", tf.stringType(), "name");
+		private static final Type ARRAY = tf.constructor(store, TYPE, "array", TYPE, "arg");
+		private static final Type BYTE = tf.constructor(store, TYPE, "byte");
+		private static final Type BOOLEAN = tf.constructor(store, TYPE, "boolean");
+		private static final IConstructor BOOL_CONS = vf.constructor(BOOLEAN);
+		private static final Type SHORT = tf.constructor(store, TYPE, "short");
+		private static final Type CHARACTER = tf.constructor(store, TYPE, "character");
+		private static final Type INTEGER = tf.constructor(store, TYPE, "integer");
+		private static final IConstructor INTEGER_CONS = vf.constructor(INTEGER);
+		private static final Type FLOAT = tf.constructor(store, TYPE, "float");
+		private static final Type DOUBLE = tf.constructor(store, TYPE, "double");
+		private static final Type LONG = tf.constructor(store, TYPE, "long");
+		private static final Type VOID = tf.constructor(store, TYPE, "void");
+		private static final IConstructor VOID_CONS = vf.constructor(VOID);
+		private static final Type STRING = tf.constructor(store, TYPE, "string");
+		
+		static IConstructor arrayType(IConstructor elem) {
+			return vf.constructor(ARRAY, elem);
+		}
+		
+		static IConstructor classType(String name) {
+			return vf.constructor(CLASS, vf.string(name));
+		}
+		
+		static IConstructor byteType() {
+			return vf.constructor(BYTE);
+		}
+		
+		static IConstructor booleanType() {
+			return BOOL_CONS;
+		}
+		
+		static IConstructor shortType() {
+			return vf.constructor(SHORT);
+		}
+		
+		
+		static IConstructor characterType() {
+			return vf.constructor(CHARACTER);
+		}
+		
+		static IConstructor integerType() {
+			return INTEGER_CONS;
+		}
+		
+		static IConstructor floatType() {
+			return vf.constructor(FLOAT);
+		}
+		
+		static IConstructor doubleType() {
+			return vf.constructor(DOUBLE);
+		}
+		
+		static IConstructor longType() {
+			return vf.constructor(LONG);
+		}
+		
+		static IConstructor voidType() {
+			return VOID_CONS;
+		}
+		
+		static IConstructor stringType() {
+			return vf.constructor(STRING);
 		}
 	}
 }
-}
+

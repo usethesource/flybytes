@@ -9,30 +9,30 @@ import String;
 import IO;
 import util::Math;
 
-alias BinOp = Expression (Type, Expression, Expression);
-alias UnOp = Expression (Type, Expression);
+alias BinOp = Expression (Expression, Expression);
+alias UnOp = Expression (Expression);
 
 Class binOpClass(Type t, BinOp op) {
-  expr = op(t, load("i"), load("j"));
+  expr = op(load("i"), load("j"));
   name = "Operator_<getName(expr)>_<getName(t)>";
   
   return class(classType(name),
       methods=[
         staticMethod(\public(), t, "op", [var(t,"i"), var(t,"j")], [
-           \return(t, expr)
+           \return(expr)
         ])
       ]
     );
 }
 
 Class unOpClass(Type t, UnOp op) {
-  expr = op(t, load("i"));
+  expr = op(load("i"));
   name = "Operator_<getName(expr)>_<getName(t)>";
   
   return class(classType(name),
       methods=[
         staticMethod(\public(), t, "op", [var(t,"i")], [
-           \return(t, expr)
+           \return(expr)
         ])
       ]
     );

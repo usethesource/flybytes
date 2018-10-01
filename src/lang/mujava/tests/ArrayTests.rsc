@@ -20,13 +20,13 @@ Class primArrayTestClass(Type t, int len) {
           \if(ne(const(integer(), len), alength(load("tmp"))), [rf]),
            
           // fail if (tmp[0] != def)
-          *[\if(ne(defVal(t), aaload(load("tmp"), const(integer(), 0))),[rf]) | len > 0, _ <- [0..1]],
+          *[\if(ne(defVal(t), aload(load("tmp"), const(integer(), 0))),[rf]) | len > 0, _ <- [0..1]],
            
           // generate `len` store instructions: tmp[i] = i;
-          *[aastore(load("tmp"), const(integer(), I), const(t, I)) | I <- [0..len]],
+          *[astore(load("tmp"), const(integer(), I), const(t, I)) | I <- [0..len]],
            
           // see if that worked by indexing into the array: if (tmp[i] != i)
-          *[\if(ne(aaload(load("tmp"), const(integer(), I)), const(t, I)), [rf]) | I <- [0..len]],
+          *[\if(ne(aload(load("tmp"), const(integer(), I)), const(t, I)), [rf]) | I <- [0..len]],
           
           // return true; 
           rt
@@ -77,13 +77,13 @@ Class valArrayTestClass(Type t, int len, Expression val) {
           \if(ne(const(integer(), len), alength(load("tmp"))), [rf]),
            
           // fail if (tmp[0] != def)
-          *[\if(ne(defVal(t), aaload(load("tmp"), const(integer(), 0))),[rf]) | len > 0, _ <- [0..1]],
+          *[\if(ne(defVal(t), aload(load("tmp"), const(integer(), 0))),[rf]) | len > 0, _ <- [0..1]],
            
           // generate `len` store instructions: tmp[i] = i;
-          *[aastore(load("tmp"), const(integer(), I), val) | I <- [0..len]],
+          *[astore(load("tmp"), const(integer(), I), val) | I <- [0..len]],
            
           // see if that worked by indexing into the array: if (tmp[i] != i)
-          *[\if(ne(aaload(load("tmp"), const(integer(), I)), val), [rf]) | I <- [0..len]],
+          *[\if(ne(aload(load("tmp"), const(integer(), I)), val), [rf]) | I <- [0..len]],
           
           // return true; 
           rt

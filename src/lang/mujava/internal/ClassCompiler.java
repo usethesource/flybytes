@@ -16,6 +16,8 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.util.CheckClassAdapter;
+import org.objectweb.asm.util.TraceClassVisitor;
 import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.uri.URIResolverRegistry;
@@ -73,7 +75,7 @@ public class ClassCompiler {
 
 			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
 
-			if (output.getConstructorType().getName() == "just") {
+			if (output.getConstructorType().getName().equals("just")) {
 				ISourceLocation classFile = (ISourceLocation) output.get("val");
 				try (OutputStream out = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 					out.write(cw.toByteArray());
@@ -484,9 +486,9 @@ public class ClassCompiler {
 				break;
 			default:
 				compileConditionalInverted(
-						() -> compileExpression(cond, () -> compileTrue()),
+						() -> compileExpression(cond, DONE),
 						0, 
-						Opcodes.IF_ICMPNE, 
+						Opcodes.IFEQ, 
 						thenBuilder,
 						elseBuilder,
 						continuation
@@ -610,7 +612,6 @@ public class ClassCompiler {
 				compileExpression_AALoad(AST.$getType(exp), AST.$getArray(exp), AST.$getIndex(exp));
 				continuation.build();
 				break;
-		
 			case "getStatic":
 				compileGetStatic(AST.$getClass(exp, classNode.name), AST.$getType(exp), AST.$getName(exp));
 				continuation.build();
@@ -656,16 +657,19 @@ public class ClassCompiler {
 				}
 				break;
 			case "nonnull":
-				compileNonNull(AST.$getArg(exp), () -> compileTrue(), () -> compileFalse(),continuation); // null check 
+				compileNonNull(AST.$getArg(exp), () -> compileTrue(), () -> compileFalse(), continuation); // null check 
 				break;
 			case "true":
 				compileTrue();
+				continuation.build();
 				break;
 			case "false":
 				compileFalse();
+				continuation.build();
 				break;
 			case "coerce":
 				compileCoerce(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
+				continuation.build();
 				break;
 			case "eq":
 				compileEq(AST.$getType(exp), AST.$getLhs(exp), AST.$getRhs(exp), () -> compileTrue(), () -> compileFalse(), continuation);
@@ -755,13 +759,13 @@ public class ClassCompiler {
 					(s) -> method.visitInsn(Opcodes.ISHL), 
 					(b) -> method.visitInsn(Opcodes.ISHL), 
 					(c) -> method.visitInsn(Opcodes.ISHL), 
-					(f) -> { throw new IllegalArgumentException("xor on void"); },
-					(d) -> { throw new IllegalArgumentException("xor on void"); },
+					(f) -> { throw new IllegalArgumentException("shl on void"); },
+					(d) -> { throw new IllegalArgumentException("shl on void"); },
 					(l) -> method.visitInsn(Opcodes.LSHL),
-					(v) -> { throw new IllegalArgumentException("xor on void"); }, 
-					(c) -> { throw new IllegalArgumentException("xor on object"); },
-					(a) -> { throw new IllegalArgumentException("xor on array"); },
-					(S) -> { throw new IllegalArgumentException("xor on string"); }
+					(v) -> { throw new IllegalArgumentException("shl on void"); }, 
+					(c) -> { throw new IllegalArgumentException("shl on object"); },
+					(a) -> { throw new IllegalArgumentException("shl on array"); },
+					(S) -> { throw new IllegalArgumentException("shl on string"); }
 					);
 		}
 
@@ -774,13 +778,13 @@ public class ClassCompiler {
 					(s) -> method.visitInsn(Opcodes.IUSHR), 
 					(b) -> method.visitInsn(Opcodes.IUSHR), 
 					(c) -> method.visitInsn(Opcodes.IUSHR), 
-					(f) -> { throw new IllegalArgumentException("xor on void"); },
-					(d) -> { throw new IllegalArgumentException("xor on void"); },
+					(f) -> { throw new IllegalArgumentException("ushr on void"); },
+					(d) -> { throw new IllegalArgumentException("ushr on void"); },
 					(l) -> method.visitInsn(Opcodes.LUSHR),
-					(v) -> { throw new IllegalArgumentException("xor on void"); }, 
-					(c) -> { throw new IllegalArgumentException("xor on object"); },
-					(a) -> { throw new IllegalArgumentException("xor on array"); },
-					(S) -> { throw new IllegalArgumentException("xor on string"); }
+					(v) -> { throw new IllegalArgumentException("ushr on void"); }, 
+					(c) -> { throw new IllegalArgumentException("ushr on object"); },
+					(a) -> { throw new IllegalArgumentException("ushr on array"); },
+					(S) -> { throw new IllegalArgumentException("ushr on string"); }
 					);
 		}
 
@@ -793,13 +797,13 @@ public class ClassCompiler {
 					(s) -> method.visitInsn(Opcodes.ISHR), 
 					(b) -> method.visitInsn(Opcodes.ISHR), 
 					(c) -> method.visitInsn(Opcodes.ISHR), 
-					(f) -> { throw new IllegalArgumentException("xor on void"); },
-					(d) -> { throw new IllegalArgumentException("xor on void"); },
+					(f) -> { throw new IllegalArgumentException("shr on void"); },
+					(d) -> { throw new IllegalArgumentException("shr on void"); },
 					(l) -> method.visitInsn(Opcodes.LSHR),
-					(v) -> { throw new IllegalArgumentException("xor on void"); }, 
-					(c) -> { throw new IllegalArgumentException("xor on object"); },
-					(a) -> { throw new IllegalArgumentException("xor on array"); },
-					(S) -> { throw new IllegalArgumentException("xor on string"); }
+					(v) -> { throw new IllegalArgumentException("shr on void"); }, 
+					(c) -> { throw new IllegalArgumentException("shr on object"); },
+					(a) -> { throw new IllegalArgumentException("shr on array"); },
+					(S) -> { throw new IllegalArgumentException("shr on string"); }
 					);
 		}
 
@@ -1038,7 +1042,6 @@ public class ClassCompiler {
 	}
 
 	private void compileExpression_NewArraySize(IConstructor type, IConstructor size) {
-		out.println("size = " + size);
 		compileExpression(size, () -> compileNewArrayWithSizeOnStack(type));
 	}
 	
@@ -1175,6 +1178,7 @@ public class ClassCompiler {
 	 */
 	private void compileConditionalInverted(Builder args, int compare, int opcode, Builder thenPart, Builder elsePart, Builder continuation) {
 		args.build();
+		
 		// TODO: is this the most efficient encoding? probably not. 
 		Label jump = new Label();
 		Label join = new Label();
@@ -1185,11 +1189,11 @@ public class ClassCompiler {
 		method.visitJumpInsn(opcode, jump);
 		thenPart.build();
 		method.visitJumpInsn(Opcodes.GOTO, join);
-		method.visitInsn(Opcodes.GOTO);
 		method.visitLabel(jump);
 		method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 		elsePart.build();
 		method.visitLabel(join);
+		method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 		continuation.build();
 	}
 

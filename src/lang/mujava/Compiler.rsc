@@ -17,7 +17,7 @@ java void compileClass(Class cls, loc classFile, bool enableAsserts=false, JDKVe
 @javaClass{lang.mujava.internal.ClassCompiler}
 @reflect{for stdout}
 @doc{compiles a mujava class to a JVM bytecode class and loads the result as a class Mirror value.}
-@memo
+//@memo
 java Mirror loadClass(Class cls, Maybe[loc] file=nothing(), list[loc] classpath=[], bool enableAsserts=false, JDKVersion version=v1_6());
 
 

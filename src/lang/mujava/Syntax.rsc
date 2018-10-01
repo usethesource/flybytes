@@ -43,7 +43,7 @@ generation.
 module lang::mujava::Syntax
 
 data Class
-  = class(Type \type /* classType(str name) */, 
+  = class(Type \type /* class(str name) */, 
       set[Modifier] modifiers = {\public()},
       str super = "java.lang.Object",
       list[str] interfaces = [],
@@ -87,7 +87,7 @@ data Type
   | float()
   | double()
   | long()
-  | classType(str name)
+  | class(str name)
   | array(Type arg)
   | \void()
   | string()
@@ -184,7 +184,7 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
  // Below popular some convenience macros for
  // generating methods and constructors:
  
-Type object() = classType("java.lang.Object");
+Type object() = class("java.lang.Object");
 
 Statement invokeSuper(list[Type] formals, list[Expression] args)
   = do(invokeSuper(constructorDesc(formals), args));
@@ -256,7 +256,7 @@ Expression new(Type class)
 // NB! This works only inside non-static methods and inside constructors 
 Expression this() = load("this");
 
-private Type CURRENT = classType("\<current\>");
+private Type CURRENT = class("\<current\>");
 
 // Load a field from the currently defined class
 Expression getField(Type \type, str name)

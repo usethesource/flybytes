@@ -971,7 +971,7 @@ public class ClassCompiler {
 			String cons = type.getConstructorType().getName();
 
 			// weird inconsistency in CHECKCAST instruction?
-			if (cons == "classType") {
+			if (cons == "class") {
 				method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type));
 			}
 			else if (cons == "array") {
@@ -993,7 +993,7 @@ public class ClassCompiler {
 		private IConstructor compileExpression_NewArraySize(IConstructor type, IConstructor size) {
 			compileExpression(size);
 			
-			if (type.getConstructorType() != Types.ARRAY) {
+			if (!type.getConstructorType().getName().equals("array")) {
 				throw new IllegalArgumentException("arg should be an array type");
 			}
 			compileNewArrayWithSizeOnStack(AST.$getArg(type));
@@ -1002,7 +1002,7 @@ public class ClassCompiler {
 
 		private IConstructor compileExpression_NewArray(IConstructor type, IList elems) {
 			intConstant(elems.length());
-			if (type.getConstructorType() != Types.ARRAY) {
+			if (!type.getConstructorType().getName().equals("array")) {
 				throw new IllegalArgumentException("arg should be an array type");
 			}
 			
@@ -1576,7 +1576,7 @@ public class ClassCompiler {
 			method.visitTypeInsn(Opcodes.NEW, cls);
 			dup();
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", desc, false);
-			return Types.classType(cls);
+			return type;
 		}
 
 		private IConstructor compileExpression_AALoad(IConstructor array, IConstructor index) {
@@ -2327,7 +2327,7 @@ public class ClassCompiler {
 			case "void" :
 				voids.accept(type);
 				break;
-			case "classType" :
+			case "class" :
 				classes.accept(type);
 				break;
 			case "array" :
@@ -2365,7 +2365,7 @@ public class ClassCompiler {
 				return longs.apply(type);
 			case "void" :
 				return voids.apply(type);
-			case "classType" :
+			case "class" :
 				return classes.apply(type);
 			case "array" :
 				return arrays.apply(type);
@@ -2409,7 +2409,7 @@ public class ClassCompiler {
 			case "void" :
 				voids.accept(type, arg);
 				break;
-			case "classType" :
+			case "class" :
 				classes.accept(type, arg);
 				break;
 			case "array" :
@@ -2424,89 +2424,28 @@ public class ClassCompiler {
 		}
 	}
 
-	@SuppressWarnings("unused")
 	private static class Types {
-		//	data Type
-		//	  = byte()
-		//	  | boolean()
-		//	  | short()
-		//	  | character()
-		//	  | integer()
-		//	  | float()
-		//	  | double()
-		//	  | long()
-		//	  | classType(str name)
-		//	  | array(Type arg)
-		//	  | \void()
-		//	  | string()
-		//	  ;
 		private static final TypeFactory tf = TypeFactory.getInstance();
 		private static final IValueFactory vf = ValueFactoryFactory.getValueFactory();
 		private static final TypeStore store = new TypeStore();
 		private static final Type TYPE = tf.abstractDataType(store, "Type");
-		private static final Type CLASS = tf.constructor(store, TYPE, "classType", tf.stringType(), "name");
-		private static final Type ARRAY = tf.constructor(store, TYPE, "array", TYPE, "arg");
-		private static final Type BYTE = tf.constructor(store, TYPE, "byte");
 		private static final Type BOOLEAN = tf.constructor(store, TYPE, "boolean");
 		private static final IConstructor BOOL_CONS = vf.constructor(BOOLEAN);
-		private static final Type SHORT = tf.constructor(store, TYPE, "short");
-		private static final Type CHARACTER = tf.constructor(store, TYPE, "character");
 		private static final Type INTEGER = tf.constructor(store, TYPE, "integer");
 		private static final IConstructor INTEGER_CONS = vf.constructor(INTEGER);
-		private static final Type FLOAT = tf.constructor(store, TYPE, "float");
-		private static final Type DOUBLE = tf.constructor(store, TYPE, "double");
-		private static final Type LONG = tf.constructor(store, TYPE, "long");
 		private static final Type VOID = tf.constructor(store, TYPE, "void");
 		private static final IConstructor VOID_CONS = vf.constructor(VOID);
-		private static final Type STRING = tf.constructor(store, TYPE, "string");
-		
-		static IConstructor arrayType(IConstructor elem) {
-			return vf.constructor(ARRAY, elem);
-		}
-		
-		static IConstructor classType(String name) {
-			return vf.constructor(CLASS, vf.string(name));
-		}
-		
-		static IConstructor byteType() {
-			return vf.constructor(BYTE);
-		}
 		
 		static IConstructor booleanType() {
 			return BOOL_CONS;
-		}
-		
-		static IConstructor shortType() {
-			return vf.constructor(SHORT);
-		}
-		
-		
-		static IConstructor characterType() {
-			return vf.constructor(CHARACTER);
 		}
 		
 		static IConstructor integerType() {
 			return INTEGER_CONS;
 		}
 		
-		static IConstructor floatType() {
-			return vf.constructor(FLOAT);
-		}
-		
-		static IConstructor doubleType() {
-			return vf.constructor(DOUBLE);
-		}
-		
-		static IConstructor longType() {
-			return vf.constructor(LONG);
-		}
-		
 		static IConstructor voidType() {
 			return VOID_CONS;
-		}
-		
-		static IConstructor stringType() {
-			return vf.constructor(STRING);
 		}
 	}
 }

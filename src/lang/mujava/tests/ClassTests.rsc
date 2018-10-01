@@ -12,7 +12,7 @@ import util::Math;
 
 public Class testClass() = 
   //public class TestClass {
-  class(classType("TestClass"),
+  class(class("TestClass"),
     fields=[
       // public static int staticField = 42;
       field(integer(), "staticField", \default=42, modifiers={\public(), \static()}),
@@ -112,15 +112,15 @@ test bool staticMethod() {
 test bool staticFieldInitializer() 
   = compiledTestClass().getStatic("staticField").toValue(#int) == 42;
 
-public Class helloWorld = class(classType("HelloWorld"), 
+public Class helloWorld = class(class("HelloWorld"), 
     fields =[
-      field( classType("java.lang.Integer"),"age", modifiers={\public()})
+      field( class("java.lang.Integer"),"age", modifiers={\public()})
     ], 
     methods=[
      defaultConstructor(\public()),
      main("args", 
-        block([var(classType("HelloWorld"), "hw"), var(integer(), "i")],[
-          store("hw", new(classType("HelloWorld"))),
+        block([var(class("HelloWorld"), "hw"), var(integer(), "i")],[
+          store("hw", new(class("HelloWorld"))),
           do(invokeVirtual(load("hw"), methodDesc(\void(),"f",[array(string())]), [load("args")])),
           \return()
         ])
@@ -158,9 +158,9 @@ public Class helloWorld = class(classType("HelloWorld"),
        
        // print the 3 elements of the argument list:
        \if(gt(load("i"), load("m")), [
-         stdout(aaload(load("s"), const(integer(), 0))),
-         stdout(aaload(load("s"), const(integer(), 1))),
-         stdout(aaload(load("s"), const(integer(), 2)))
+         stdout(aload(load("s"), const(integer(), 0))),
+         stdout(aload(load("s"), const(integer(), 1))),
+         stdout(aload(load("s"), const(integer(), 2)))
        ]),
        
        

@@ -11,7 +11,7 @@ Class primVarTestClass(Type t, value v) {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(classType("PrimVarTestClass_<getName(t)>"),
+  return class(class("PrimVarTestClass_<getName(t)>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         block([var(t, "tmp")],
@@ -40,7 +40,7 @@ Expression defVal(character()) = const(character(), 0);
 Expression defVal(short()) = const(short(), 0);
 Expression defVal(float()) = const(float(), 0.0);
 Expression defVal(double()) = const(double(), 0.0);
-Expression defVal(classType(str _)) = null();
+Expression defVal(class(str _)) = null();
 Expression defVal(array(Type _)) = null();
 Expression defVal(string()) = null();
  
@@ -69,7 +69,7 @@ Class objVarTestClass(Type t, Expression v) {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(classType("ObjVarTestClass_<getName(t)>"),
+  return class(class("ObjVarTestClass_<getName(t)>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         block([var(t, "tmp")],

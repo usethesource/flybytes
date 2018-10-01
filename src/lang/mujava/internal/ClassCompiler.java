@@ -461,37 +461,43 @@ public class ClassCompiler {
 				break;
 			case "eq":
 				compileEq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
-				break;
+				return;
 			case "ne":
 				compileNeq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
-				break;
+				return;
 			case "le":
 				compileLe(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
-				break;
+				return;
 			case "gt":
 				compileGt(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
-				break;
+				return;
 			case "ge":
 				compileGe(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
-				break;
+				return;
 			case "lt":
 				compileLt(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
-				break;
+				return;
 			case "null":
 				if (cond.getConstructorType().getArity() != 1) {
 					throw new IllegalArgumentException("null check without a parameter");
 				}
 				compileNull(AST.$getArg(cond), thenBuilder, elseBuilder, continuation);
-				break;
+				return;
 			case "nonnull":
 				if (cond.getConstructorType().getArity() != 1) {
 					throw new IllegalArgumentException("nonnull check without a parameter");
 				}
 				compileNull(AST.$getArg(cond), thenBuilder, elseBuilder, continuation);
-				break;
+				return;
+			case "neg":
+				// if(!expr) is compiled to IFNE directly without intermediate (inefficient) negation code
+				compileExpression(AST.$getArg(cond));
+				compileConditionalInverted(0, Opcodes.IFNE, thenBuilder, elseBuilder, continuation);
+				return;
 			default:
 				compileExpression(cond);
 				compileConditionalInverted(0, Opcodes.IFEQ, thenBuilder, elseBuilder, continuation);
+				return;
 			}
 		}
 

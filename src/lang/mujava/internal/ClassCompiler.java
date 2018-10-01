@@ -404,7 +404,7 @@ public class ClassCompiler {
 				compileStat_Store(stat); 
 				continuation.build();
 				break;
-			case "aastore" :
+			case "astore" :
 				compileStat_AAStore(AST.$getArray(stat), AST.$getIndex(stat), AST.$getArg(stat));
 				continuation.build();
 				break;
@@ -597,7 +597,7 @@ public class ClassCompiler {
 				return compileExpression_ALength(AST.$getArg(exp));
 			case "load" : 
 				return compileExpression_Load(AST.$getName(exp)); 
-			case "aaload" :
+			case "aload" :
 				return compileExpression_AALoad(AST.$getArray(exp), AST.$getIndex(exp));
 			case "getStatic":
 				return compileGetStatic(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));

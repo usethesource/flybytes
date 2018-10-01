@@ -104,7 +104,7 @@ data Variable = var(Type \type, str name);
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Statement(loc src = |unknown:///|)
   = \store(str name, Expression \value)
-  | \aastore(Expression array, Expression index, Expression arg)
+  | \astore(Expression array, Expression index, Expression arg)
   | \do(Expression exp) // pops the result of the expression when needed
   | \return()
   | \return(Expression arg)
@@ -143,7 +143,7 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | \true()
   | \false()
   | load(str name)
-  | aaload(Expression array, Expression index)
+  | aload(Expression array, Expression index)
   | \const(Type \type, value constant)
   | block(list[Statement] statements, Expression arg)
   | invokeStatic(Type class, Signature desc, list[Expression] args)

@@ -144,7 +144,7 @@ public class ClassCompiler {
 		private IConstructor[] variableTypes;
 		private String[] variableNames;
 		private IConstructor[] variableDefaults;
-		private boolean hasConstructor = false;
+		private boolean hasDefaultConstructor = false;
 		private boolean hasStaticInitializer;
 		private Map<String, IConstructor> fieldInitializers = new HashMap<>();
 		private Map<String, IConstructor> staticFieldInitializers = new HashMap<>();
@@ -209,8 +209,8 @@ public class ClassCompiler {
 			if (kws.hasParameter("methods")) {
 				compileMethods(classNode, AST.$getMethodsParameter(kws));
 			}
-			
-			if (!hasConstructor) {
+
+			if (!hasDefaultConstructor) {
 				generateDefaultConstructor(classNode);
 			}
 			
@@ -222,7 +222,8 @@ public class ClassCompiler {
 		}
 
 		private void generateDefaultConstructor(ClassNode cn) {
-			method = new MethodNode(Opcodes.ACC_STATIC, "<init>", "()V", null, null);
+			out.println("generating default constructor");
+			method = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
 			method.visitCode();
 			Label l0 = new Label();
 			Label l1 = new Label();
@@ -242,6 +243,7 @@ public class ClassCompiler {
 			
 			method.visitMaxs(1, 1);
 			method.visitEnd();
+			classNode.methods.add(method);
 		}
 
 		private void compileFields(ClassNode classNode, IList fields) {
@@ -313,9 +315,8 @@ public class ClassCompiler {
 			IConstructor sig = AST.$getDesc(cons);
 			boolean isConstructor = sig.getConstructorType().getName().equals("constructorDesc");
 			String name = isConstructor ? "<init>" : AST.$getName(sig);
-			hasConstructor |= isConstructor;
-			
 			IList sigFormals = AST.$getFormals(sig);
+			hasDefaultConstructor |= (isConstructor && sigFormals.isEmpty());
 			IList varFormals = AST.$getFormals(cons);
 			IConstructor block = AST.$getBlock(cons);
 			IList locals = AST.$getVariables(block);
@@ -1967,7 +1968,6 @@ public class ClassCompiler {
 					}
 				}
 				else {
-					out.println("constant field initializer: " + defaultExpr);
 					IValue val = AST.$getConstant(defaultExpr);
 					value = Switch.type(type, 
 							(z) -> ((IBool) val).getValue(), 
@@ -1978,9 +1978,9 @@ public class ClassCompiler {
 							(f) -> ((IReal) val).floatValue(), 
 							(d) -> ((IReal) val).doubleValue(), 
 							(l) -> ((IInteger) val).longValue(), 
-							(v) -> { throw new IllegalArgumentException("void field initializer"); }, 
-							(c) -> { throw new IllegalArgumentException("unsupported constant type"); }, 
-							(a) -> { throw new IllegalArgumentException("unsupported constant array initializer"); }, 
+							(v) -> { throw new IllegalArgumentException("constant void initializer"); }, 
+							(c) -> { throw new IllegalArgumentException("constant object initializer"); }, 
+							(a) -> { throw new IllegalArgumentException("constant array initializer"); }, 
 							(s) -> ((IString) val).getValue());
 					// GOTO end of method using `value` initialized to the right constant
 				}

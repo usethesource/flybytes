@@ -24,7 +24,7 @@ public Class testClass() =
       // public TestClass(int init) {
       //   field = init;
       // }
-      constructor(\public(), [],[invokeSuper([],[]), \return()]),
+      //constructor(\public(), [],[invokeSuper([],[]), \return()]),
       constructor(\public(), [var(integer(), "init")],[
          invokeSuper([],[]), // must call to super!
          putField(integer(), "field", load("init")),

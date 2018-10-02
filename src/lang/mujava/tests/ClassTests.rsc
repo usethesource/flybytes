@@ -15,18 +15,16 @@ public Class testClass() =
   class(class("TestClass"),
     fields=[
       // public static int staticField = 42;
-      field(integer(), "staticField", \default=42, modifiers={\public(), \static()}),
+      field(integer(), "staticField", \default=const(integer(), 42), modifiers={\public(), \static()}),
       
       // public int field;
       field(integer(), "field", modifiers={\public()})
     ],
     methods=[
-      // public TestClass() { }
-      defaultConstructor(\public()),
-      
       // public TestClass(int init) {
       //   field = init;
       // }
+      constructor(\public(), [],[invokeSuper([],[]), \return()]),
       constructor(\public(), [var(integer(), "init")],[
          invokeSuper([],[]), // must call to super!
          putField(integer(), "field", load("init")),
@@ -72,7 +70,7 @@ public Class testClass() =
     ]
   );
   
-Mirror compiledTestClass() = loadClass(testClass());
+Mirror compiledTestClass() = loadClass(testClass(), file=just(|project://mujava/generated/TestClass.class|));
  
 test bool newInstanceGetUnitializedInteger() {
   c = compiledTestClass();
@@ -108,19 +106,19 @@ test bool staticMethod() {
   return r == tester;
 }
   
-
 test bool staticFieldInitializer() 
   = compiledTestClass().getStatic("staticField").toValue(#int) == 42;
 
-public Class helloWorld = class(class("HelloWorld"), 
+private Type HELLO = class("HelloWorld");
+
+public Class helloWorld = class(HELLO, 
     fields =[
-      field( class("java.lang.Integer"),"age", modifiers={\public()})
+      field(Integer(), "age", modifiers={\public()})
     ], 
     methods=[
-     defaultConstructor(\public()),
      main("args", 
-        block([var(class("HelloWorld"), "hw"), var(integer(), "i")],[
-          store("hw", new(class("HelloWorld"))),
+        block([var(HELLO, "hw"), var(integer(), "i")],[
+          store("hw", new(HELLO)),
           do(invokeVirtual(load("hw"), methodDesc(\void(),"f",[array(string())]), [load("args")])),
           \return()
         ])
@@ -162,7 +160,6 @@ public Class helloWorld = class(class("HelloWorld"),
          stdout(aload(load("s"), const(integer(), 1))),
          stdout(aload(load("s"), const(integer(), 2)))
        ]),
-       
        
        //\return(long(), load("j"))
        \return()

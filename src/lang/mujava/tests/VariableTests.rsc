@@ -32,17 +32,7 @@ Class primVarTestClass(Type t, value v) {
     );
 } 
 
-Expression defVal(boolean()) = const(boolean(), false);
-Expression defVal(integer()) = const(integer(), 0);
-Expression defVal(long()) = const(long(), 0);
-Expression defVal(byte()) = const(byte(), 0);
-Expression defVal(character()) = const(character(), 0);
-Expression defVal(short()) = const(short(), 0);
-Expression defVal(float()) = const(float(), 0.0);
-Expression defVal(double()) = const(double(), 0.0);
-Expression defVal(class(str _)) = null();
-Expression defVal(array(Type _)) = null();
-Expression defVal(string()) = null();
+
  
 bool testVarClass(Class c) { 
   m = loadClass(c, file=just(|project://mujava/generated/<c.\type.name>.class|));

@@ -5,6 +5,8 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -33,7 +35,6 @@ import io.usethesource.vallang.IString;
 import io.usethesource.vallang.IValue;
 import io.usethesource.vallang.IValueFactory;
 import io.usethesource.vallang.IWithKeywordParameters;
-import io.usethesource.vallang.type.ITypeVisitor;
 import io.usethesource.vallang.type.Type;
 import io.usethesource.vallang.type.TypeFactory;
 import io.usethesource.vallang.type.TypeStore;
@@ -134,6 +135,7 @@ public class ClassCompiler {
 	 * for a single Class definition.
 	 */
 	private static class Compile {
+		private static final IList EMPTYLIST = ValueFactoryFactory.getValueFactory().list();
 		private static final Builder<?> DONE = () -> { return null; };
 		private final ClassVisitor cw;
 		private final int version;
@@ -141,6 +143,11 @@ public class ClassCompiler {
 		private final PrintWriter out;
 		private IConstructor[] variableTypes;
 		private String[] variableNames;
+		private IConstructor[] variableDefaults;
+		private boolean hasConstructor = false;
+		private boolean hasStaticInitializer;
+		private Map<String, IConstructor> fieldInitializers = new HashMap<>();
+		private Map<String, IConstructor> staticFieldInitializers = new HashMap<>();
 		private int variableCounter;
 		private Label scopeStart;
 		private Label scopeEnd;
@@ -149,6 +156,7 @@ public class ClassCompiler {
 		private ClassNode classNode;
 		private final Builder<?> pushTrue = () -> compileTrue();
 		private final Builder<?> pushFalse = () -> compileFalse();
+		
 
 		public Compile(ClassVisitor cw, int version, PrintWriter out) {
 			this.cw = cw;
@@ -201,8 +209,39 @@ public class ClassCompiler {
 			if (kws.hasParameter("methods")) {
 				compileMethods(classNode, AST.$getMethodsParameter(kws));
 			}
+			
+			if (!hasConstructor) {
+				generateDefaultConstructor(classNode);
+			}
+			
+			if (!hasStaticInitializer && !staticFieldInitializers.isEmpty()) {
+				compileStaticInitializer(classNode, null);
+			}
 
 			classNode.accept(cw);
+		}
+
+		private void generateDefaultConstructor(ClassNode cn) {
+			method = new MethodNode(Opcodes.ACC_STATIC, "<init>", "()V", null, null);
+			method.visitCode();
+			Label l0 = new Label();
+			Label l1 = new Label();
+			method.visitLocalVariable("this", "L" + cn.name + ";", null, l0, l1, 0);
+			
+			// this = new MyClass(...)
+			method.visitVarInsn(Opcodes.ALOAD, 0);
+			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cn.superName, "<init>", "()V", false);
+			
+			// this.a = blaBla;
+			// ...
+			compileFieldInitializers(classNode, method);
+			
+			// return
+			method.visitInsn(Opcodes.RETURN);
+			method.visitLabel(l1);
+			
+			method.visitMaxs(1, 1);
+			method.visitEnd();
 		}
 
 		private void compileFields(ClassNode classNode, IList fields) {
@@ -215,13 +254,57 @@ public class ClassCompiler {
 		private void compileMethods(ClassNode classNode, IList methods) {
 			for (IValue field : methods) {
 				IConstructor cons = (IConstructor) field;
-				compileMethod(classNode, cons);
+				if (cons.getConstructorType().getName().equals("static")) {
+					compileStaticInitializer(classNode, cons);
+				}
+				else {
+					compileMethod(classNode, cons);
+				}
 			}
 		}
 
+		private void compileStaticInitializer(ClassNode classNode, IConstructor cons) {
+			if (hasStaticInitializer) {
+				throw new IllegalArgumentException("can only have one static initializer per class");
+			}
+			else {
+				hasStaticInitializer = true;
+			}
+			
+			IConstructor block = cons != null ? AST.$getBlock(cons) : null;
+			IList locals = cons != null ? AST.$getVariables(block) : EMPTYLIST;
+			
+			method = new MethodNode(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
+
+			int slotCount = 2 /* for wide vars*/ * locals.length(); // total number of vars 
+			variableTypes = new IConstructor[slotCount];
+			variableNames = new String[slotCount];
+			variableDefaults = new IConstructor[slotCount];
+
+			scopeStart = new Label();
+			scopeEnd = new Label();
+
+			method.visitCode(); 
+			method.visitLabel(scopeStart);
+			
+			compileStaticFieldInitializers(classNode, method);
+			
+			if (block != null) {
+				compileBlock(block);
+			}
+
+			method.visitInsn(Opcodes.RETURN);
+			method.visitLabel(scopeEnd);
+			method.visitMaxs(0, 0);
+			method.visitEnd();
+
+			classNode.methods.add(method);
+		}
+		
+
 		private void compileMethod(ClassNode classNode, IConstructor cons) {
 			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
-
+			
 			int modifiers = Opcodes.ACC_PUBLIC;
 			if (kws.hasParameter("modifiers")) {
 				modifiers = compileModifiers(AST.$getModifiersParameter(kws));
@@ -230,7 +313,8 @@ public class ClassCompiler {
 			IConstructor sig = AST.$getDesc(cons);
 			boolean isConstructor = sig.getConstructorType().getName().equals("constructorDesc");
 			String name = isConstructor ? "<init>" : AST.$getName(sig);
-
+			hasConstructor |= isConstructor;
+			
 			IList sigFormals = AST.$getFormals(sig);
 			IList varFormals = AST.$getFormals(cons);
 			IConstructor block = AST.$getBlock(cons);
@@ -242,12 +326,15 @@ public class ClassCompiler {
 
 			method = new MethodNode(modifiers, name, isConstructor ? Signature.constructor(sig) : Signature.method(sig), null, null);
 
-			// "this" is the implicit first argument for all non-static methods
 			boolean isStatic = (modifiers & Opcodes.ACC_STATIC) != 0;
 
 			variableCounter = isStatic ? 0 : 1;
-			variableTypes = new IConstructor[2 /*for wide var */ * (varFormals.length() + locals.length()) + variableCounter];
-			variableNames = new String[2 /*for wide vars*/ * (varFormals.length() + locals.length()) + variableCounter];
+			int slotCount = 2 /* for wide vars*/ 
+					      * (varFormals.length() + locals.length()) // total number of vars 
+					      + variableCounter /* room for first "this" variable */;
+			variableTypes = new IConstructor[slotCount];
+			variableNames = new String[slotCount];
+			variableDefaults = new IConstructor[slotCount];
 
 			if (!isStatic) {
 				variableTypes[0] = classType;
@@ -259,13 +346,18 @@ public class ClassCompiler {
 
 			method.visitCode(); 
 			method.visitLabel(scopeStart);
-
+			
 			if (!isStatic) {
 				// generate the variable for the implicit this reference
 				method.visitLocalVariable("this", Signature.type(classType), null, scopeStart, scopeEnd, 0);
 			}
 
-			compileVariables(varFormals, false /* no initialization */);
+			compileLocalVariables(varFormals, false /* no initialization */);
+			
+			if (isConstructor && !fieldInitializers.isEmpty()) {
+				compileFieldInitializers(classNode, method);
+			}
+			
 			compileBlock(block);
 
 			method.visitLabel(scopeEnd);
@@ -275,7 +367,26 @@ public class ClassCompiler {
 			classNode.methods.add(method);
 		}
 
-		private void compileVariables(IList formals, boolean initialize) {
+		private void compileFieldInitializers(ClassNode classNode, MethodNode method) {
+			for (String field : fieldInitializers.keySet()) {
+				IConstructor def = fieldInitializers.get(field);
+				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("default");
+				compileExpression_Load("this");
+				compileExpression(exp);
+				method.visitFieldInsn(Opcodes.PUTFIELD, classNode.name, field, Signature.type(AST.$getType(def)));
+			}
+		}
+		
+		private void compileStaticFieldInitializers(ClassNode classNode, MethodNode method) {
+			for (String field : staticFieldInitializers.keySet()) {
+				IConstructor def = staticFieldInitializers.get(field);
+				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("default");
+				compileExpression(exp);
+				method.visitFieldInsn(Opcodes.PUTSTATIC, classNode.name, field, Signature.type(AST.$getType(def)));
+			}
+		}
+
+		private void compileLocalVariables(IList formals, boolean initialize) {
 			int startLocals = variableCounter;
 
 			for (IValue elem : formals) {
@@ -283,11 +394,12 @@ public class ClassCompiler {
 
 				variableTypes[variableCounter] = AST.$getType(var);
 				variableNames[variableCounter] = AST.$getName(var);
+				variableDefaults[variableCounter] = AST.$getDefault(var);
 				method.visitLocalVariable(variableNames[variableCounter], Signature.type(variableTypes[variableCounter]), null, scopeStart, scopeEnd, variableCounter);
 
 				Switch.type0(variableTypes[variableCounter], 
-						(z)  -> variableCounter++,
-						(ii) -> variableCounter++,
+						(z) -> variableCounter++,
+						(i) -> variableCounter++,
 						(s) -> variableCounter++,
 						(b) -> variableCounter++,
 						(c) -> variableCounter++,
@@ -316,63 +428,72 @@ public class ClassCompiler {
 					if (variableTypes[i] == null) {
 						continue;
 					}
-
-					Switch.type(variableTypes[i], i,
-							(BiConsumer<IConstructor,Integer>) (z,j) -> { 
-								method.visitInsn(Opcodes.ICONST_0);
-								method.visitVarInsn(Opcodes.ISTORE, j); 
-							},
-							(ii,j) -> { 
-								method.visitInsn(Opcodes.ICONST_0);
-								method.visitVarInsn(Opcodes.ISTORE, j); 
-							},
-							(s,j) -> { 
-								method.visitInsn(Opcodes.ICONST_0);
-								method.visitVarInsn(Opcodes.ISTORE, j); 
-							},
-							(b,j) -> { 
-								method.visitInsn(Opcodes.ICONST_0);
-								method.visitVarInsn(Opcodes.ISTORE, j); 
-							},
-							(c,j) -> { 
-								method.visitInsn(Opcodes.ICONST_0);
-								method.visitVarInsn(Opcodes.ISTORE, j); 
-							},
-							(f,j) -> { 
-								method.visitInsn(Opcodes.FCONST_0);
-								method.visitVarInsn(Opcodes.FSTORE, j); 
-							},
-							(d,j) -> { 
-								method.visitInsn(Opcodes.DCONST_0);
-								method.visitVarInsn(Opcodes.DSTORE, j);
-							}, 
-							(l,j) -> { 
-								method.visitInsn(Opcodes.LCONST_0);
-								method.visitVarInsn(Opcodes.LSTORE, j);
-							}, 
-							(v,j) -> { 
-								throw new IllegalArgumentException("void variable"); 
-							},
-							(c,j) -> { 
-								method.visitInsn(Opcodes.ACONST_NULL);
-								method.visitVarInsn(Opcodes.ASTORE, j); 
-							},
-							(a,j) -> { 
-								method.visitInsn(Opcodes.ACONST_NULL);
-								method.visitVarInsn(Opcodes.ASTORE, j); 
-							},
-							(S,j) -> {
-								stringConstant("");
-								method.visitVarInsn(Opcodes.ASTORE, j);
-							}
-
-							);
+					
+					if (variableDefaults[i] == null) {
+						computeDefaultValueForVariable(i);
+					}
+					else {
+						compileStat_Store(variableNames[i], variableDefaults[i]);
+					}
 				}
 			}
 		}
 
+		private void computeDefaultValueForVariable(int i) {
+			Switch.type(variableTypes[i], i,
+					(BiConsumer<IConstructor,Integer>) (z,j) -> { 
+						method.visitInsn(Opcodes.ICONST_0);
+						method.visitVarInsn(Opcodes.ISTORE, j); 
+					},
+					(ii,j) -> { 
+						method.visitInsn(Opcodes.ICONST_0);
+						method.visitVarInsn(Opcodes.ISTORE, j); 
+					},
+					(s,j) -> { 
+						method.visitInsn(Opcodes.ICONST_0);
+						method.visitVarInsn(Opcodes.ISTORE, j); 
+					},
+					(b,j) -> { 
+						method.visitInsn(Opcodes.ICONST_0);
+						method.visitVarInsn(Opcodes.ISTORE, j); 
+					},
+					(c,j) -> { 
+						method.visitInsn(Opcodes.ICONST_0);
+						method.visitVarInsn(Opcodes.ISTORE, j); 
+					},
+					(f,j) -> { 
+						method.visitInsn(Opcodes.FCONST_0);
+						method.visitVarInsn(Opcodes.FSTORE, j); 
+					},
+					(d,j) -> { 
+						method.visitInsn(Opcodes.DCONST_0);
+						method.visitVarInsn(Opcodes.DSTORE, j);
+					}, 
+					(l,j) -> { 
+						method.visitInsn(Opcodes.LCONST_0);
+						method.visitVarInsn(Opcodes.LSTORE, j);
+					}, 
+					(v,j) -> { 
+						throw new IllegalArgumentException("void variable"); 
+					},
+					(c,j) -> { 
+						method.visitInsn(Opcodes.ACONST_NULL);
+						method.visitVarInsn(Opcodes.ASTORE, j); 
+					},
+					(a,j) -> { 
+						method.visitInsn(Opcodes.ACONST_NULL);
+						method.visitVarInsn(Opcodes.ASTORE, j); 
+					},
+					(S,j) -> {
+						stringConstant("");
+						method.visitVarInsn(Opcodes.ASTORE, j);
+					}
+
+					);
+		}
+
 		private void compileBlock(IConstructor block) {
-			compileVariables(AST.$getVariables(block), true);
+			compileLocalVariables(AST.$getVariables(block), true);
 			compileStatements(AST.$getStatements(block), DONE);
 		}
 
@@ -401,7 +522,7 @@ public class ClassCompiler {
 				continuation.build();
 				break;
 			case "store" : 
-				compileStat_Store(stat); 
+				compileStat_Store(AST.$getName(stat), AST.$getValue(stat)); 
 				continuation.build();
 				break;
 			case "astore" :
@@ -435,8 +556,30 @@ public class ClassCompiler {
 			}
 		}
 
-		private void compileStat_For(IList $getInit, IConstructor $getCondition, IConstructor $getNext, IList $getStatements, Builder<?> continuation) {
-			throw new UnsupportedOperationException();
+		private void compileStat_For(IList init, IConstructor cond, IList next, IList body, Builder<?> continuation) {
+			compileStatements(init, DONE);
+			Label start = new Label();
+			Label join = new Label();
+			
+			// TODO: this can be done better
+			method.visitLabel(start);
+			if (cond.getConstructorType().getName().equals("neg")) {
+				compileExpression(AST.$getArg(cond));
+				compileConditionalInverted(0, Opcodes.IFNE, () -> compileStatements(body, DONE), () -> jumpTo(join), DONE);
+			}
+			else {
+				compileExpression(cond);
+				compileConditionalInverted(0, Opcodes.IFEQ, () -> compileStatements(body, DONE), () -> jumpTo(join), DONE);
+			}
+			compileStatements(next, DONE);
+			jumpTo(start);
+			method.visitLabel(join);
+			continuation.build();
+		}
+
+		private Void jumpTo(Label join) {
+			method.visitJumpInsn(Opcodes.GOTO, join);
+			return null;
 		}
 
 		private void compileStat_If(IConstructor cond, IList thenBlock, Builder<?> continuation) {
@@ -512,10 +655,9 @@ public class ClassCompiler {
 			method.visitFieldInsn(Opcodes.PUTFIELD, cls, name, Signature.type(type));
 		}
 
-		private void compileStat_Store(IConstructor stat) {
-			String name = AST.$getName(stat);
+		private void compileStat_Store(String name, IConstructor expression) {
 			int pos = positionOf(name);
-			compileExpression(AST.$getValue(stat));
+			compileExpression(expression);
 
 			Switch.type0(variableTypes[pos],
 					(z) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
@@ -914,7 +1056,7 @@ public class ClassCompiler {
 						Label contLabel = new Label();
 						method.visitJumpInsn(Opcodes.IFEQ, zeroLabel);
 						compileFalse();
-						method.visitJumpInsn(Opcodes.GOTO, contLabel);
+						jumpTo(contLabel);
 						method.visitLabel(zeroLabel);
 						compileTrue();
 						method.visitLabel(contLabel);
@@ -1176,7 +1318,7 @@ public class ClassCompiler {
 			}
 			method.visitJumpInsn(opcode, jump);
 			thenPart.build();
-			method.visitJumpInsn(Opcodes.GOTO, join);
+			jumpTo(join);
 			method.visitLabel(jump);
 			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			elsePart.build();
@@ -1807,11 +1949,56 @@ public class ClassCompiler {
 
 			String name = AST.$getName(cons);
 
-			String signature = Signature.type(AST.$getType(cons));
+			IConstructor type = AST.$getType(cons);
+			String signature = Signature.type(type);
 
 			Object value = null;
 			if (kws.hasParameter("default")) {
-				value = compileValueConstant(AST.$getDefaultParameter(kws));
+				IConstructor defaultExpr = (IConstructor) kws.getParameter("default");
+				
+				if (!AST.$is("const", defaultExpr)) {
+					if ((access & Opcodes.ACC_STATIC) != 0) {
+						// later code will be generated into the static init block
+					   staticFieldInitializers.put(name, cons);
+					}
+					else {
+						// later code will be generated into each constructor
+					   fieldInitializers.put(name, cons);
+					}
+				}
+				else {
+					out.println("constant field initializer: " + defaultExpr);
+					IValue val = AST.$getConstant(defaultExpr);
+					value = Switch.type(type, 
+							(z) -> ((IBool) val).getValue(), 
+							(i) -> ((IInteger) val).intValue(), 
+							(s) -> ((IInteger) val).intValue(), 
+							(b) -> ((IInteger) val).intValue(), 
+							(c) -> ((IInteger) val).intValue(), 
+							(f) -> ((IReal) val).floatValue(), 
+							(d) -> ((IReal) val).doubleValue(), 
+							(l) -> ((IInteger) val).longValue(), 
+							(v) -> { throw new IllegalArgumentException("void field initializer"); }, 
+							(c) -> { throw new IllegalArgumentException("unsupported constant type"); }, 
+							(a) -> { throw new IllegalArgumentException("unsupported constant array initializer"); }, 
+							(s) -> ((IString) val).getValue());
+					// GOTO end of method using `value` initialized to the right constant
+				}
+			}
+			else {
+				value = Switch.type(type, 
+						(z) -> false, 
+						(i) -> 0, 
+						(s) -> 0, 
+						(b) -> 0, 
+						(c) -> 0, 
+						(f) -> 0.0f, 
+						(d) -> 0.0d, 
+						(l) -> 0L, 
+						(v) -> null, 
+						(c) -> null, 
+						(a) -> null, 
+						(s) -> null);
 			}
 
 			classNode.fields.add(new FieldNode(access, name, signature, null, value));
@@ -1858,127 +2045,6 @@ public class ClassCompiler {
 			}
 
 			return res;
-		}
-
-		/**
-		 * Converts an arbitary IValue to some arbitrary JVM constant object.
-		 * For integers and reals it does something meaningful, for all the other
-		 * objects it returns the standard string representation of a value. For
-		 * external values it returns 'null';
-		 * @param parameter
-		 * @return Integer, Double or String object
-		 */
-		private Object compileValueConstant(IValue parameter) {
-			return parameter.getType().accept(new ITypeVisitor<Object, RuntimeException>() {
-
-				@Override
-				public Object visitAbstractData(Type arg0) throws RuntimeException {
-					if ("null".equals(AST.$getConstructorName(parameter))) {
-						return null;
-					}
-
-					return parameter.toString();
-				}
-
-				@Override
-				public Object visitAlias(Type arg0) throws RuntimeException {
-					return arg0.getAliased().accept(this);
-				}
-
-				@Override
-				public Object visitBool(Type arg0) throws RuntimeException {
-					return new Boolean(AST.$getBoolean(parameter));
-				}
-
-				@Override
-				public Object visitConstructor(Type arg0) throws RuntimeException {
-					if ("null".equals(AST.$getConstructorName(parameter))) {
-						return null;
-					}
-					return parameter.toString();
-				}
-
-				@Override
-				public Object visitDateTime(Type arg0) throws RuntimeException {
-					return parameter.toString();
-				}
-
-				@Override
-				public Object visitExternal(Type arg0) throws RuntimeException {
-					return null;
-				}
-
-				@Override
-				public Object visitInteger(Type arg0) throws RuntimeException {
-					return new Integer(AST.$getIntegerConstant(parameter));
-				}
-
-
-				@Override
-				public Object visitList(Type arg0) throws RuntimeException {
-					return parameter.toString();
-				}
-
-				@Override
-				public Object visitMap(Type arg0)  {
-					return parameter.toString();
-				}
-
-				@Override
-				public Object visitNode(Type arg0)  {
-					return parameter.toString();
-				}
-
-				@Override
-				public Object visitNumber(Type arg0)  {
-					return new Double(AST.$getDouble(parameter));
-				}
-
-				@Override
-				public Object visitParameter(Type arg0)  {
-					return null;
-				}
-
-				@Override
-				public Object visitRational(Type arg0)  {
-					return new Double(AST.$getDouble(parameter));
-				}
-
-				@Override
-				public Object visitReal(Type arg0)  {
-					return new Double(((IReal) parameter).doubleValue());
-				}
-
-				@Override
-				public Object visitSet(Type arg0)  {
-					return parameter.toString();
-				}
-
-				@Override
-				public Object visitSourceLocation(Type arg0)  {
-					return ((ISourceLocation) parameter).getURI().toASCIIString();
-				}
-
-				@Override
-				public Object visitString(Type arg0)  {
-					return AST.$string(parameter);
-				}
-
-				@Override
-				public Object visitTuple(Type arg0)  {
-					return parameter.toString();
-				}
-
-				@Override
-				public Object visitValue(Type arg0)  {
-					return parameter.toString();
-				}
-
-				@Override
-				public Object visitVoid(Type arg0)  {
-					return null;
-				}
-			});
 		}
 	}
 
@@ -2084,8 +2150,22 @@ public class ClassCompiler {
 			return exp.get("constant");
 		}
 
-		public static IConstructor $getNext(IConstructor stat) {
-			return (IConstructor) stat.get("next");
+		public static boolean $is(String string, IConstructor parameter) {
+			return parameter.getConstructorType().getName().equals(string);
+		}
+
+		public static IConstructor $getDefault(IConstructor var) {
+			IWithKeywordParameters<? extends IConstructor> kws = var.asWithKeywordParameters();
+			
+			if (!kws.hasParameter("default")) {
+				return null;
+			}
+
+			return (IConstructor) kws.getParameter("default");
+		}
+
+		public static IList $getNext(IConstructor stat) {
+			return (IList) stat.get("next");
 		}
 
 		public static IList $getInit(IConstructor stat) {

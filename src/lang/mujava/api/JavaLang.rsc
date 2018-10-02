@@ -4,13 +4,13 @@ import lang::mujava::Syntax;
 import lang::mujava::Mirror;
 
 Type String() = string();
-Type Boolean() = classType("java.lang.Boolean");
-Type Integer() = classType("java.lang.Integer");
-Type Character() = classType("java.lang.Character");
-Type Double() = classType("java.lang.Double");
-Type Long() = classType("java.lang.Long");
-Type Short() = classType("java.lang.Short");
-Type Float() = classType("java.lang.Float");
+Type Boolean() = class("java.lang.Boolean");
+Type Integer() = class("java.lang.Integer");
+Type Character() = class("java.lang.Character");
+Type Double() = class("java.lang.Double");
+Type Long() = class("java.lang.Long");
+Type Short() = class("java.lang.Short");
+Type Float() = class("java.lang.Float");
 
 Mirror StringMirror() = classMirror("java.lang.string");
 Mirror BooleanMirror() = classMirror("java.lang.Boolean");

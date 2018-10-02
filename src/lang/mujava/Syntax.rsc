@@ -64,10 +64,11 @@ data Class
    ;
 
 data Field
-  = field(Type \type, str name, value \default = \null(), set[Modifier] modifiers = {\private()});
+  = field(Type \type, str name, Expression \default = defValue(\type), set[Modifier] modifiers = {\private()});
          
 data Method
   = method(Signature desc, list[Variable] formals, Block block, set[Modifier] modifiers = {\public()})
+  | static(Block block)
   ;
 
 Method method(Modifier access, Type ret, str name, list[Variable] formals, Block block)
@@ -99,7 +100,7 @@ data Block
   = block(list[Variable] variables, list[Statement] statements)
   ;
  
-data Variable = var(Type \type, str name); 
+data Variable = var(Type \type, str name, Expression \default = defValue(\type)); 
 
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Statement(loc src = |unknown:///|)
@@ -112,9 +113,11 @@ data Statement(loc src = |unknown:///|)
   | \putStatic(Type class, str name, Type \type, Expression arg)
   | \if(Expression condition, list[Statement] thenBlock)
   | \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
+  | \for(list[Statement] init, Expression condition, list[Statement] next, list[Statement] statements)
   
+  //| \while(Expression condition, list[Statement] block)
  // TODO: these are still to be implemented:
- //| \for(list[Statement] init, Expression condition, list[Statement] next, list[Statement] block)
+  
   //| \while(Expression condition, list[Statement] block)
   //| \doWhile(list[Statement] block, Expression condition)
   
@@ -181,6 +184,18 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | inc(str name, int inc)
   ;
  
+Expression defVal(boolean()) = const(boolean(), false);
+Expression defVal(integer()) = const(integer(), 0);
+Expression defVal(long()) = const(long(), 0);
+Expression defVal(byte()) = const(byte(), 0);
+Expression defVal(character()) = const(character(), 0);
+Expression defVal(short()) = const(short(), 0);
+Expression defVal(float()) = const(float(), 0.0);
+Expression defVal(double()) = const(double(), 0.0);
+Expression defVal(class(str _)) = null();
+Expression defVal(array(Type _)) = null();
+Expression defVal(string()) = null();
+ 
  // Below popular some convenience macros for
  // generating methods and constructors:
  
@@ -221,20 +236,6 @@ Method staticMethod(Modifier access, Type ret, str name, list[Variable] args, Bl
 Method staticMethod(Modifier access, Type ret, str name, list[Variable] args, list[Statement] stats)
   = staticMethod(access, ret, name, args, block([], stats));
     
-// generate a default constructor for classes which have no supertype  
-Method defaultConstructor(Modifier access)
-  = method(constructorDesc([]), [], block([], [
-      invokeSuper(),
-      \return()
-  ]), modifiers={access});   
- 
-// generate a default constructor based on a given superclass
-Method defaultConstructor(Modifier access, str super)
-  = method(constructorDesc([]), [], block([], [
-      do(\void(), invokeSuper(super)),
-      \return()
-  ])); 
-  
 // generate a constructor with argument and code 
 //   NB: don't forget to generate super call in the block!    
 Method constructor(Modifier access, list[Variable] formals, Block block)

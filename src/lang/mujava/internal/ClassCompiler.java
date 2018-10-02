@@ -18,6 +18,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.util.CheckClassAdapter;
 import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.uri.URIResolverRegistry;
@@ -222,7 +223,6 @@ public class ClassCompiler {
 		}
 
 		private void generateDefaultConstructor(ClassNode cn) {
-			out.println("generating default constructor");
 			method = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
 			method.visitCode();
 			Label l0 = new Label();
@@ -1767,7 +1767,7 @@ public class ClassCompiler {
 			compileExpression(receiver);
 			compileExpressionList(args);
 
-			method.visitMethodInsn(Opcodes.INVOKEINTERFACE, interf, AST.$getName(sig), Signature.method(sig), false);
+			method.visitMethodInsn(Opcodes.INVOKEINTERFACE, interf, AST.$getName(sig), Signature.method(sig), true);
 			return AST.$getReturn(sig);
 		}
 

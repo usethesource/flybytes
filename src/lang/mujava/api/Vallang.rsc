@@ -4,24 +4,27 @@ import lang::mujava::Syntax;
 import lang::mujava::Mirror;
 
 @doc{generate call ValueFactoryFactory.getInstance()}
-Expression getValueFactory() = invokeStatic("org.rascalmpl.values.ValueFactoryFactory", methodDesc(classType("org.rascalmpl.values.IValueFactory"), "getValueFactory", []), []);
+Expression getValueFactory() = invokeStatic(ValueFactoryFactory, methodDesc(IValueFactory, "getValueFactory", []), []);
 
-Expression getRascalFactory() = invokeStatic("org.rascalmpl.values.uptr.IRascalValueFactory", methodDesc(classType("org.rascalmpl.values.uptr.IRascalValueFactory"), "getInstance", []), []);
+Expression getRascalFactory() = invokeStatic(IRascalValueFactory, methodDesc(IRascalValueFactory, "getInstance", []), []);
 
 @doc{generate call vf.integer(i), etc.}
 Expression vfInteger(Expression vf, Expression i) = invokeInterface(IValueFactory, vf, methodDesc(IInteger, "integer", [integer()]), [i]);
+Expression vfInteger(Expression vf, int i) = vfInteger(vf, const(integer(), i));
 Expression vfReal(Expression vf, Expression d) = invokeInterface(IValueFactory, vf, methodDesc(IInteger, "real", [double()]), [d]); 
 
-Type IValueFactory = classType("io.usethesource.vallang.IValueFactory");
-Type IValue = classType("io.usethesource.vallang.IValue");
-Type IInteger = classType("io.usethesource.vallang.IInteger");
-Type IReal = classType("io.usethesource.vallang.IReal");
-Type IRational = classType("io.usethesource.vallang.IRational");
-Type INumber = classType("io.usethesource.vallang.INumber");
-Type IConstructor = classType("io.usethesource.vallang.IConstructor");
-Type INode = classType("io.usethesource.vallang.INode");
-Type ISet = classType("io.usethesource.vallang.ISet");
-Type IList = classType("io.usethesource.vallang.IList");
-Type IMap = classType("io.usethesource.vallang.IMap");
+public Type ValueFactoryFactory = class("org.rascalmpl.values.ValueFactoryFactory");
+public Type IRascalValueFactory = class("org.rascalmpl.values.uptr.IRascalValueFactory");
+public Type IValueFactory = class("io.usethesource.vallang.IValueFactory");
+public Type IValue = class("io.usethesource.vallang.IValue");
+public Type IInteger = class("io.usethesource.vallang.IInteger");
+public Type IReal = class("io.usethesource.vallang.IReal");
+public Type IRational = class("io.usethesource.vallang.IRational");
+public Type INumber = class("io.usethesource.vallang.INumber");
+public Type IConstructor = class("io.usethesource.vallang.IConstructor");
+public Type INode = class("io.usethesource.vallang.INode");
+public Type ISet = class("io.usethesource.vallang.ISet");
+public Type IList = class("io.usethesource.vallang.IList");
+public Type IMap = class("io.usethesource.vallang.IMap");
 
 Expression INumber_Add(Expression lhs, Expression rhs) = invokeInterface(lhs, methodDesc(INumber, "add", [INumber]), [rhs]); 

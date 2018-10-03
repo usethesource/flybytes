@@ -210,7 +210,7 @@ public class ClassCompiler {
 			}
 
 			if (kws.hasParameter("fields")) {
-				compileFields(classNode, AST.$getFieldsParameter(kws));
+				compileFields(classNode, AST.$getFieldsParameter(kws), isInterface);
 			}
 
 			if (kws.hasParameter("methods")) {
@@ -252,10 +252,10 @@ public class ClassCompiler {
 			classNode.methods.add(method);
 		}
 
-		private void compileFields(ClassNode classNode, IList fields) {
+		private void compileFields(ClassNode classNode, IList fields, boolean interf) {
 			for (IValue field : fields) {
 				IConstructor cons = (IConstructor) field;
-				compileField(classNode, cons);
+				compileField(classNode, cons, interf);
 			}
 		}
 
@@ -1954,11 +1954,14 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.DUP);
 		}
 
-		private void compileField(ClassNode classNode, IConstructor cons) {
+		private void compileField(ClassNode classNode, IConstructor cons, boolean interf) {
 			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
 			int access = 0;
 
-			if (kws.hasParameter("modifiers")) {
+			if (interf) {
+				access = Opcodes.ACC_PUBLIC + Opcodes.ACC_FINAL + Opcodes.ACC_STATIC;
+			}
+			else if (kws.hasParameter("modifiers")) {
 				access = compileModifiers(AST.$getModifiersParameter(kws));
 			}
 			else {

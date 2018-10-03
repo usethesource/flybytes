@@ -18,7 +18,6 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.util.CheckClassAdapter;
 import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.uri.URIResolverRegistry;
@@ -147,6 +146,7 @@ public class ClassCompiler {
 		private IConstructor[] variableDefaults;
 		private boolean hasDefaultConstructor = false;
 		private boolean hasStaticInitializer;
+		private boolean isInterface;
 		private Map<String, IConstructor> fieldInitializers = new HashMap<>();
 		private Map<String, IConstructor> staticFieldInitializers = new HashMap<>();
 		private int variableCounter;
@@ -157,7 +157,8 @@ public class ClassCompiler {
 		private ClassNode classNode;
 		private final Builder<?> pushTrue = () -> compileTrue();
 		private final Builder<?> pushFalse = () -> compileFalse();
-		
+
+
 
 		public Compile(ClassVisitor cw, int version, PrintWriter out) {
 			this.cw = cw;
@@ -169,6 +170,7 @@ public class ClassCompiler {
 			classNode = new ClassNode();
 			IWithKeywordParameters<? extends IConstructor> kws = o.asWithKeywordParameters();
 
+			isInterface = AST.$is("interface", o);
 			classType = AST.$getType(o);
 			classNode.version = version;
 			classNode.signature = null; /* anything else leads to the class extending itself! */
@@ -179,6 +181,10 @@ public class ClassCompiler {
 			}
 			else {
 				classNode.access = Opcodes.ACC_PUBLIC;
+			}
+
+			if (isInterface) {
+				classNode.access += Opcodes.ACC_ABSTRACT + Opcodes.ACC_INTERFACE;
 			}
 
 			if (kws.hasParameter("super")) {
@@ -214,7 +220,7 @@ public class ClassCompiler {
 			if (!hasDefaultConstructor) {
 				generateDefaultConstructor(classNode);
 			}
-			
+
 			if (!hasStaticInitializer && !staticFieldInitializers.isEmpty()) {
 				compileStaticInitializer(classNode, null);
 			}
@@ -228,19 +234,19 @@ public class ClassCompiler {
 			Label l0 = new Label();
 			Label l1 = new Label();
 			method.visitLocalVariable("this", "L" + cn.name + ";", null, l0, l1, 0);
-			
+
 			// this = new MyClass(...)
 			method.visitVarInsn(Opcodes.ALOAD, 0);
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cn.superName, "<init>", "()V", false);
-			
+
 			// this.a = blaBla;
 			// ...
 			compileFieldInitializers(classNode, method);
-			
+
 			// return
 			method.visitInsn(Opcodes.RETURN);
 			method.visitLabel(l1);
-			
+
 			method.visitMaxs(1, 1);
 			method.visitEnd();
 			classNode.methods.add(method);
@@ -272,10 +278,10 @@ public class ClassCompiler {
 			else {
 				hasStaticInitializer = true;
 			}
-			
+
 			IConstructor block = cons != null ? AST.$getBlock(cons) : null;
 			IList locals = cons != null ? AST.$getVariables(block) : EMPTYLIST;
-			
+
 			method = new MethodNode(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
 
 			int slotCount = 2 /* for wide vars*/ * locals.length(); // total number of vars 
@@ -288,9 +294,9 @@ public class ClassCompiler {
 
 			method.visitCode(); 
 			method.visitLabel(scopeStart);
-			
+
 			compileStaticFieldInitializers(classNode, method);
-			
+
 			if (block != null) {
 				compileBlock(block);
 			}
@@ -302,12 +308,16 @@ public class ClassCompiler {
 
 			classNode.methods.add(method);
 		}
-		
+
 
 		private void compileMethod(ClassNode classNode, IConstructor cons) {
 			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
+
+			boolean isAbstract = cons.getConstructorType().getArity() == 1; // only a signature
 			
 			int modifiers = Opcodes.ACC_PUBLIC;
+			modifiers += isAbstract ? Opcodes.ACC_ABSTRACT : 0;
+			
 			if (kws.hasParameter("modifiers")) {
 				modifiers = compileModifiers(AST.$getModifiersParameter(kws));
 			}
@@ -315,56 +325,63 @@ public class ClassCompiler {
 			IConstructor sig = AST.$getDesc(cons);
 			boolean isConstructor = sig.getConstructorType().getName().equals("constructorDesc");
 			String name = isConstructor ? "<init>" : AST.$getName(sig);
-			IList sigFormals = AST.$getFormals(sig);
-			hasDefaultConstructor |= (isConstructor && sigFormals.isEmpty());
-			IList varFormals = AST.$getFormals(cons);
-			IConstructor block = AST.$getBlock(cons);
-			IList locals = AST.$getVariables(block);
-
-			if (sigFormals.length() != varFormals.length()) {
-				throw new IllegalArgumentException("type signature of " + name + " has different number of types (" + sigFormals.length() + ") from formal parameters (" + varFormals.length() + "), see: " + sigFormals + " versus " + varFormals);
-			}
 
 			method = new MethodNode(modifiers, name, isConstructor ? Signature.constructor(sig) : Signature.method(sig), null, null);
-
-			boolean isStatic = (modifiers & Opcodes.ACC_STATIC) != 0;
-
-			variableCounter = isStatic ? 0 : 1;
-			int slotCount = 2 /* for wide vars*/ 
-					      * (varFormals.length() + locals.length()) // total number of vars 
-					      + variableCounter /* room for first "this" variable */;
-			variableTypes = new IConstructor[slotCount];
-			variableNames = new String[slotCount];
-			variableDefaults = new IConstructor[slotCount];
-
-			if (!isStatic) {
-				variableTypes[0] = classType;
-				variableNames[0] = "this";
-			}
-
-			scopeStart = new Label();
-			scopeEnd = new Label();
-
-			method.visitCode(); 
-			method.visitLabel(scopeStart);
 			
-			if (!isStatic) {
-				// generate the variable for the implicit this reference
-				method.visitLocalVariable("this", Signature.type(classType), null, scopeStart, scopeEnd, 0);
+			if (!isAbstract) {
+				if ((modifiers & Opcodes.ACC_ABSTRACT) != 0) {
+					throw new IllegalArgumentException("method with body should not be abstract");
+				}
+				IList sigFormals = AST.$getFormals(sig);
+				hasDefaultConstructor |= (isConstructor && sigFormals.isEmpty());
+				IList varFormals = AST.$getFormals(cons);
+				IConstructor block = AST.$getBlock(cons);
+				IList locals = !isAbstract ? AST.$getVariables(block) : EMPTYLIST;
+
+				if (sigFormals.length() != varFormals.length()) {
+					throw new IllegalArgumentException("type signature of " + name + " has different number of types (" + sigFormals.length() + ") from formal parameters (" + varFormals.length() + "), see: " + sigFormals + " versus " + varFormals);
+				}
+
+				boolean isStatic = (modifiers & Opcodes.ACC_STATIC) != 0;
+
+				variableCounter = isStatic ? 0 : 1;
+				int slotCount = 2 /* for wide vars*/ 
+						* (varFormals.length() + locals.length()) // total number of vars 
+						+ variableCounter /* room for first "this" variable */;
+				variableTypes = new IConstructor[slotCount];
+				variableNames = new String[slotCount];
+				variableDefaults = new IConstructor[slotCount];
+
+				if (!isStatic) {
+					variableTypes[0] = classType;
+					variableNames[0] = "this";
+				}
+
+				scopeStart = new Label();
+				scopeEnd = new Label();
+
+				method.visitCode(); 
+				method.visitLabel(scopeStart);
+
+				if (!isStatic) {
+					// generate the variable for the implicit this reference
+					method.visitLocalVariable("this", Signature.type(classType), null, scopeStart, scopeEnd, 0);
+				}
+
+				compileLocalVariables(varFormals, false /* no initialization */);
+
+				if (isConstructor && !fieldInitializers.isEmpty()) {
+					compileFieldInitializers(classNode, method);
+				}
+
+				compileBlock(block);
+
+				method.visitLabel(scopeEnd);
+				method.visitMaxs(0, 0);
+				
 			}
-
-			compileLocalVariables(varFormals, false /* no initialization */);
 			
-			if (isConstructor && !fieldInitializers.isEmpty()) {
-				compileFieldInitializers(classNode, method);
-			}
-			
-			compileBlock(block);
-
-			method.visitLabel(scopeEnd);
-			method.visitMaxs(0, 0);
-			method.visitEnd();
-
+			method.visitEnd(); // also needed for abstract methods
 			classNode.methods.add(method);
 		}
 
@@ -377,7 +394,7 @@ public class ClassCompiler {
 				method.visitFieldInsn(Opcodes.PUTFIELD, classNode.name, field, Signature.type(AST.$getType(def)));
 			}
 		}
-		
+
 		private void compileStaticFieldInitializers(ClassNode classNode, MethodNode method) {
 			for (String field : staticFieldInitializers.keySet()) {
 				IConstructor def = staticFieldInitializers.get(field);
@@ -429,7 +446,7 @@ public class ClassCompiler {
 					if (variableTypes[i] == null) {
 						continue;
 					}
-					
+
 					if (variableDefaults[i] == null) {
 						computeDefaultValueForVariable(i);
 					}
@@ -561,7 +578,7 @@ public class ClassCompiler {
 			compileStatements(init, DONE);
 			Label start = new Label();
 			Label join = new Label();
-			
+
 			// TODO: this can be done better
 			method.visitLabel(start);
 			if (cond.getConstructorType().getName().equals("neg")) {
@@ -1123,7 +1140,7 @@ public class ClassCompiler {
 			else {
 				throw new IllegalArgumentException("can not check cast to " + type);
 			}
-			
+
 			return type;
 		}
 
@@ -1135,7 +1152,7 @@ public class ClassCompiler {
 
 		private IConstructor compileExpression_NewArraySize(IConstructor type, IConstructor size) {
 			compileExpression(size);
-			
+
 			if (!type.getConstructorType().getName().equals("array")) {
 				throw new IllegalArgumentException("arg should be an array type");
 			}
@@ -1148,7 +1165,7 @@ public class ClassCompiler {
 			if (!type.getConstructorType().getName().equals("array")) {
 				throw new IllegalArgumentException("arg should be an array type");
 			}
-			
+
 			compileNewArrayWithSizeOnStack(AST.$getArg(type));
 
 			int i = 0;
@@ -1158,7 +1175,7 @@ public class ClassCompiler {
 				compileExpression((IConstructor) elem);
 				compileArrayStoreWithArrayIndexValueOnStack(type);
 			}
-			
+
 			return type;
 		}
 
@@ -1181,7 +1198,7 @@ public class ClassCompiler {
 
 		private IConstructor compileLt(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
 			IConstructor type = prepareArguments(lhs, rhs);
-			
+
 			Switch.type0(type, 
 					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation),
 					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation), 
@@ -1220,7 +1237,7 @@ public class ClassCompiler {
 
 		private IConstructor compileGt(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
 			IConstructor type = prepareArguments(lhs, rhs);
-			
+
 			Switch.type0(type, 
 					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation),
 					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation), 
@@ -1240,7 +1257,7 @@ public class ClassCompiler {
 
 		private IConstructor compileGe(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
 			IConstructor type = prepareArguments(lhs, rhs);
-			
+
 			Switch.type0(type, 
 					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation),
 					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation), 
@@ -1265,9 +1282,9 @@ public class ClassCompiler {
 			else if (rhs.getConstructorType().getName().equals("null")) {
 				return compileNull(lhs, thenPart, elsePart, continuation);
 			}
-			
+
 			IConstructor type = prepareArguments(lhs, rhs);
-			
+
 			Switch.type0(type, 
 					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation),
 					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation), 
@@ -1347,9 +1364,9 @@ public class ClassCompiler {
 			else if (rhs.getConstructorType().getName().equals("null")) {
 				return compileNonNull(lhs, thenPart, elsePart, continuation);
 			}
-			
+
 			IConstructor type = prepareArguments(lhs, rhs);
-			
+
 			Switch.type0(type, 
 					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation),
 					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation), 
@@ -1364,7 +1381,7 @@ public class ClassCompiler {
 					(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, continuation),
 					(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, continuation)
 					);
-			
+
 			return Types.booleanType();
 		}
 
@@ -1956,15 +1973,15 @@ public class ClassCompiler {
 			Object value = null;
 			if (kws.hasParameter("default")) {
 				IConstructor defaultExpr = (IConstructor) kws.getParameter("default");
-				
+
 				if (!AST.$is("const", defaultExpr)) {
 					if ((access & Opcodes.ACC_STATIC) != 0) {
 						// later code will be generated into the static init block
-					   staticFieldInitializers.put(name, cons);
+						staticFieldInitializers.put(name, cons);
 					}
 					else {
 						// later code will be generated into each constructor
-					   fieldInitializers.put(name, cons);
+						fieldInitializers.put(name, cons);
 					}
 				}
 				else {
@@ -2156,7 +2173,7 @@ public class ClassCompiler {
 
 		public static IConstructor $getDefault(IConstructor var) {
 			IWithKeywordParameters<? extends IConstructor> kws = var.asWithKeywordParameters();
-			
+
 			if (!kws.hasParameter("default")) {
 				return null;
 			}
@@ -2231,7 +2248,7 @@ public class ClassCompiler {
 		public static IConstructor $getClass(IConstructor parameter) {
 			return (IConstructor) parameter.get("class");
 		}
-		
+
 		public static String $getClassFromType(IConstructor type, String currentClass) {
 			return Switch.type(type, 
 					(z) -> "java.lang.Boolean", 
@@ -2515,15 +2532,15 @@ public class ClassCompiler {
 		private static final IConstructor INTEGER_CONS = vf.constructor(INTEGER);
 		private static final Type VOID = tf.constructor(store, TYPE, "void");
 		private static final IConstructor VOID_CONS = vf.constructor(VOID);
-		
+
 		static IConstructor booleanType() {
 			return BOOL_CONS;
 		}
-		
+
 		static IConstructor integerType() {
 			return INTEGER_CONS;
 		}
-		
+
 		static IConstructor voidType() {
 			return VOID_CONS;
 		}

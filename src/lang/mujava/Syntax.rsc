@@ -49,10 +49,17 @@ data Class
       list[str] interfaces = [],
       list[Field] fields = [], 
       list[Method] methods = [],
-      list[Annotation] annotations = [],
-      list[Class] children = [],
+      //list[Annotation] annotations = [],
+      //list[Class] children = [],
       loc source = |unknown:///|
-    );
+    )
+  | interface(Type \type /* class(str name) */,
+      list[Field] fields = [],
+      list[Method] methods = [],
+      //list[Annotation] annotations = [],
+      loc source = |unknown:///|
+    )  
+   ;
     
  data Modifier
    = \public()
@@ -68,6 +75,7 @@ data Field
          
 data Method
   = method(Signature desc, list[Variable] formals, Block block, set[Modifier] modifiers = {\public()})
+  | method(Signature desc, set[Modifier] modifiers={\abstract(), \public()})
   | static(Block block)
   ;
 

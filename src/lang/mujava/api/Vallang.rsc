@@ -27,4 +27,4 @@ public Type ISet = class("io.usethesource.vallang.ISet");
 public Type IList = class("io.usethesource.vallang.IList");
 public Type IMap = class("io.usethesource.vallang.IMap");
 
-Expression INumber_Add(Expression lhs, Expression rhs) = invokeInterface(lhs, methodDesc(INumber, "add", [INumber]), [rhs]); 
+Expression INumber_Add(Expression lhs, Expression rhs) = invokeInterface(INumber, lhs, methodDesc(INumber, "add", [INumber]), [rhs]); 

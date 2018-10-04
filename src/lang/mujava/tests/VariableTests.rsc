@@ -14,8 +14,10 @@ Class primVarTestClass(Type t, value v) {
   return class(reference("PrimVarTestClass_<getName(t)>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
-        block([var(t, "tmp")],
         [
+          // t tmp;
+          decl(t, "tmp"),
+          
           // fail if (tmp != def)
           \if(ne(defVal(t), load("tmp")),[rf]),
            
@@ -27,7 +29,7 @@ Class primVarTestClass(Type t, value v) {
           
           // return true; 
           rt
-        ]))
+        ])
       ]
     );
 } 
@@ -62,8 +64,10 @@ Class objVarTestClass(Type t, Expression v) {
   return class(reference("ObjVarTestClass_<getName(t)>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
-        block([var(t, "tmp")],
         [
+           // t tmp;
+           decl(t, "tmp"),
+           
           // fail if (tmp != def)
           \if(equals(load("tmp"), defVal(t)),[rf]),
            
@@ -75,7 +79,7 @@ Class objVarTestClass(Type t, Expression v) {
           
           // return true; 
           rt
-        ]))
+        ])
       ]
     );
 } 

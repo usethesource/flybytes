@@ -11,10 +11,9 @@ Class primArrayTestClass(Type t, int len) {
   return class(reference("PrimArrayTestClass_<getName(t)>_<len>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
-        block([var(array(t), "tmp")],
         [
-          // tmp = new Type[len];
-          store("tmp", newArray(array(t), const(integer(), len))),
+          // Type[] tmp = new Type[len];
+          decl(array(t), "tmp", \default=newArray(array(t), const(integer(), len))),
            
           // fail if tmp.length != len
           \if(ne(const(integer(), len), alength(load("tmp"))), [rf]),
@@ -30,7 +29,7 @@ Class primArrayTestClass(Type t, int len) {
           
           // return true; 
           rt
-        ]))
+        ])
       ]
     );
 } 
@@ -68,8 +67,8 @@ Class valArrayTestClass(Type t, int len, Expression val) {
   return class(reference("ValArrayTestClass_<getName(t)>_<len>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
-        block([var(array(t), "tmp")],
         [
+          decl(array(t), "tmp"),
           // tmp = new Type[len];
           store("tmp", newArray(array(t), const(integer(), len))),
            
@@ -87,7 +86,7 @@ Class valArrayTestClass(Type t, int len, Expression val) {
           
           // return true; 
           rt
-        ]))
+        ])
       ]
     );
 }  

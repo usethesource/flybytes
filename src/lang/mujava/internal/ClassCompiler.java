@@ -226,21 +226,19 @@ public class ClassCompiler {
 	 * for a single Class definition.
 	 */
 	private static class Compile {
-		private static final IList EMPTYLIST = ValueFactoryFactory.getValueFactory().list();
 		private static final Builder<?> DONE = () -> { return null; };
 		private final ClassVisitor cw;
 		private final int version;
 		@SuppressWarnings("unused")
 		private final PrintWriter out;
-		private IConstructor[] variableTypes;
-		private String[] variableNames;
-		private IConstructor[] variableDefaults;
+		private ArrayList<IConstructor> variableTypes;
+		private ArrayList<String> variableNames;
+		private ArrayList<IConstructor> variableDefaults;
 		private boolean hasDefaultConstructor = false;
 		private boolean hasStaticInitializer;
 		private boolean isInterface;
 		private Map<String, IConstructor> fieldInitializers = new HashMap<>();
 		private Map<String, IConstructor> staticFieldInitializers = new HashMap<>();
-		private int variableCounter;
 		private Label scopeStart;
 		private Label scopeEnd;
 		private MethodNode method;
@@ -370,15 +368,11 @@ public class ClassCompiler {
 				hasStaticInitializer = true;
 			}
 
-			IConstructor block = cons != null ? AST.$getBlock(cons) : null;
-			IList locals = cons != null ? AST.$getVariables(block) : EMPTYLIST;
-
 			method = new MethodNode(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
 
-			int slotCount = 2 /* for wide vars*/ * locals.length(); // total number of vars 
-			variableTypes = new IConstructor[slotCount];
-			variableNames = new String[slotCount];
-			variableDefaults = new IConstructor[slotCount];
+			variableTypes = new ArrayList<>();
+			variableNames = new ArrayList<>();
+			variableDefaults = new ArrayList<>();
 
 			scopeStart = new Label();
 			scopeEnd = new Label();
@@ -388,8 +382,9 @@ public class ClassCompiler {
 
 			compileStaticFieldInitializers(classNode, method);
 
+			IList block = AST.$getBlock(cons);
 			if (block != null) {
-				compileBlock(block);
+				compileStatements(block, DONE);
 			}
 
 			method.visitInsn(Opcodes.RETURN);
@@ -431,8 +426,6 @@ public class ClassCompiler {
 				IList sigFormals = AST.$getFormals(sig);
 				hasDefaultConstructor |= (isConstructor && sigFormals.isEmpty());
 				IList varFormals = AST.$getFormals(cons);
-				IConstructor block = AST.$getBlock(cons);
-				IList locals = !isAbstract ? AST.$getVariables(block) : EMPTYLIST;
 
 				if (sigFormals.length() != varFormals.length()) {
 					throw new IllegalArgumentException("type signature of " + name + " has different number of types (" + sigFormals.length() + ") from formal parameters (" + varFormals.length() + "), see: " + sigFormals + " versus " + varFormals);
@@ -440,17 +433,12 @@ public class ClassCompiler {
 
 				boolean isStatic = (modifiers & Opcodes.ACC_STATIC) != 0;
 
-				variableCounter = isStatic ? 0 : 1;
-				int slotCount = 2 /* for wide vars*/ 
-						* (varFormals.length() + locals.length()) // total number of vars 
-						+ variableCounter /* room for first "this" variable */;
-				variableTypes = new IConstructor[slotCount];
-				variableNames = new String[slotCount];
-				variableDefaults = new IConstructor[slotCount];
+				variableTypes = new ArrayList<>();
+				variableNames =  new ArrayList<>();
+				variableDefaults = new ArrayList<>();
 
 				if (!isStatic) {
-					variableTypes[0] = classType;
-					variableNames[0] = "this";
+					declareVariable(classType, "this", null, false);
 				}
 
 				scopeStart = new Label();
@@ -458,27 +446,58 @@ public class ClassCompiler {
 
 				method.visitCode(); 
 				method.visitLabel(scopeStart);
-
-				if (!isStatic) {
-					// generate the variable for the implicit this reference
-					method.visitLocalVariable("this", Signature.type(classType), null, scopeStart, scopeEnd, 0);
-				}
-
-				compileLocalVariables(varFormals, false /* no initialization */);
+				
+				compileFormalVariables(varFormals, false /* no initialization */);
 
 				if (isConstructor && !fieldInitializers.isEmpty()) {
 					compileFieldInitializers(classNode, method);
 				}
 
-				compileBlock(block);
+				compileStatements(AST.$getBlock(cons), DONE);
 
 				method.visitLabel(scopeEnd);
-				method.visitMaxs(0, 0);
 				
+				for (int i = 0; i < variableNames.size(); i++) {
+					String varName = variableNames.get(i);
+					if (varName == null) {
+						continue; // empty slot
+					}
+					
+					method.visitLocalVariable(varName, Signature.type(variableTypes.get(i)), null, scopeStart, scopeEnd, i);
+				}
+				
+				method.visitMaxs(0, variableNames.size());
 			}
 			
 			method.visitEnd(); // also needed for abstract methods
 			classNode.methods.add(method);
+		}
+		
+		private void declareVariable(IConstructor type, String name, IConstructor def, boolean initialize) {
+			int pos = variableNames.size();
+			
+			variableTypes.add(type);
+			variableNames.add(name);
+			variableDefaults.add(def);
+			
+			String typeName = type.getConstructorType().getName();
+			if (typeName.equals("double") || typeName.equals("long")) {
+				// doubles and longs take up 2 stack positions
+				variableTypes.add(null);
+				variableNames.add(null);
+				variableDefaults.add(null); 
+			}
+			
+			if (initialize) {
+				if (def == null) {
+					computeDefaultValueForVariable(type, pos);
+				}
+				else {
+					compileStat_Store(name, def);
+				}
+			}
+			
+			return;
 		}
 
 		private void compileFieldInitializers(ClassNode classNode, MethodNode method) {
@@ -500,61 +519,26 @@ public class ClassCompiler {
 			}
 		}
 
-		private void compileLocalVariables(IList formals, boolean initialize) {
-			int startLocals = variableCounter;
+		private void compileFormalVariables(IList formals, boolean initialize) {
+			int startLocals = variableNames.size();
 
 			for (IValue elem : formals) {
 				IConstructor var = (IConstructor) elem;
-
-				variableTypes[variableCounter] = AST.$getType(var);
-				variableNames[variableCounter] = AST.$getName(var);
-				variableDefaults[variableCounter] = AST.$getDefault(var);
-				method.visitLocalVariable(variableNames[variableCounter], Signature.type(variableTypes[variableCounter]), null, scopeStart, scopeEnd, variableCounter);
-
-				Switch.type0(variableTypes[variableCounter], 
-						(z) -> variableCounter++,
-						(i) -> variableCounter++,
-						(s) -> variableCounter++,
-						(b) -> variableCounter++,
-						(c) -> variableCounter++,
-						(f) -> variableCounter++,
-						(d) -> { 
-							// doubles take up 2 stack positions
-							variableCounter+=2; 
-						}, 
-						(l) -> { 
-							// longs take up 2 stack positions
-							variableCounter+=2; 
-						}, 
-						(v) -> { 
-							throw new IllegalArgumentException("void variable"); 
-						},
-						(c) -> variableCounter++,
-						(a) -> variableCounter++,
-						(S) -> variableCounter++
-						);
+				IConstructor varType = AST.$getType(var);
+				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize);
 			}
 
 			if (initialize) {
 				// now all formals and local variables are declared.
 				// initializing local variables to avoid hard-to-analyze JVM crashes
-				for (int i = startLocals; i < variableTypes.length; i++) {
-					if (variableTypes[i] == null) {
-						continue;
-					}
-
-					if (variableDefaults[i] == null) {
-						computeDefaultValueForVariable(i);
-					}
-					else {
-						compileStat_Store(variableNames[i], variableDefaults[i]);
-					}
+				for (int i = startLocals; i < variableTypes.size(); i++) {
+					
 				}
 			}
 		}
 
-		private void computeDefaultValueForVariable(int i) {
-			Switch.type(variableTypes[i], i,
+		private void computeDefaultValueForVariable(IConstructor type, int pos) {
+			Switch.type(type, pos,
 					(BiConsumer<IConstructor,Integer>) (z,j) -> { 
 						method.visitInsn(Opcodes.ICONST_0);
 						method.visitVarInsn(Opcodes.ISTORE, j); 
@@ -606,11 +590,6 @@ public class ClassCompiler {
 					);
 		}
 
-		private void compileBlock(IConstructor block) {
-			compileLocalVariables(AST.$getVariables(block), true);
-			compileStatements(AST.$getStatements(block), DONE);
-		}
-
 		/**
 		 * We use a continuation passing style here, such that when branching
 		 * code is generated we can generate the right code in the right place 
@@ -631,6 +610,10 @@ public class ClassCompiler {
 
 		private void compileStatement(IConstructor stat, Builder<?> continuation) {
 			switch (stat.getConstructorType().getName()) {
+			case "decl":
+				compileStat_Decl(stat);
+				continuation.build();
+				break;
 			case "do" : 
 				compileStat_Do((IConstructor) stat.get("exp"));
 				continuation.build();
@@ -668,6 +651,15 @@ public class ClassCompiler {
 				compileStat_For(AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continuation);
 				break;
 			}
+		}
+
+		private void compileStat_Decl(IConstructor stat) {
+			IConstructor def = null;
+			if (stat.asWithKeywordParameters().hasParameter("default")) {
+				def = (IConstructor) stat.asWithKeywordParameters().getParameter("default");
+			}
+			
+			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true);
 		}
 
 		private void compileStat_For(IList init, IConstructor cond, IList next, IList body, Builder<?> continuation) {
@@ -773,7 +765,7 @@ public class ClassCompiler {
 			int pos = positionOf(name);
 			compileExpression(expression);
 
-			Switch.type0(variableTypes[pos],
+			Switch.type0(variableTypes.get(pos),
 					(z) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
 					(i) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
 					(s) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
@@ -1904,7 +1896,7 @@ public class ClassCompiler {
 
 		private IConstructor compileExpression_Load(String name) {
 			int pos = positionOf(name);
-			IConstructor type = variableTypes[pos];
+			IConstructor type = variableTypes.get(pos);
 
 			Switch.type(type, pos,
 					(z,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
@@ -1989,8 +1981,8 @@ public class ClassCompiler {
 		}
 
 		private int positionOf(String name) {
-			for (int pos = 0; pos < variableNames.length; pos++) {
-				if (name.equals(variableNames[pos])) {
+			for (int pos = 0; pos < variableNames.size(); pos++) {
+				if (name.equals(variableNames.get(pos))) {
 					return pos;
 				}
 			}
@@ -2434,8 +2426,8 @@ public class ClassCompiler {
 			return (IList) sig.get("formals");
 		}
 
-		public static IConstructor $getBlock(IConstructor cons) {
-			return (IConstructor) cons.get("block");
+		public static IList $getBlock(IConstructor cons) {
+			return (IList) cons.get("block");
 		}
 
 		public static IList $getMethodsParameter(IWithKeywordParameters<? extends IConstructor> kws) {

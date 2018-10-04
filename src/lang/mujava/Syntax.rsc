@@ -74,12 +74,12 @@ data Field
   = field(Type \type, str name, Expression \default = defValue(\type), set[Modifier] modifiers = {\private()});
          
 data Method
-  = method(Signature desc, list[Variable] formals, Block block, set[Modifier] modifiers = {\public()})
+  = method(Signature desc, list[Formal] formals, list[Statement] block, set[Modifier] modifiers = {\public()})
   | method(Signature desc, set[Modifier] modifiers={\abstract(), \public()})
-  | static(Block block)
+  | static(list[Statement] block)
   ;
 
-Method method(Modifier access, Type ret, str name, list[Variable] formals, Block block)
+Method method(Modifier access, Type ret, str name, list[Formal] formals, list[Statement] block)
   = method(methodDesc(ret, name, [ var.\type | var <- formals]), formals, block, modifiers={access});
 
 data Signature 
@@ -104,15 +104,12 @@ data Type
 
 data Annotation; // TODO
 
-data Block
-  = block(list[Variable] variables, list[Statement] statements)
-  ;
- 
-data Variable = var(Type \type, str name, Expression \default = defValue(\type)); 
+data Formal = var(Type \type, str name, Expression \default = defValue(\type)); 
 
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Statement(loc src = |unknown:///|)
   = \store(str name, Expression \value)
+  | \decl(Type \type, str name, Expression \default = defValue(\type))
   | \astore(Expression array, Expression index, Expression arg)
   | \do(Expression exp) // pops the result of the expression when needed
   | \return()
@@ -237,42 +234,31 @@ Statement invokeSuper()
   = invokeSuper([], []);
   
 // generate a main method
-Method main(str args, Block block) 
+Method main(str args, list[Statement] block) 
   = method(methodDesc(\void(), "main", [array(string())]), 
       [var(array(string()), args)], 
       block, 
       modifiers={\public(), \static(), \final()});
       
 // generate a normal method 
-Method method(Modifier access, Type ret, str name, list[Variable] args, Block block)
+Method method(Modifier access, Type ret, str name, list[Formal] args, list[Statement] block)
   = method(methodDesc(ret, name, [a.\type | a <- args]), 
            args, 
            block, 
            modifiers={access});
  
- // generate a normal method without local variables
-Method method(Modifier access, Type ret, str name, list[Variable] args, list[Statement] stats)
-  = method(access, ret, name, args, block([], stats));
-             
 // generate a static method           
-Method staticMethod(Modifier access, Type ret, str name, list[Variable] args, Block block)
+Method staticMethod(Modifier access, Type ret, str name, list[Formal] args, list[Statement] block)
   = method(methodDesc(ret, name, [a.\type | a <- args]), 
            args, 
            block, 
            modifiers={static(), access});
 
-// generate a static method without local variables
-Method staticMethod(Modifier access, Type ret, str name, list[Variable] args, list[Statement] stats)
-  = staticMethod(access, ret, name, args, block([], stats));
-    
 // generate a constructor with argument and code 
 //   NB: don't forget to generate super call in the block!    
-Method constructor(Modifier access, list[Variable] formals, Block block)
+Method constructor(Modifier access, list[Formal] formals, list[Statement] block)
   = method(constructorDesc([ var.\type | var <- formals]), formals, block);
   
-Method constructor(Modifier access, list[Variable] formals, list[Statement] stats)
-  = method(constructorDesc([ var.\type | var <- formals]), formals, block([], stats));
-
 // allocate a new object using the constructor with the given argument types,
 // and passing the given actual parameters      
 Expression new(Type class, list[Type] argTypes, list[Expression] args)

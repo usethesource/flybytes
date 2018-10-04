@@ -18,7 +18,7 @@ Class binOpClass(Type t, BinOp op) {
   
   return class(reference(name),
       methods=[
-        staticMethod(\public(), t, "op", [var(t,"i"), var(t,"j")], [
+        staticMethod(\public(), t, "op",  [var(t, "i"), var(t, "j")],[
            \return(expr)
         ])
       ]
@@ -31,7 +31,7 @@ Class unOpClass(Type t, UnOp op) {
   
   return class(reference(name),
       methods=[
-        staticMethod(\public(), t, "op", [var(t,"i")], [
+        staticMethod(\public(), t, "op", [var(t, "i")],[
            \return(expr)
         ])
       ]

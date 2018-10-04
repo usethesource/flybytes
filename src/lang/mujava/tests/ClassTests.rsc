@@ -144,31 +144,36 @@ public Class helloWorld = class(HELLO,
       field(Integer(), "age", modifiers={\public()})
     ], 
     methods=[
-     main("args", 
-        block([var(HELLO, "hw"), var(integer(), "i")],[
-          store("hw", new(HELLO)),
+     main("args",  [
+          decl(HELLO, "hw", \default=new(HELLO)),
           do(invokeVirtual(load("hw"), methodDesc(\void(),"f",[array(string())]), [load("args")])),
           \return()
-        ])
+        ]
       ),
       
      staticMethod(\public(), \integer(), "MIN", [var(integer(),"i"),var(integer(), "j")], 
-        block([],[
+        [
            \if (lt(load("i"), load("j")),[
              \return(load("i"))
            ],[
              \return(load("j"))
            ])
-        ])),
+        ]),
         
      staticMethod(\public(), \integer(), "LEN", [var(array(string()),"a")], 
-        block([],[
+        [
            \return(alength(load("a")))
-        ])),   
+        ]),   
           
-     method(\public(), \void(), "f", [var(array(string()), "s")], block([var(integer(),"i"), var(long(),"j"), var(float(), "k"), var(double(), "l"), var(integer(), "m")],[
-       // test storing numbers in local variables
+     method(\public(), \void(), "f", [var(array(string()), "s")], [
+       // test declarations
+       decl(integer(), "i"), 
+       decl(long(), "j"), 
+       decl(float(), "k"), 
+       decl(double(), "l"), 
+       decl(integer(), "m"),
        
+       // test storing numbers in local variables
        store("i", const(integer(), 245)),
        store("j", const(long(), 350000)),
        store("k", const(float(), 10.5)),
@@ -191,7 +196,7 @@ public Class helloWorld = class(HELLO,
        
        //\return(long(), load("j"))
        \return()
-     ]))
+     ])
     ]
   );
   

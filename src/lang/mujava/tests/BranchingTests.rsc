@@ -14,10 +14,10 @@ public Class ifClass(Expression cond) {
   
   return class(reference(name),
       methods=[
-        staticMethod(\public(), boolean(), "ifTest", [], block([], [
+        staticMethod(\public(), boolean(), "ifTest", [], [
            \if (cond, [\return(\true())]),
            \return(\false())
-        ])),
+        ]),
         staticMethod(\public(), boolean(), "ifElseTest", [], [
            \if (cond, [\return(\true())], [\return(\false())])
         ]),

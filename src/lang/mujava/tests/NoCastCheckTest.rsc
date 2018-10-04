@@ -14,16 +14,12 @@ private Expression VF = load("VF");
 Class noUpCastTestClass() =
   class(reference("NoUpcastTestClass"), 
         methods=[
-          staticMethod(\public(), boolean(), "testMethod", [], block(
+          staticMethod(\public(), boolean(), "testMethod", [], 
           [
-            var(IValueFactory, "VF"),
-            var(IInteger, "i")
-          ],
-          [
-            store("VF", getValueFactory()),
-            store("i", vfInteger(VF, 8)),
+            decl(IValueFactory, "VF", \default=getValueFactory()),
+            decl(IInteger, "i", \default=vfInteger(VF, 8)),
             \return(equals(load("i"), INumber_Add(vfInteger(VF, 4), vfInteger(VF, 4))))
-          ]))
+          ])
         ]
        );
        
@@ -37,18 +33,13 @@ test bool upcastTest() = testCastClass(noUpCastTestClass());
 Class noDownCastTestClass() =
   class(reference("NoDowncastTestClass"), 
         methods=[
-          staticMethod(\public(), boolean(), "testMethod", [], block(
+          staticMethod(\public(), boolean(), "testMethod", [],
           [
-            var(IValueFactory, "VF"),
-            var(object(), "i"),
-            var(object(), "j")
-          ],
-          [
-            store("VF", getValueFactory()),
-            store("i", vfInteger(VF, 8)),
-            store("j", vfInteger(VF, 4)),
+            decl(IValueFactory, "VF", \default=getValueFactory()),
+            decl(object(), "i", \default=vfInteger(VF, 8)),
+            decl(object(), "j", \default=vfInteger(VF, 4)),
             \return(equals(load("i"), INumber_Add(load("j"), load("j"))))
-          ]))
+          ])
         ]
        );  
        

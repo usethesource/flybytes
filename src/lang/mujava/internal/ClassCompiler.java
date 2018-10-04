@@ -473,7 +473,7 @@ public class ClassCompiler {
 			classNode.methods.add(method);
 		}
 		
-		private void declareVariable(IConstructor type, String name, IConstructor def, boolean initialize) {
+		private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize) {
 			int pos = variableNames.size();
 			
 			variableTypes.add(type);
@@ -488,12 +488,20 @@ public class ClassCompiler {
 				variableDefaults.add(null); 
 			}
 			
-			if (initialize) {
+			if (alwaysInitialize) {
 				if (def == null) {
 					computeDefaultValueForVariable(type, pos);
 				}
 				else {
 					compileStat_Store(name, def);
+				}
+			}
+			else {
+				if (def != null && (typeName.equals("reference") || typeName.equals("array"))) {
+					// if somebody passed 'null' as actual parameter and we have something to initialize with here,
+					// then we store that into the variable now. mujava has default parameters!
+					compileExpression_Load(name);
+					compileConditionalInverted(0, Opcodes.IFNONNULL, () -> compileStat_Store(name, def), null, DONE);
 				}
 			}
 			
@@ -761,7 +769,7 @@ public class ClassCompiler {
 			method.visitFieldInsn(Opcodes.PUTFIELD, cls, name, Signature.type(type));
 		}
 
-		private void compileStat_Store(String name, IConstructor expression) {
+		private Void compileStat_Store(String name, IConstructor expression) {
 			int pos = positionOf(name);
 			compileExpression(expression);
 
@@ -779,6 +787,8 @@ public class ClassCompiler {
 					(a) -> { /* array */ method.visitVarInsn(Opcodes.ASTORE, pos); },
 					(S) -> { /* string */ method.visitVarInsn(Opcodes.ASTORE, pos); }
 					);
+			
+			return null;
 		}
 
 		private void compileStat_Return(IConstructor stat) {

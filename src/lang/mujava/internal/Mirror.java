@@ -578,7 +578,7 @@ public class Mirror {
 		switch (mirror.getConstructorType().getName()) {
 		case "null" : 
 			return null; 
-		case "class" : 
+		case "reference" : 
 			return ((MirrorCallBack<?>) mirror.get("invokeStatic")).getWrapped();
 		case "object": 
 			return ((MirrorCallBack<?>) mirror.get("invoke")).getWrapped();

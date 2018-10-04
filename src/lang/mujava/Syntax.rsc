@@ -104,6 +104,7 @@ data Type
 
 data Annotation; // TODO
 
+@doc{optional init expressions will be used at run-time if `null` is passed as actual parameter}
 data Formal = var(Type \type, str name, Expression init = defValue(\type)); 
 
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}

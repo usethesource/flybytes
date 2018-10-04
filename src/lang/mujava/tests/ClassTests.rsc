@@ -109,6 +109,34 @@ test bool staticMethod() {
 test bool staticFieldInitializer() 
   = compiledTestClass().getStatic("staticField").toValue(#int) == 42;
 
+
+public Class extendClass() 
+  = class(class("ExtendedClass"),
+       super=class("TestClass"),
+       methods=[
+       //  method(Modifier access, Type ret, str name, list[Variable] args, list[Statement] stats)
+         method(\public(), boolean(), "testMethod", [], [
+            // call a super method
+            do(invokeVirtual(this(), methodDesc(\void(), "setField", [integer()]), [const(integer(), 32)])),
+            
+            // get a super field
+            \return(eq(getField(integer(), "field"), const(integer(), 32)))
+         ])
+       ]
+  );
+  
+test bool extendTest() {
+  // load the classes together
+  cs = loadClasses([extendClass(), testClass()], prefix=just(|project://mujava/generated/|));
+  
+  // get a mirror instance of the subclass
+  c = cs["ExtendedClass"];
+  i = c.newInstance(constructorDesc([]),[]);
+  
+  // call super method with a side-effect
+  return i.invoke(methodDesc(\void(), "testMethod", []), []).toValue(#bool);
+}
+
 private Type HELLO = class("HelloWorld");
 
 public Class helloWorld = class(HELLO, 

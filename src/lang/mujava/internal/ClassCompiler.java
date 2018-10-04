@@ -6,6 +6,7 @@ import java.io.PrintWriter;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -21,12 +22,15 @@ import org.objectweb.asm.tree.MethodNode;
 import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.uri.URIResolverRegistry;
+import org.rascalmpl.uri.URIUtil;
 import org.rascalmpl.values.ValueFactoryFactory;
 
 import io.usethesource.vallang.IBool;
 import io.usethesource.vallang.IConstructor;
 import io.usethesource.vallang.IInteger;
 import io.usethesource.vallang.IList;
+import io.usethesource.vallang.IMap;
+import io.usethesource.vallang.IMapWriter;
 import io.usethesource.vallang.INumber;
 import io.usethesource.vallang.IReal;
 import io.usethesource.vallang.ISet;
@@ -65,6 +69,50 @@ public class ClassCompiler {
 		}
 	}
 
+	public IMap loadClasses(IList classes, IConstructor prefix, IList classpath, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
+		ClassMapLoader l = new ClassMapLoader(getClass().getClassLoader());
+		
+		ISourceLocation classFolder = null;
+		
+		if (prefix.getConstructorType().getName().equals("just")) {
+			classFolder = (ISourceLocation) prefix.get("val");
+		}
+		
+		for (IValue elem : classes) {
+			IConstructor cls = (IConstructor) elem;
+			String name = AST.$getName(AST.$getType(cls));
+
+			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+			new Compile(cw, AST.$getVersionCode(version), out).compileClass(cls);
+			byte[] bytes = cw.toByteArray();
+			
+			l.putBytes(name, cw.toByteArray());
+			
+		    if (classFolder != null) {
+		    	ISourceLocation classFile = URIUtil.getChildLocation(classFolder, name.replace('.','/') + ".class");
+				try (OutputStream out = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
+					out.write(bytes);
+				}
+				catch (IOException e) {
+					RuntimeExceptionFactory.io(vf.string(e.getMessage()), null, null);
+				}
+			}
+		}
+		
+		try {
+			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+			IMapWriter w = vf.mapWriter();
+
+			for (String name : l) {
+				w.put(vf.string(name), m.mirrorClass(name, l.getClass(name)));
+			}
+
+			return w.done();
+		} catch (ClassNotFoundException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
 	public IValue loadClass(IConstructor cls, IConstructor output, IList classpath, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
 		this.out = ctx.getStdOut();
 
@@ -73,7 +121,7 @@ public class ClassCompiler {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 			new Compile(cw, AST.$getVersionCode(version), out).compileClass(cls);
 
-			Class<?> loaded = loadClass(className, cw);
+			Class<?> loaded = loadSingleClass(className, cw);
 
 			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
 
@@ -90,7 +138,7 @@ public class ClassCompiler {
 			return m.mirrorClass(className, loaded);
 		} 
 		catch (Throwable e) {
-			throw e;
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -119,17 +167,60 @@ public class ClassCompiler {
 		}
 	}
 
-	private Class<?> loadClass(String className, ClassWriter cw) {
-		Class<?> loaded = new ClassLoader(getClass().getClassLoader()) {
-			public Class<?> defineClass(byte[] bytes) {
-				return super.defineClass(className, bytes, 0, bytes.length);
-			}	
-		}.defineClass(cw.toByteArray());
-
-		return loaded;
+	private Class<?> loadSingleClass(String className, ClassWriter cw) throws ClassNotFoundException {
+		ClassMapLoader l = new ClassMapLoader(getClass().getClassLoader());
+		l.putBytes(className, cw.toByteArray());
+		return l.getClass(className);
 	}
+	
+	/**
+	 * Load classes from a simple map (from class names to their bytearray bytecode representations)
+	 */
+	static private class ClassMapLoader extends ClassLoader implements Iterable<String> {
+		private final Map<String, byte[]> bytecodes;
+		private final Map<String, Class<?>> cache;
 
+		public ClassMapLoader(ClassLoader parent) {
+			super(parent);
+			this.bytecodes = new HashMap<>();
+			this.cache = new HashMap<>();
+		}
+		
+		public void putBytes(String name, byte[] bytes) {
+			bytecodes.put(name, bytes);
+		}
 
+		@Override
+		protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+			return getClass(name);
+		}
+		
+		@Override
+		public Class<?> loadClass(String name) throws ClassNotFoundException {
+			return getClass(name);
+		}
+		
+		public Class<?> getClass(String name) throws ClassNotFoundException {
+			if (cache.containsKey(name)) {
+				return cache.get(name);
+			}
+			
+			byte[] bytes = bytecodes.get(name);
+			if (bytes == null) {
+				return getParent().loadClass(name);
+			}
+			
+			Class<?> result = super.defineClass(name, bytes, 0, bytes.length);
+			cache.put(name,  result);
+			return result;
+		}
+
+		@Override
+		public Iterator<String> iterator() {
+			return bytecodes.keySet().iterator();
+		}
+	}
+	
 	/**
 	 * The Compile class encapsulates a single run of the muJava -> JVM bytecode compiler
 	 * for a single Class definition.
@@ -197,7 +288,7 @@ public class ClassCompiler {
 			if (kws.hasParameter("interfaces")) {
 				ArrayList<String> interfaces = new ArrayList<String>();
 				for (IValue v : AST.$getInterfaces(kws)) {
-					interfaces.add(AST.$string(v).replace('.','/'));
+					interfaces.add(AST.$getName((IConstructor) v).replace('.','/'));
 				}
 				classNode.interfaces = interfaces;
 			}
@@ -217,7 +308,7 @@ public class ClassCompiler {
 				compileMethods(classNode, AST.$getMethodsParameter(kws));
 			}
 
-			if (!hasDefaultConstructor) {
+			if (!hasDefaultConstructor && !isInterface) {
 				generateDefaultConstructor(classNode);
 			}
 
@@ -329,9 +420,14 @@ public class ClassCompiler {
 			method = new MethodNode(modifiers, name, isConstructor ? Signature.constructor(sig) : Signature.method(sig), null, null);
 			
 			if (!isAbstract) {
+				if (isInterface && classNode.version < Opcodes.V1_8) {
+					throw new IllegalArgumentException("default methods requires at least JVM version v1_8()");
+				}
+				
 				if ((modifiers & Opcodes.ACC_ABSTRACT) != 0) {
 					throw new IllegalArgumentException("method with body should not be abstract");
 				}
+				
 				IList sigFormals = AST.$getFormals(sig);
 				hasDefaultConstructor |= (isConstructor && sigFormals.isEmpty());
 				IList varFormals = AST.$getFormals(cons);
@@ -2359,7 +2455,7 @@ public class ClassCompiler {
 		}
 
 		public static String $getSuper(IWithKeywordParameters<? extends IConstructor> kws) {
-			return ((IString) kws.getParameter("super")).getValue().replace('.','/');
+			return AST.$getName(((IConstructor) kws.getParameter("super"))).replace('.', '/');
 		}
 
 		public static String $string(IValue v) {

@@ -45,8 +45,8 @@ module lang::mujava::Syntax
 data Class
   = class(Type \type /* class(str name) */, 
       set[Modifier] modifiers = {\public()},
-      str super = "java.lang.Object",
-      list[str] interfaces = [],
+      Type super = object(),
+      list[Type] interfaces = [],
       list[Field] fields = [], 
       list[Method] methods = [],
       //list[Annotation] annotations = [],

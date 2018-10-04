@@ -12,7 +12,7 @@ import util::Math;
 public Class ifClass(Expression cond) {
   name = "IfCmp_<getName(cond)>";
   
-  return class(class(name),
+  return class(reference(name),
       methods=[
         staticMethod(\public(), boolean(), "ifTest", [], block([], [
            \if (cond, [\return(\true())]),
@@ -59,7 +59,7 @@ private Class ifCmpClass(Type t, BinOp op) {
   expr = op(load("i"), load("j"));
   name = "IfCmp_<getName(expr)>_<getName(t)>";
   
-  return class(class(name),
+  return class(reference(name),
       methods=[
         staticMethod(\public(), boolean(), "ifThenTest", [var(t,"i"), var(t,"j")], [
            \if (expr /* should be short-cut to IFCMP internally */, [

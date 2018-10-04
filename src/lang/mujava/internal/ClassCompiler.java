@@ -1227,7 +1227,7 @@ public class ClassCompiler {
 			String cons = type.getConstructorType().getName();
 
 			// weird inconsistency in CHECKCAST instruction?
-			if (cons == "class") {
+			if (cons == "reference") {
 				method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type));
 			}
 			else if (cons == "array") {
@@ -1532,7 +1532,7 @@ public class ClassCompiler {
 					}, 
 					(v) -> failedCoercion("string", to), 
 					(a) -> failedCoercion("string", to),
-					(c) -> failedCoercion("class", to),
+					(c) -> failedCoercion("reference", to),
 					(S) -> { /* identity */ }
 					);
 		}
@@ -1556,7 +1556,7 @@ public class ClassCompiler {
 					(d) -> failedCoercion("double", to),
 					(l) -> failedCoercion("long", to),
 					(v) -> failedCoercion("void", to),
-					(c) -> failedCoercion("class", to),
+					(c) -> failedCoercion("reference", to),
 					(a) -> coerceArrayToArray(from, to, arg),
 					(S) -> failedCoercion("string", to) // TODO byteArray?
 					);
@@ -1577,7 +1577,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.L2D); },
 					(l) -> { /* do nothing */ },
 					(v) -> { pop(); compileNull(); },
-					(c) -> failedCoercion("class", to),
+					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						compileExpression(arg);
@@ -1660,7 +1660,7 @@ public class ClassCompiler {
 							/* do nothing */
 						}
 						else {
-							failedCoercion("class", to);
+							failedCoercion("reference", to);
 						}
 					},
 					(a) -> failedCoercion("array", to),
@@ -1682,7 +1682,7 @@ public class ClassCompiler {
 					(d) -> { /* do nothing */ },
 					(l) -> { method.visitInsn(Opcodes.D2L); } ,
 					(v) -> { pop(); compileNull(); },
-					(c) -> failedCoercion("class", to),
+					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						compileExpression(arg);
@@ -1702,7 +1702,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.F2D); },
 					(l) -> { method.visitInsn(Opcodes.F2L); },
 					(v) -> { pop(); compileNull(); },
-					(c) -> failedCoercion("class", to),
+					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						compileExpression(arg);
@@ -1722,7 +1722,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.I2D); },
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); compileNull(); },
-					(c) -> failedCoercion("class", to),
+					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						compileExpression(arg);
@@ -1742,7 +1742,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.I2D); },
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); compileNull(); },
-					(c) -> failedCoercion("class", to),
+					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						compileExpression(arg);
@@ -1762,7 +1762,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.I2D); },
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); compileNull(); },
-					(c) -> failedCoercion("class", to),
+					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						compileExpression(arg);
@@ -1782,7 +1782,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.I2D); },
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); compileNull(); },
-					(c) -> failedCoercion("class", to),
+					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						compileExpression(arg);
@@ -2523,7 +2523,7 @@ public class ClassCompiler {
 			case "void" :
 				voids.accept(type);
 				break;
-			case "class" :
+			case "reference" :
 				classes.accept(type);
 				break;
 			case "array" :
@@ -2561,7 +2561,7 @@ public class ClassCompiler {
 				return longs.apply(type);
 			case "void" :
 				return voids.apply(type);
-			case "class" :
+			case "reference" :
 				return classes.apply(type);
 			case "array" :
 				return arrays.apply(type);
@@ -2605,7 +2605,7 @@ public class ClassCompiler {
 			case "void" :
 				voids.accept(type, arg);
 				break;
-			case "class" :
+			case "reference" :
 				classes.accept(type, arg);
 				break;
 			case "array" :

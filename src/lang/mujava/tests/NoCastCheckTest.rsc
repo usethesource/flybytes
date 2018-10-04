@@ -12,7 +12,7 @@ import IO;
 private Expression VF = load("VF");
 
 Class noUpCastTestClass() =
-  class(class("NoUpcastTestClass"), 
+  class(reference("NoUpcastTestClass"), 
         methods=[
           staticMethod(\public(), boolean(), "testMethod", [], block(
           [
@@ -35,7 +35,7 @@ bool testCastClass(Class c) {
 test bool upcastTest() = testCastClass(noUpCastTestClass());
 
 Class noDownCastTestClass() =
-  class(class("NoDowncastTestClass"), 
+  class(reference("NoDowncastTestClass"), 
         methods=[
           staticMethod(\public(), boolean(), "testMethod", [], block(
           [

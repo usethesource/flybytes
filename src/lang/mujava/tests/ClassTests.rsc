@@ -12,7 +12,7 @@ import util::Math;
 
 public Class testClass() = 
   //public class TestClass {
-  class(class("TestClass"),
+  class(reference("TestClass"),
     fields=[
       // public static int staticField = 42;
       field(integer(), "staticField", \default=const(integer(), 42), modifiers={\public(), \static()}),
@@ -111,8 +111,8 @@ test bool staticFieldInitializer()
 
 
 public Class extendClass() 
-  = class(class("ExtendedClass"),
-       super=class("TestClass"),
+  = class(reference("ExtendedClass"),
+       super=reference("TestClass"),
        methods=[
        //  method(Modifier access, Type ret, str name, list[Variable] args, list[Statement] stats)
          method(\public(), boolean(), "testMethod", [], [
@@ -137,7 +137,7 @@ test bool extendTest() {
   return i.invoke(methodDesc(\void(), "testMethod", []), []).toValue(#bool);
 }
 
-private Type HELLO = class("HelloWorld");
+private Type HELLO = reference("HelloWorld");
 
 public Class helloWorld = class(HELLO, 
     fields =[

@@ -15,7 +15,7 @@ Class cmpOpClass(Type t, CompOp op) {
   expr = op(load("i"), load("j"));
   name = "Comparison_<getName(expr)>_<getName(t)>";
   
-  return class(class(name),
+  return class(reference(name),
       methods=[
         staticMethod(\public(), boolean(), "op", [var(t,"i"), var(t,"j")], [
            \return(expr)
@@ -127,7 +127,7 @@ test bool testEqFalse(int i)
          v2 := make(t, 2),
          testCmpOp(cmpOpClass(t, eq), t, v1, v2, false));
 
-private value make(class(str cl), int _) = classMirror(cl).newInstance(constructorDesc([]),[]);
+private value make(reference(str cl), int _) = classMirror(cl).newInstance(constructorDesc([]),[]);
 private value make(string(), int i) = prim(string(), "hello<i>");
 private value make(array(integer()), int i) = array(integer(), [integer(i)]);
 

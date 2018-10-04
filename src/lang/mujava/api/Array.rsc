@@ -11,4 +11,4 @@ Expression index(str array, Expression index)
    = aaload(load(array), index); 
    
 Expression toString(Type elemType, Expression array)
-   = invokeStatic("java/util/Arrays", methodDesc(string(), "toString", [array(elemType)]), [array]);
+   = invokeStatic(reference("java.util.Arrays"), methodDesc(string(), "toString", [array(elemType)]), [array]);

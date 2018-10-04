@@ -16,7 +16,7 @@ Class binOpClass(Type t, BinOp op) {
   expr = op(load("i"), load("j"));
   name = "Operator_<getName(expr)>_<getName(t)>";
   
-  return class(class(name),
+  return class(reference(name),
       methods=[
         staticMethod(\public(), t, "op", [var(t,"i"), var(t,"j")], [
            \return(expr)
@@ -29,7 +29,7 @@ Class unOpClass(Type t, UnOp op) {
   expr = op(load("i"));
   name = "Operator_<getName(expr)>_<getName(t)>";
   
-  return class(class(name),
+  return class(reference(name),
       methods=[
         staticMethod(\public(), t, "op", [var(t,"i")], [
            \return(expr)

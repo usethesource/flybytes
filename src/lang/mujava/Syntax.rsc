@@ -43,7 +43,7 @@ generation.
 module lang::mujava::Syntax
 
 data Class
-  = class(Type \type /* class(str name) */, 
+  = class(Type \type /* reference(str name) */, 
       set[Modifier] modifiers = {\public()},
       Type super = object(),
       list[Type] interfaces = [],
@@ -53,7 +53,7 @@ data Class
       //list[Class] children = [],
       loc source = |unknown:///|
     )
-  | interface(Type \type /* class(str name) */,
+  | interface(Type \type /* reference(str name) */,
       list[Field] fields = [],
       list[Method] methods = [],
       //list[Annotation] annotations = [],
@@ -96,7 +96,7 @@ data Type
   | float()
   | double()
   | long()
-  | class(str name)
+  | reference(str name)
   | array(Type arg)
   | \void()
   | string()
@@ -157,11 +157,32 @@ data Expression(loc src = |unknown:///|, bool wide = \false())
   | aload(Expression array, Expression index)
   | \const(Type \type, value constant)
   | block(list[Statement] statements, Expression arg)
-  | invokeStatic(Type class, Signature desc, list[Expression] args)
-  | invokeSpecial(Type class, Expression receiver, Signature desc, list[Expression] args)
-  | invokeVirtual(Type class, Expression receiver, Signature desc, list[Expression] args)
-  | invokeInterface(Type class, Expression receiver, Signature desc, list[Expression] args)
-  | invokeSuper(Signature desc, list[Expression] args)
+  
+  | /* For invoking static methods of classes or interfaces */
+    invokeStatic(Type class, Signature desc, list[Expression] args)
+  
+  | /* If no dynamic dispatch is needed, or searching superclasses is required, and you know which class 
+     * implements the method, use this to invoke a method for efficiency's sake. 
+     * The invocation is checked at class load time. 
+     */
+    invokeSpecial(Type class, Expression receiver, Signature desc, list[Expression] args)
+  
+  | /* If you do need dynamic dispatch, or the method is implemented in a superclass, and this is
+     * not a default method of an interface, use this invocation method. You need to be sure the method
+     * exists _somewhere_ reachable from the \class reference type.
+     * The invocation checked at class load time. 
+     */
+    invokeVirtual(Type class, Expression receiver, Signature desc, list[Expression] args)
+  
+  | /* For invoking methods you know only from interfaces, such as default methods. 
+     * The method can even be absent at runtime in which case this throws a RuntimeException. 
+     * The check occurs at the first invocation at run-time. 
+     */
+    invokeInterface(Type class, Expression receiver, Signature desc, list[Expression] args)
+  
+  | /* Invoke a super constructor, typically only used in constructor method bodies */
+    invokeSuper(Signature desc, list[Expression] args)
+    
   | newInstance(Type class, Signature desc, list[Expression] args)
   | getField(Type class, Expression receiver, Type \type, str name)
   | getStatic(Type class, Type \type, str name)
@@ -200,14 +221,14 @@ Expression defVal(character()) = const(character(), 0);
 Expression defVal(short()) = const(short(), 0);
 Expression defVal(float()) = const(float(), 0.0);
 Expression defVal(double()) = const(double(), 0.0);
-Expression defVal(class(str _)) = null();
+Expression defVal(reference(str _)) = null();
 Expression defVal(array(Type _)) = null();
 Expression defVal(string()) = null();
  
  // Below popular some convenience macros for
  // generating methods and constructors:
  
-Type object() = class("java.lang.Object");
+Type object() = reference("java.lang.Object");
 
 Statement invokeSuper(list[Type] formals, list[Expression] args)
   = do(invokeSuper(constructorDesc(formals), args));
@@ -265,7 +286,7 @@ Expression new(Type class)
 // NB! This works only inside non-static methods and inside constructors 
 Expression this() = load("this");
 
-private Type CURRENT = class("\<current\>");
+private Type CURRENT = reference("\<current\>");
 
 // Load a field from the currently defined class
 Expression getField(Type \type, str name)

@@ -12,5 +12,5 @@ Statement stderr(Expression arg)
 
 // not-public because it depends on the magic constants "err" and "out" to work         
 private Expression println(str stream, Expression arg)
-   = invokeVirtual(class("java.io.PrintStream"), getStatic(class("java.lang.System"), class("java.io.PrintStream"), stream), 
+   = invokeVirtual(reference("java.io.PrintStream"), getStatic(reference("java.lang.System"), reference("java.io.PrintStream"), stream), 
          methodDesc(\void(), "println", [object()]), [arg]);         

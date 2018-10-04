@@ -16,7 +16,7 @@ Class forLoopClass() {
           
           \for(
           [ // init block
-             decl(array(integer()), "tmp", \default=newArray(array(integer()), const(integer(), 10))),
+             decl(array(integer()), "tmp", init=newArray(array(integer()), const(integer(), 10))),
              decl(integer(), "i", const(integer(), 0))
           ],
           

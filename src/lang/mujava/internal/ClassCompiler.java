@@ -503,7 +503,7 @@ public class ClassCompiler {
 		private void compileFieldInitializers(ClassNode classNode, MethodNode method) {
 			for (String field : fieldInitializers.keySet()) {
 				IConstructor def = fieldInitializers.get(field);
-				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("default");
+				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("init");
 				compileExpression_Load("this");
 				compileExpression(exp);
 				method.visitFieldInsn(Opcodes.PUTFIELD, classNode.name, field, Signature.type(AST.$getType(def)));
@@ -513,7 +513,7 @@ public class ClassCompiler {
 		private void compileStaticFieldInitializers(ClassNode classNode, MethodNode method) {
 			for (String field : staticFieldInitializers.keySet()) {
 				IConstructor def = staticFieldInitializers.get(field);
-				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("default");
+				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("init");
 				compileExpression(exp);
 				method.visitFieldInsn(Opcodes.PUTSTATIC, classNode.name, field, Signature.type(AST.$getType(def)));
 			}
@@ -655,8 +655,8 @@ public class ClassCompiler {
 
 		private void compileStat_Decl(IConstructor stat) {
 			IConstructor def = null;
-			if (stat.asWithKeywordParameters().hasParameter("default")) {
-				def = (IConstructor) stat.asWithKeywordParameters().getParameter("default");
+			if (stat.asWithKeywordParameters().hasParameter("init")) {
+				def = (IConstructor) stat.asWithKeywordParameters().getParameter("init");
 			}
 			
 			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true);
@@ -2062,8 +2062,8 @@ public class ClassCompiler {
 			String signature = Signature.type(type);
 
 			Object value = null;
-			if (kws.hasParameter("default")) {
-				IConstructor defaultExpr = (IConstructor) kws.getParameter("default");
+			if (kws.hasParameter("init")) {
+				IConstructor defaultExpr = (IConstructor) kws.getParameter("init");
 
 				if (!AST.$is("const", defaultExpr)) {
 					if ((access & Opcodes.ACC_STATIC) != 0) {
@@ -2265,11 +2265,11 @@ public class ClassCompiler {
 		public static IConstructor $getDefault(IConstructor var) {
 			IWithKeywordParameters<? extends IConstructor> kws = var.asWithKeywordParameters();
 
-			if (!kws.hasParameter("default")) {
+			if (!kws.hasParameter("init")) {
 				return null;
 			}
 
-			return (IConstructor) kws.getParameter("default");
+			return (IConstructor) kws.getParameter("init");
 		}
 
 		public static IList $getNext(IConstructor stat) {
@@ -2455,7 +2455,7 @@ public class ClassCompiler {
 		}
 
 		public static IValue $getDefaultParameter(IWithKeywordParameters<? extends IConstructor> kws) {
-			return kws.getParameter("default");
+			return kws.getParameter("init");
 		}
 
 		public static IConstructor $getArg(IConstructor type) {

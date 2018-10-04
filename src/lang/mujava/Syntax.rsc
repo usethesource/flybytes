@@ -71,7 +71,7 @@ data Class
    ;
 
 data Field
-  = field(Type \type, str name, Expression \default = defValue(\type), set[Modifier] modifiers = {\private()});
+  = field(Type \type, str name, Expression init = defValue(\type), set[Modifier] modifiers = {\private()});
          
 data Method
   = method(Signature desc, list[Formal] formals, list[Statement] block, set[Modifier] modifiers = {\public()})
@@ -104,12 +104,12 @@ data Type
 
 data Annotation; // TODO
 
-data Formal = var(Type \type, str name, Expression \default = defValue(\type)); 
+data Formal = var(Type \type, str name, Expression init = defValue(\type)); 
 
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Statement(loc src = |unknown:///|)
   = \store(str name, Expression \value)
-  | \decl(Type \type, str name, Expression \default = defValue(\type))
+  | \decl(Type \type, str name, Expression init = defValue(\type))
   | \astore(Expression array, Expression index, Expression arg)
   | \do(Expression exp) // pops the result of the expression when needed
   | \return()

@@ -16,8 +16,8 @@ Class noUpCastTestClass() =
         methods=[
           staticMethod(\public(), boolean(), "testMethod", [], 
           [
-            decl(IValueFactory, "VF", \default=getValueFactory()),
-            decl(IInteger, "i", \default=vfInteger(VF, 8)),
+            decl(IValueFactory, "VF", init=getValueFactory()),
+            decl(IInteger, "i", init=vfInteger(VF, 8)),
             \return(equals(load("i"), INumber_Add(vfInteger(VF, 4), vfInteger(VF, 4))))
           ])
         ]
@@ -35,9 +35,9 @@ Class noDownCastTestClass() =
         methods=[
           staticMethod(\public(), boolean(), "testMethod", [],
           [
-            decl(IValueFactory, "VF", \default=getValueFactory()),
-            decl(object(), "i", \default=vfInteger(VF, 8)),
-            decl(object(), "j", \default=vfInteger(VF, 4)),
+            decl(IValueFactory, "VF", init=getValueFactory()),
+            decl(object(), "i", init=vfInteger(VF, 8)),
+            decl(object(), "j", init=vfInteger(VF, 4)),
             \return(equals(load("i"), INumber_Add(load("j"), load("j"))))
           ])
         ]

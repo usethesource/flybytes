@@ -15,7 +15,7 @@ public Class testClass() =
   class(reference("TestClass"),
     fields=[
       // public static int staticField = 42;
-      field(integer(), "staticField", \default=const(integer(), 42), modifiers={\public(), \static()}),
+      field(integer(), "staticField", init=const(integer(), 42), modifiers={\public(), \static()}),
       
       // public int field;
       field(integer(), "field", modifiers={\public()})
@@ -145,7 +145,7 @@ public Class helloWorld = class(HELLO,
     ], 
     methods=[
      main("args",  [
-          decl(HELLO, "hw", \default=new(HELLO)),
+          decl(HELLO, "hw", init=new(HELLO)),
           do(invokeVirtual(load("hw"), methodDesc(\void(),"f",[array(string())]), [load("args")])),
           \return()
         ]

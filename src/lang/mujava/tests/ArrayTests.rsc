@@ -13,7 +13,7 @@ Class primArrayTestClass(Type t, int len) {
         staticMethod(\public(), boolean(), "testMethod", [],
         [
           // Type[] tmp = new Type[len];
-          decl(array(t), "tmp", \default=newArray(array(t), const(integer(), len))),
+          decl(array(t), "tmp", init=newArray(array(t), const(integer(), len))),
            
           // fail if tmp.length != len
           \if(ne(const(integer(), len), alength(load("tmp"))), [rf]),

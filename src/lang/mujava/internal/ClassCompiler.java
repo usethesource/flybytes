@@ -528,20 +528,10 @@ public class ClassCompiler {
 		}
 
 		private void compileFormalVariables(IList formals, boolean initialize) {
-			int startLocals = variableNames.size();
-
 			for (IValue elem : formals) {
 				IConstructor var = (IConstructor) elem;
 				IConstructor varType = AST.$getType(var);
 				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize);
-			}
-
-			if (initialize) {
-				// now all formals and local variables are declared.
-				// initializing local variables to avoid hard-to-analyze JVM crashes
-				for (int i = startLocals; i < variableTypes.size(); i++) {
-					
-				}
 			}
 		}
 

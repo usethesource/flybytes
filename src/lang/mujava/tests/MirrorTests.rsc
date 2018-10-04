@@ -89,10 +89,10 @@ test bool arrayLoadLong()
   = array(long(), [long(maxValue(long()))]).load(0).toValue(#int) == maxValue(long()); 
   
 test bool arrayLoadObjectNull()
-  = array(object(), 10).load(0) == null(); 
+  = array(object(), 10).load(0) == Mirror::null(); 
   
 test bool arrayLoadStringNull()
-  = array(string(), 10).load(0) == null();
+  = array(string(), 10).load(0) == Mirror::null();
   
 test bool arrayLoadStringSingleton()
   = string(array(string(), [string("x")]).load(0)) == "x"; 

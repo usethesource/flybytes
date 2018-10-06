@@ -708,7 +708,6 @@ public class ClassCompiler {
 		}
 
 		private Label getOrGenerateLabel(String label) {
-			label = "$$" + label; // to void name clashes
 			Label l = labels.get(label);
 			
 			if (l == null) {
@@ -1505,10 +1504,10 @@ public class ClassCompiler {
 			thenPart.build();
 			jumpTo(join);
 			method.visitLabel(jump);
-			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+//			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			elsePart.build();
 			method.visitLabel(join);
-			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+//			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 			continuation.build();
 		}
 

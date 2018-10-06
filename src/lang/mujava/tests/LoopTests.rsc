@@ -176,10 +176,11 @@ Class forLoopBreakNestedClass() {
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
+          // int k = 0
+           decl(integer(), "k", init=const(integer(), 0)),
           \for(
-          [ // int i = 0, k = 0
-             decl(integer(), "i", init=const(integer(), 0)),
-             decl(integer(), "k", init=const(integer(), 0))
+          [ // int i = 0
+             decl(integer(), "i", init=const(integer(), 0))
           ],
           
           // cond: i < 10
@@ -203,7 +204,7 @@ Class forLoopBreakNestedClass() {
             ],
           
             [ // if (i == 5) break outer;
-              \if(eq(load("i"), const(integer(), 50)), [
+              \if(eq(load("i"), const(integer(), 5)), [
                 \break(label="outer")
               ]),
               
@@ -219,8 +220,8 @@ Class forLoopBreakNestedClass() {
           label="outer"
           ),
           
-          // return k == 40; 
-          \return(eq(load("k"), const(integer(), 44)))
+          // return k == 55; 
+          \return(eq(load("k"), const(integer(), 55)))
         ])
       ]
     );

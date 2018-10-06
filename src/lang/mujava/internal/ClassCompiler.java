@@ -138,6 +138,7 @@ public class ClassCompiler {
 			return m.mirrorClass(className, loaded);
 		} 
 		catch (Throwable e) {
+			e.printStackTrace(out);
 			throw new RuntimeException(e);
 		}
 	}
@@ -246,6 +247,7 @@ public class ClassCompiler {
 		private ClassNode classNode;
 		private final Builder<?> pushTrue = () -> compileTrue();
 		private final Builder<?> pushFalse = () -> compileFalse();
+		private Map<String, Label> labels;
 
 
 
@@ -336,7 +338,7 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.RETURN);
 			method.visitLabel(l1);
 
-			method.visitMaxs(1, 1);
+			method.visitMaxs(0, 0);
 			method.visitEnd();
 			classNode.methods.add(method);
 		}
@@ -384,7 +386,7 @@ public class ClassCompiler {
 
 			IList block = AST.$getBlock(cons);
 			if (block != null) {
-				compileStatements(block, DONE);
+				compileStatements(block, null, null, DONE);
 			}
 
 			method.visitInsn(Opcodes.RETURN);
@@ -413,6 +415,9 @@ public class ClassCompiler {
 			String name = isConstructor ? "<init>" : AST.$getName(sig);
 
 			method = new MethodNode(modifiers, name, isConstructor ? Signature.constructor(sig) : Signature.method(sig), null, null);
+			
+			// every method body has a fresh set of jump labels
+			labels = new HashMap<>(); 
 			
 			if (!isAbstract) {
 				if (isInterface && classNode.version < Opcodes.V1_8) {
@@ -453,7 +458,7 @@ public class ClassCompiler {
 					compileFieldInitializers(classNode, method);
 				}
 
-				compileStatements(AST.$getBlock(cons), DONE);
+				compileStatements(AST.$getBlock(cons), null, null, DONE);
 
 				method.visitLabel(scopeEnd);
 				
@@ -466,7 +471,7 @@ public class ClassCompiler {
 					method.visitLocalVariable(varName, Signature.type(variableTypes.get(i)), null, scopeStart, scopeEnd, i);
 				}
 				
-				method.visitMaxs(0, variableNames.size());
+				method.visitMaxs(0, 0);
 			}
 			
 			method.visitEnd(); // also needed for abstract methods
@@ -593,23 +598,31 @@ public class ClassCompiler {
 		 * code is generated we can generate the right code in the right place 
 		 * without superfluous additional labels and gotos.
 		 */
-		private Void compileStatements(IList statements, Builder<?> continuation) {
+		private Void compileStatements(IList statements, Label continueLabel, Label breakLabel, Builder<?> continuation) {
 			if (statements.length() == 0) {
 				continuation.build();
 			}
 			else {
 				compileStatement(
-						(IConstructor) statements.get(0),
-						() -> compileStatements(statements.delete(0), continuation)
+						(IConstructor) statements.get(0), continueLabel,
+						breakLabel, () -> compileStatements(statements.delete(0), continueLabel, breakLabel, continuation)
 						);
 			}
 			return null;
 		}
 
-		private void compileStatement(IConstructor stat, Builder<?> continuation) {
+		private void compileStatement(IConstructor stat, Label continueLabel, Label breakLabel, Builder<?> continuation) {
 			switch (stat.getConstructorType().getName()) {
 			case "decl":
 				compileStat_Decl(stat);
+				continuation.build();
+				break;
+			case "label":
+				compileLabel(AST.$getLabel(stat));
+				continuation.build();
+				break;
+			case "goto":
+				compileGoto(AST.$getLabel(stat));
 				continuation.build();
 				break;
 			case "do" : 
@@ -636,19 +649,63 @@ public class ClassCompiler {
 				compileStat_Return(stat);
 				// dropping the continuation, there is nothing to do after return!
 				break;
+			case "break":
+				compileStat_Break(stat, breakLabel);
+				// dropping the continuation, there is nothing to do after break!
+				break;
+			case "continue":
+				compileStat_Continue(stat, continueLabel);
+				// dropping the continuation, there is nothing to do after break!
+				break;
+			
 			case "if":
 				if (stat.getConstructorType().getArity() == 3) {
-					compileStat_IfThenElse(AST.$getCondition(stat), AST.$getThenBlock(stat), AST.$getElseBlock(stat), continuation);
+					compileStat_IfThenElse(AST.$getCondition(stat), AST.$getThenBlock(stat), AST.$getElseBlock(stat), continueLabel, breakLabel, continuation);
 				}
 				else {
 					assert stat.getConstructorType().getArity() == 2;
-					compileStat_If(AST.$getCondition(stat), AST.$getThenBlock(stat), continuation);
+					compileStat_If(AST.$getCondition(stat), AST.$getThenBlock(stat), continueLabel, breakLabel, continuation);
 				}
 				break;
 			case "for":
-				compileStat_For(AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continuation);
+				compileStat_For(AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continueLabel, breakLabel, continuation);
 				break;
 			}
+		}
+
+		private void compileStat_Break(IConstructor stat, Label join) {
+			if (join == null) {
+				throw new IllegalArgumentException("no loop to break from (or inside an expression block");
+			}
+			method.visitJumpInsn(Opcodes.GOTO, join);
+		}
+		
+		private void compileStat_Continue(IConstructor stat, Label join) {
+			if (join == null) {
+				throw new IllegalArgumentException("no loop to continue with (or inside an expression block");
+			}
+			method.visitJumpInsn(Opcodes.GOTO, join);
+		}
+
+		private void compileGoto(String label) {
+			Label l = getOrGenerateLabel(label);
+			method.visitJumpInsn(Opcodes.GOTO, l);
+		}
+
+		private Label getOrGenerateLabel(String label) {
+			label = "$$" + label; // to void name clashes
+			Label l = labels.get(label);
+			
+			if (l == null) {
+				l = new Label();
+				labels.put(label, l);
+			}
+			
+			return l;
+		}
+
+		private void compileLabel(String label) {
+			method.visitLabel(getOrGenerateLabel(label));
 		}
 
 		private void compileStat_Decl(IConstructor stat) {
@@ -660,22 +717,24 @@ public class ClassCompiler {
 			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true);
 		}
 
-		private void compileStat_For(IList init, IConstructor cond, IList next, IList body, Builder<?> continuation) {
-			compileStatements(init, DONE);
+		private void compileStat_For(IList init, IConstructor cond, IList next, IList body, Label continueLabel, Label breakLabel, Builder<?> continuation) {
+			compileStatements(init, continueLabel, breakLabel, DONE);
 			Label start = new Label();
 			Label join = new Label();
+			Label cont = new Label();
 
 			// TODO: this can be done better
 			method.visitLabel(start);
 			if (cond.getConstructorType().getName().equals("neg")) {
 				compileExpression(AST.$getArg(cond));
-				compileConditionalInverted(0, Opcodes.IFNE, () -> compileStatements(body, DONE), () -> jumpTo(join), DONE);
+				compileConditionalInverted(0, Opcodes.IFNE, () -> compileStatements(body, cont, join, DONE), () -> jumpTo(join), DONE);
 			}
 			else {
 				compileExpression(cond);
-				compileConditionalInverted(0, Opcodes.IFEQ, () -> compileStatements(body, DONE), () -> jumpTo(join), DONE);
+				compileConditionalInverted(0, Opcodes.IFEQ, () -> compileStatements(body, cont, join, DONE), () -> jumpTo(join), DONE);
 			}
-			compileStatements(next, DONE);
+			method.visitLabel(cont);
+			compileStatements(next, cont /*watch out! */, join, DONE);
 			jumpTo(start);
 			method.visitLabel(join);
 			continuation.build();
@@ -686,13 +745,13 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private void compileStat_If(IConstructor cond, IList thenBlock, Builder<?> continuation) {
-			compileStat_IfThenElse(cond, thenBlock, null, continuation);
+		private void compileStat_If(IConstructor cond, IList thenBlock, Label continueLabel, Label breakLabel, Builder<?> continuation) {
+			compileStat_IfThenElse(cond, thenBlock, null, continueLabel, breakLabel, continuation);
 		}
 
-		private void compileStat_IfThenElse(IConstructor cond, IList thenBlock, IList elseBlock, Builder<?> continuation) {
-			Builder<?> thenBuilder = () -> compileStatements(thenBlock, DONE);
-			Builder<?> elseBuilder = elseBlock != null ? () -> compileStatements(elseBlock, DONE) : DONE;
+		private void compileStat_IfThenElse(IConstructor cond, IList thenBlock, IList elseBlock, Label continueLabel, Label breakLabel, Builder<?> continuation) {
+			Builder<?> thenBuilder = () -> compileStatements(thenBlock, continueLabel, breakLabel, DONE);
+			Builder<?> elseBuilder = elseBlock != null ? () -> compileStatements(elseBlock, continueLabel, breakLabel, DONE) : DONE;
 
 			// here we special case for !=, ==, <=, >=, < and >, null, nonnull, because
 			// there are special jump instructions for these operators on the JVM and we don't want to push
@@ -1799,7 +1858,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor compileBlock(IList block, IConstructor arg) {
-			compileStatements(block, DONE);
+			compileStatements(block, null, null, DONE);
 			IConstructor type = compileExpression(arg);
 			return type;
 		}
@@ -2256,6 +2315,10 @@ public class ClassCompiler {
 
 		public static IValue $getConstant(IConstructor exp) {
 			return exp.get("constant");
+		}
+
+		public static String $getLabel(IConstructor stat) {
+			return ((IString) stat.get("label")).getValue();
 		}
 
 		public static boolean $is(String string, IConstructor parameter) {

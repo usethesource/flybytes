@@ -668,7 +668,8 @@ public class ClassCompiler {
 				}
 				break;
 			case "for":
-				compileStat_For(AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continueLabel, breakLabel, continuation);
+				String label = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
+				compileStat_For(label, AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continueLabel, breakLabel, continuation);
 				break;
 			}
 		}
@@ -677,14 +678,28 @@ public class ClassCompiler {
 			if (join == null) {
 				throw new IllegalArgumentException("no loop to break from (or inside an expression block");
 			}
-			method.visitJumpInsn(Opcodes.GOTO, join);
+			
+			if (stat.asWithKeywordParameters().hasParameter("label")) {
+				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
+				compileGoto("break:" + loopLabel);
+			}
+			else {
+				method.visitJumpInsn(Opcodes.GOTO, join);
+			}
 		}
 		
 		private void compileStat_Continue(IConstructor stat, Label join) {
 			if (join == null) {
 				throw new IllegalArgumentException("no loop to continue with (or inside an expression block");
 			}
-			method.visitJumpInsn(Opcodes.GOTO, join);
+			
+			if (stat.asWithKeywordParameters().hasParameter("label")) {
+				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
+				compileGoto("continue:" + loopLabel);
+			}
+			else {
+				method.visitJumpInsn(Opcodes.GOTO, join);
+			}
 		}
 
 		private void compileGoto(String label) {
@@ -717,11 +732,16 @@ public class ClassCompiler {
 			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true);
 		}
 
-		private void compileStat_For(IList init, IConstructor cond, IList next, IList body, Label continueLabel, Label breakLabel, Builder<?> continuation) {
+		private void compileStat_For(String label, IList init, IConstructor cond, IList next, IList body, Label continueLabel, Label breakLabel, Builder<?> continuation) {
 			compileStatements(init, continueLabel, breakLabel, DONE);
 			Label start = new Label();
 			Label join = new Label();
 			Label cont = new Label();
+			
+			if (label != null) {
+				labels.put("break:" + label, join);
+				labels.put("continue:" + label, cont);
+			}
 
 			// TODO: this can be done better
 			method.visitLabel(start);

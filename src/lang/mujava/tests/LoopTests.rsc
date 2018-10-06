@@ -12,22 +12,24 @@ Class forLoopClass() {
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
-          // tmp = new Type[len];
+          
           
           \for(
           [ // init block
+             // Type[] tmp = new Type[len];
              decl(array(integer()), "tmp", init=newArray(array(integer()), const(integer(), 10))),
+             // int i = 0;
              decl(integer(), "i", init=const(integer(), 0))
           ],
           
-          // cond 
+          // i < tmp.length 
           lt(load("i"), alength(load("tmp"))),
           
-          [ // next block
+          [ // i = i + 1
             store("i", add(load("i"), const(integer(), 1))) 
           ],
           
-          [ // body
+          [ // tmp[i] = i;
             astore(load("tmp"), load("i"), load("i"))
           ]
           ),
@@ -54,10 +56,8 @@ Class forLoopBreakClass() {
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
-          // tmp = new Type[len];
-          
           \for(
-          [ // init block
+          [ // int = 0;
              decl(integer(), "i", init=const(integer(), 0))
           ],
           
@@ -92,10 +92,8 @@ Class forLoopContinueClass() {
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
-          // tmp = new Type[len];
-          
           \for(
-          [ // init block
+          [ // int i = 0, j = 0;
              decl(integer(), "i", init=const(integer(), 0)),
              decl(integer(), "j", init=const(integer(), 0))
           ],
@@ -123,4 +121,62 @@ Class forLoopContinueClass() {
     );
 } 
 
-test bool testBreakContinue() = testForClass(forLoopContinueClass());
+test bool testForContinue() = testForClass(forLoopContinueClass());
+
+Class forLoopBreakNestedClass() {
+  return class(reference("ForLoopBreakNestedClass"),
+      methods=[
+        staticMethod(\public(), boolean(), "testMethod", [],
+        [
+          \for(
+          [ // int i = 0, k = 0
+             decl(integer(), "i", init=const(integer(), 0)),
+             decl(integer(), "k", init=const(integer(), 0))
+          ],
+          
+          // cond: i < 10
+          lt(load("i"), const(integer(), 10)),
+          
+          [ // next: i = i + 1
+            store("i", add(load("i"), const(integer(), 1))) 
+          ],
+          
+          [ 
+            \for(
+            [ // int j = 0
+                decl(integer(), "j", init=const(integer(), 0))
+            ],
+          
+            // cond: j < 10
+            lt(load("j"), const(integer(), 10)),
+          
+            [ // next: j = j + 1
+              store("j", add(load("j"), const(integer(), 1))) 
+            ],
+          
+            [ // if (i == 5) break outer;
+              \if(eq(load("i"), const(integer(), 50)), [
+                \break(label="outer")
+              ]),
+              
+              // k = k + 1 
+              store("k", add(load("k"), const(integer(), 1)))
+            ],
+            label="inner"
+            ),
+            
+            // k = k + 1 (should be skipped after break(label=outer) above)
+            store("k", add(load("k"), const(integer(), 1)))
+          ],
+          label="outer"
+          ),
+          
+          // return k == 40; 
+          \return(eq(load("k"), const(integer(), 44)))
+        ])
+      ]
+    );
+} 
+
+@ignore
+test bool testBreakNested() = testForClass(forLoopBreakNestedClass());

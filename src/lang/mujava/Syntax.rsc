@@ -42,8 +42,6 @@ generation.
 @author{Jurgen J. Vinju}
 module lang::mujava::Syntax
 
-import util::Maybe;
-
 data Class
   = class(Type \type /* reference(str name) */, 
       set[Modifier] modifiers = {\public()},
@@ -124,14 +122,14 @@ data Statement(loc src = |unknown:///|)
   | \for(list[Statement] init, 
          Expression condition, 
          list[Statement] next, 
-         list[Statement] statements, Maybe[str] label = nothing())
+         list[Statement] statements, str label = "")
   | 
     // "goto" caveat: do not jump over otherwise dead code, the muJAVA compiler will choke on 
     // it because ASM chokes on it while doing dataflow analysis to compute stack map frames.
     \goto(str label) 
   | label(str label)
-  | \break(Maybe[str] label = nothing())
-  | \continue(Maybe[str] label = nothing())
+  | \break(str label = "")
+  | \continue(str label = "")
   //| \while(Expression condition, list[Statement] block)
  // TODO: these are still to be implemented:
   //| \while(Expression condition, list[Statement] block)

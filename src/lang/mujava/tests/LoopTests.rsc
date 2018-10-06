@@ -48,6 +48,54 @@ bool testForClass(Class c) {
 
 test bool testNormalFor() = testForClass(forLoopClass());
 
+Class NestedFor() {
+  return class(reference("NestedForClass"),
+      methods=[
+        staticMethod(\public(), boolean(), "testMethod", [],
+        [
+          \for(
+          [ // int i = 0, k = 0
+             decl(integer(), "i", init=const(integer(), 0)),
+             decl(integer(), "k", init=const(integer(), 0))
+          ],
+          
+          // cond: i < 10
+          lt(load("i"), const(integer(), 10)),
+          
+          [ // next: i = i + 1
+            store("i", add(load("i"), const(integer(), 1))) 
+          ],
+          
+          [ 
+            \for(
+            [ // int j = 0
+                decl(integer(), "j", init=const(integer(), 0))
+            ],
+          
+            // cond: j < 10
+            lt(load("j"), const(integer(), 10)),
+          
+            [ // next: j = j + 1
+              store("j", add(load("j"), const(integer(), 1))) 
+            ],
+          
+            [ 
+              // k = k + 1 
+              store("k", add(load("k"), const(integer(), 1)))
+            ]
+            )
+          ]
+          ),
+          
+          // return k == 100; 
+          \return(eq(load("k"), const(integer(), 100)))
+        ])
+      ]
+    );
+} 
+
+test bool testNestedFor() = testForClass(NestedFor());
+
 Class forLoopBreakClass() {
   rf = \return(\false());
   rt = \return(\true());

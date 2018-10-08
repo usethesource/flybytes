@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -177,7 +178,7 @@ public class ClassCompiler {
 	/**
 	 * Load classes from a simple map (from class names to their bytearray bytecode representations)
 	 */
-	static private class ClassMapLoader extends ClassLoader implements Iterable<String> {
+	static private class ClassMapLoader extends ClassLoader implements Iterable<String>, Opcodes {
 		private final Map<String, byte[]> bytecodes;
 		private final Map<String, Class<?>> cache;
 
@@ -248,8 +249,6 @@ public class ClassCompiler {
 		private final Builder<?> pushTrue = () -> trueExp();
 		private final Builder<?> pushFalse = () -> falseExp();
 		private Map<String, Label> labels;
-
-
 
 		public Compile(ClassVisitor cw, int version, PrintWriter out) {
 			this.cw = cw;
@@ -616,7 +615,7 @@ public class ClassCompiler {
 				labelStat(AST.$getLabel(stat));
 				break;
 			case "goto":
-				gotoStat(AST.$getLabel(stat));
+				gotoStat(AST.$getLabel(stat), joinLabel);
 				break;
 			case "do" : 
 				doStat((IConstructor) stat.get("exp"));
@@ -669,7 +668,42 @@ public class ClassCompiler {
 				break;
 			case "throw":
 				throwStat(AST.$getArg(stat));
+				break;
+			case "monitor":
+				monitorStat(AST.$getArg(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
+				break;
 			}
+		}
+
+		private void monitorStat(IConstructor lock, IList block, Label continueLabel, Label breakLabel, Label joinLabel) {
+			Label startExceptionBlock = new Label();
+			Label endExceptionBlock = new Label();
+			Label handlerStart = new Label();
+			Label handlerEnd = new Label();
+			
+			method.visitTryCatchBlock(startExceptionBlock, endExceptionBlock, handlerStart, null);
+			method.visitTryCatchBlock(handlerStart, handlerEnd, handlerStart, null);
+
+			IConstructor type = expr(lock);
+			String lockVarName = "$lock:" + UUID.randomUUID().toString();
+			declareVariable(type, lockVarName, null, false);
+			dup(); // for MONITORENTER
+			method.visitVarInsn(Opcodes.ASTORE, positionOf(lockVarName));
+			method.visitInsn(Opcodes.MONITORENTER);
+			
+			method.visitLabel(startExceptionBlock);
+			method.visitLineNumber(22, startExceptionBlock);
+			statements(block, null, null, null /* no support for break, continue, goto */);
+			method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
+			method.visitInsn(Opcodes.MONITOREXIT);
+			method.visitLabel(endExceptionBlock);
+
+			method.visitJumpInsn(Opcodes.GOTO, joinLabel); // nothing happened
+			method.visitLabel(handlerStart);
+			method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
+			method.visitInsn(Opcodes.MONITOREXIT); // an exception happened, exit the monitor
+			method.visitLabel(handlerEnd);
+			method.visitInsn(Opcodes.ATHROW); // rethrow
 		}
 
 		private void throwStat(IConstructor arg) {
@@ -732,12 +766,12 @@ public class ClassCompiler {
 
 		private void breakStat(IConstructor stat, Label join) {
 			if (join == null) {
-				throw new IllegalArgumentException("no loop to break from (or inside an expression block");
+				throw new IllegalArgumentException("no loop to break from (or inside an expression or monitor block");
 			}
 			
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
-				gotoStat("break:" + loopLabel);
+				gotoStat("break:" + loopLabel, join);
 			}
 			else {
 				method.visitJumpInsn(Opcodes.GOTO, join);
@@ -746,19 +780,22 @@ public class ClassCompiler {
 		
 		private void continueStat(IConstructor stat, Label join) {
 			if (join == null) {
-				throw new IllegalArgumentException("no loop to continue with (or inside an expression block");
+				throw new IllegalArgumentException("no loop to continue with (or inside an expression or monitor block");
 			}
 			
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
-				gotoStat("continue:" + loopLabel);
+				gotoStat("continue:" + loopLabel, join);
 			}
 			else {
 				method.visitJumpInsn(Opcodes.GOTO, join);
 			}
 		}
 
-		private void gotoStat(String label) {
+		private void gotoStat(String label, Label join) {
+			if (join == null) {
+				throw new IllegalArgumentException("goto within a monitor block is not supported");
+			}
 			Label l = getOrGenerateLabel(label);
 			method.visitJumpInsn(Opcodes.GOTO, l);
 		}
@@ -2276,6 +2313,9 @@ public class ClassCompiler {
 					break;
 				case "interface": 
 					res += Opcodes.ACC_INTERFACE; 
+					break;
+				case "synchronized":
+					res += Opcodes.ACC_SYNCHRONIZED;
 					break;
 				}
 			}

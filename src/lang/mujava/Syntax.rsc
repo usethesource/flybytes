@@ -68,6 +68,7 @@ data Class
    | \friendly()
    | \static()
    | \final()
+   | \synchronized()
    ;
 
 data Field
@@ -129,11 +130,12 @@ data Stat(loc src = |unknown:///|)
   | \continue(str label = "")
   | \while(Exp condition, list[Stat] block)
   | \doWhile(list[Stat] block, Exp condition)
-  | \throw(Exp exception)  
+  | \throw(Exp exception)
+  | \monitor(Exp arg, list[Stat] block)  
   //| \try(list[Stat] tryBlock, list[Catch] \catchBlock, list[Stat] \finallyBlock)
   //| \switch(Exp \value, list[Case] caseBlocks, list[Stat] defaultBlock)
 
-  //| monitor(Exp lock, list[Stat] block)
+  
  
   ;
 

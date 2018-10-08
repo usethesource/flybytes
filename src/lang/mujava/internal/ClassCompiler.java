@@ -240,13 +240,13 @@ public class ClassCompiler {
 		private boolean isInterface;
 		private Map<String, IConstructor> fieldInitializers = new HashMap<>();
 		private Map<String, IConstructor> staticFieldInitializers = new HashMap<>();
-		private Label scopeStart;
-		private Label scopeEnd;
+		private Label methodStartLabel;
+		private Label methodEndLabel;
 		private MethodNode method;
 		private IConstructor classType;
 		private ClassNode classNode;
-		private final Builder<?> pushTrue = () -> compileTrue();
-		private final Builder<?> pushFalse = () -> compileFalse();
+		private final Builder<?> pushTrue = () -> trueExp();
+		private final Builder<?> pushFalse = () -> falseExp();
 		private Map<String, Label> labels;
 
 
@@ -301,11 +301,11 @@ public class ClassCompiler {
 			}
 
 			if (kws.hasParameter("fields")) {
-				compileFields(classNode, AST.$getFieldsParameter(kws), isInterface);
+				fields(classNode, AST.$getFieldsParameter(kws), isInterface);
 			}
 
 			if (kws.hasParameter("methods")) {
-				compileMethods(classNode, AST.$getMethodsParameter(kws));
+				methods(classNode, AST.$getMethodsParameter(kws));
 			}
 
 			if (!hasDefaultConstructor && !isInterface) {
@@ -313,7 +313,7 @@ public class ClassCompiler {
 			}
 
 			if (!hasStaticInitializer && !staticFieldInitializers.isEmpty()) {
-				compileStaticInitializer(classNode, null);
+				staticInitializer(classNode, null);
 			}
 
 			classNode.accept(cw);
@@ -332,7 +332,7 @@ public class ClassCompiler {
 
 			// this.a = blaBla;
 			// ...
-			compileFieldInitializers(classNode, method);
+			fieldInitializers(classNode, method);
 
 			// return
 			method.visitInsn(Opcodes.RETURN);
@@ -343,26 +343,26 @@ public class ClassCompiler {
 			classNode.methods.add(method);
 		}
 
-		private void compileFields(ClassNode classNode, IList fields, boolean interf) {
+		private void fields(ClassNode classNode, IList fields, boolean interf) {
 			for (IValue field : fields) {
 				IConstructor cons = (IConstructor) field;
 				compileField(classNode, cons, interf);
 			}
 		}
 
-		private void compileMethods(ClassNode classNode, IList methods) {
+		private void methods(ClassNode classNode, IList methods) {
 			for (IValue field : methods) {
 				IConstructor cons = (IConstructor) field;
 				if (cons.getConstructorType().getName().equals("static")) {
-					compileStaticInitializer(classNode, cons);
+					staticInitializer(classNode, cons);
 				}
 				else {
-					compileMethod(classNode, cons);
+					method(classNode, cons);
 				}
 			}
 		}
 
-		private void compileStaticInitializer(ClassNode classNode, IConstructor cons) {
+		private void staticInitializer(ClassNode classNode, IConstructor cons) {
 			if (hasStaticInitializer) {
 				throw new IllegalArgumentException("can only have one static initializer per class");
 			}
@@ -376,21 +376,21 @@ public class ClassCompiler {
 			variableNames = new ArrayList<>();
 			variableDefaults = new ArrayList<>();
 
-			scopeStart = new Label();
-			scopeEnd = new Label();
+			methodStartLabel = new Label();
+			methodEndLabel = new Label();
 
 			method.visitCode(); 
-			method.visitLabel(scopeStart);
+			method.visitLabel(methodStartLabel);
 
-			compileStaticFieldInitializers(classNode, method);
+			staticFieldInitializers(classNode, method);
 
 			IList block = AST.$getBlock(cons);
 			if (block != null) {
-				compileStatements(block, null, null, DONE);
+				statements(block, null, null, methodEndLabel);
 			}
 
+			method.visitLabel(methodEndLabel);
 			method.visitInsn(Opcodes.RETURN);
-			method.visitLabel(scopeEnd);
 			method.visitMaxs(0, 0);
 			method.visitEnd();
 
@@ -398,7 +398,7 @@ public class ClassCompiler {
 		}
 
 
-		private void compileMethod(ClassNode classNode, IConstructor cons) {
+		private void method(ClassNode classNode, IConstructor cons) {
 			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
 
 			boolean isAbstract = cons.getConstructorType().getArity() == 1; // only a signature
@@ -446,21 +446,21 @@ public class ClassCompiler {
 					declareVariable(classType, "this", null, false);
 				}
 
-				scopeStart = new Label();
-				scopeEnd = new Label();
+				methodStartLabel = new Label();
+				methodEndLabel = new Label();
 
 				method.visitCode(); 
-				method.visitLabel(scopeStart);
+				method.visitLabel(methodStartLabel);
 				
-				compileFormalVariables(varFormals, false /* no initialization */);
+				formalVariables(varFormals, false /* no initialization */);
 
 				if (isConstructor && !fieldInitializers.isEmpty()) {
-					compileFieldInitializers(classNode, method);
+					fieldInitializers(classNode, method);
 				}
 
-				compileStatements(AST.$getBlock(cons), null, null, DONE);
+				statements(AST.$getBlock(cons), null, null, methodEndLabel);
 
-				method.visitLabel(scopeEnd);
+				method.visitLabel(methodEndLabel);
 				
 				for (int i = 0; i < variableNames.size(); i++) {
 					String varName = variableNames.get(i);
@@ -468,7 +468,7 @@ public class ClassCompiler {
 						continue; // empty slot
 					}
 					
-					method.visitLocalVariable(varName, Signature.type(variableTypes.get(i)), null, scopeStart, scopeEnd, i);
+					method.visitLocalVariable(varName, Signature.type(variableTypes.get(i)), null, methodStartLabel, methodEndLabel, i);
 				}
 				
 				method.visitMaxs(0, 0);
@@ -498,7 +498,7 @@ public class ClassCompiler {
 					computeDefaultValueForVariable(type, pos);
 				}
 				else {
-					compileStat_Store(name, def);
+					storeStat(name, def);
 				}
 			}
 			else {
@@ -506,33 +506,33 @@ public class ClassCompiler {
 					// if somebody passed 'null' as actual parameter and we have something to initialize with here,
 					// then we store that into the variable now. mujava has default parameters!
 					compileExpression_Load(name);
-					compileConditionalInverted(0, Opcodes.IFNONNULL, () -> compileStat_Store(name, def), null, DONE);
+					compileConditionalInverted(0, Opcodes.IFNONNULL, () -> storeStat(name, def), null, null);
 				}
 			}
 			
 			return;
 		}
 
-		private void compileFieldInitializers(ClassNode classNode, MethodNode method) {
+		private void fieldInitializers(ClassNode classNode, MethodNode method) {
 			for (String field : fieldInitializers.keySet()) {
 				IConstructor def = fieldInitializers.get(field);
 				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("init");
 				compileExpression_Load("this");
-				compileExpression(exp);
+				expr(exp);
 				method.visitFieldInsn(Opcodes.PUTFIELD, classNode.name, field, Signature.type(AST.$getType(def)));
 			}
 		}
 
-		private void compileStaticFieldInitializers(ClassNode classNode, MethodNode method) {
+		private void staticFieldInitializers(ClassNode classNode, MethodNode method) {
 			for (String field : staticFieldInitializers.keySet()) {
 				IConstructor def = staticFieldInitializers.get(field);
 				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("init");
-				compileExpression(exp);
+				expr(exp);
 				method.visitFieldInsn(Opcodes.PUTSTATIC, classNode.name, field, Signature.type(AST.$getType(def)));
 			}
 		}
 
-		private void compileFormalVariables(IList formals, boolean initialize) {
+		private void formalVariables(IList formals, boolean initialize) {
 			for (IValue elem : formals) {
 				IConstructor var = (IConstructor) elem;
 				IConstructor varType = AST.$getType(var);
@@ -593,116 +593,104 @@ public class ClassCompiler {
 					);
 		}
 
-		/**
-		 * We use a continuation passing style here, such that when branching
-		 * code is generated we can generate the right code in the right place 
-		 * without superfluous additional labels and gotos.
-		 */
-		private Void compileStatements(IList statements, Label continueLabel, Label breakLabel, Builder<?> continuation) {
-			if (statements.length() == 0) {
-				continuation.build();
-			}
-			else {
-				compileStatement(
-						(IConstructor) statements.get(0), continueLabel,
-						breakLabel, () -> compileStatements(statements.delete(0), continueLabel, breakLabel, continuation)
-						);
+		private Void statements(IList statements, Label continueLabel, Label breakLabel, Label joinLabel) {
+			int i = 0, len = statements.length();
+			for (IValue elem : statements) {
+				// generate the label for where the next statement ends, unless this is the last statement, because
+				// then we rejoin the context and we have a label for that given in the parameter 'joinLabel'
+				Label nextLabel = (++i < len || joinLabel == null) ? new Label() : joinLabel;
+				statement((IConstructor) elem, continueLabel, breakLabel, nextLabel);
+				if (i < len) {
+					method.visitLabel(nextLabel);
+				}
 			}
 			return null;
 		}
 
-		private void compileStatement(IConstructor stat, Label continueLabel, Label breakLabel, Builder<?> continuation) {
+		private void statement(IConstructor stat, Label continueLabel, Label breakLabel, Label joinLabel) {
 			switch (stat.getConstructorType().getName()) {
 			case "decl":
-				compileStat_Decl(stat);
-				continuation.build();
+				declStat(stat, joinLabel);
 				break;
 			case "label":
-				compileLabel(AST.$getLabel(stat));
-				continuation.build();
+				labelStat(AST.$getLabel(stat));
 				break;
 			case "goto":
-				compileGoto(AST.$getLabel(stat));
-				continuation.build();
+				gotoStat(AST.$getLabel(stat));
 				break;
 			case "do" : 
-				compileStat_Do((IConstructor) stat.get("exp"));
-				continuation.build();
+				doStat((IConstructor) stat.get("exp"));
 				break;
 			case "store" : 
-				compileStat_Store(AST.$getName(stat), AST.$getValue(stat)); 
-				continuation.build();
+				storeStat(AST.$getName(stat), AST.$getValue(stat)); 
 				break;
 			case "astore" :
-				compileStat_AAStore(AST.$getArray(stat), AST.$getIndex(stat), AST.$getArg(stat));
-				continuation.build();
+				aastoreStat(AST.$getArray(stat), AST.$getIndex(stat), AST.$getArg(stat));
 				break;
 			case "putField":
-				compileStat_PutField(AST.$getClassFromType(AST.$getClass(stat), classNode.name), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
-				continuation.build();
+				putFieldStat(AST.$getClassFromType(AST.$getClass(stat), classNode.name), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
 				break;
 			case "putStatic":
-				compileStat_PutStatic(AST.$getClassFromType(AST.$getClass(stat), classNode.name), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
-				continuation.build();
+				putStaticStat(AST.$getClassFromType(AST.$getClass(stat), classNode.name), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
 				break;
 			case "return" : 
-				compileStat_Return(stat);
-				// dropping the continuation, there is nothing to do after return!
+				returnStat(stat);
+				// dropping the joinLabel, there is nothing to do after return!
 				break;
 			case "break":
-				compileStat_Break(stat, breakLabel);
-				// dropping the continuation, there is nothing to do after break!
+				breakStat(stat, breakLabel);
+				// dropping the joinLabel, there is nothing to do after break!
 				break;
 			case "continue":
-				compileStat_Continue(stat, continueLabel);
-				// dropping the continuation, there is nothing to do after break!
+				continueStat(stat, continueLabel);
+				// dropping the joinLabel, there is nothing to do after break!
 				break;
 			
 			case "if":
 				if (stat.getConstructorType().getArity() == 3) {
-					compileStat_IfThenElse(AST.$getCondition(stat), AST.$getThenBlock(stat), AST.$getElseBlock(stat), continueLabel, breakLabel, continuation);
+					ifThenElseStat(AST.$getCondition(stat), AST.$getThenBlock(stat), AST.$getElseBlock(stat), continueLabel, breakLabel, joinLabel);
 				}
 				else {
 					assert stat.getConstructorType().getArity() == 2;
-					compileStat_If(AST.$getCondition(stat), AST.$getThenBlock(stat), continueLabel, breakLabel, continuation);
+					ifStat(AST.$getCondition(stat), AST.$getThenBlock(stat), continueLabel, breakLabel, joinLabel);
 				}
 				break;
 			case "for":
 				String label = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
-				compileStat_For(label, AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continueLabel, breakLabel, continuation);
+				forStat(label, AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			}
 		}
 
-		private void compileStat_Break(IConstructor stat, Label join) {
+		private void breakStat(IConstructor stat, Label join) {
 			if (join == null) {
 				throw new IllegalArgumentException("no loop to break from (or inside an expression block");
 			}
 			
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
-				compileGoto("break:" + loopLabel);
+				gotoStat("break:" + loopLabel);
 			}
 			else {
 				method.visitJumpInsn(Opcodes.GOTO, join);
 			}
 		}
 		
-		private void compileStat_Continue(IConstructor stat, Label join) {
+		private void continueStat(IConstructor stat, Label join) {
 			if (join == null) {
 				throw new IllegalArgumentException("no loop to continue with (or inside an expression block");
 			}
 			
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
-				compileGoto("continue:" + loopLabel);
+				gotoStat("continue:" + loopLabel);
 			}
 			else {
 				method.visitJumpInsn(Opcodes.GOTO, join);
 			}
 		}
 
-		private void compileGoto(String label) {
+		private void gotoStat(String label) {
 			Label l = getOrGenerateLabel(label);
 			method.visitJumpInsn(Opcodes.GOTO, l);
 		}
@@ -718,11 +706,11 @@ public class ClassCompiler {
 			return l;
 		}
 
-		private void compileLabel(String label) {
+		private void labelStat(String label) {
 			method.visitLabel(getOrGenerateLabel(label));
 		}
 
-		private void compileStat_Decl(IConstructor stat) {
+		private void declStat(IConstructor stat, Label joinLabel) {
 			IConstructor def = null;
 			if (stat.asWithKeywordParameters().hasParameter("init")) {
 				def = (IConstructor) stat.asWithKeywordParameters().getParameter("init");
@@ -731,32 +719,29 @@ public class ClassCompiler {
 			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true);
 		}
 
-		private void compileStat_For(String label, IList init, IConstructor cond, IList next, IList body, Label continueLabel, Label breakLabel, Builder<?> continuation) {
-			compileStatements(init, continueLabel, breakLabel, DONE);
+		private void forStat(String label, IList init, IConstructor cond, IList next, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
+			statements(init, continueLabel, breakLabel, joinLabel);
 			Label start = new Label();
-			Label join = new Label();
 			Label cont = new Label();
 			
 			if (label != null) {
-				labels.put("break:" + label, join);
+				labels.put("break:" + label, joinLabel);
 				labels.put("continue:" + label, cont);
 			}
 
 			// TODO: this can be done better
 			method.visitLabel(start);
 			if (cond.getConstructorType().getName().equals("neg")) {
-				compileExpression(AST.$getArg(cond));
-				compileConditionalInverted(0, Opcodes.IFNE, () -> compileStatements(body, cont, join, DONE), () -> jumpTo(join), DONE);
+				expr(AST.$getArg(cond));
+				compileConditionalInverted(0, Opcodes.IFNE, () -> statements(body, cont, joinLabel, joinLabel), () -> jumpTo(joinLabel), joinLabel);
 			}
 			else {
-				compileExpression(cond);
-				compileConditionalInverted(0, Opcodes.IFEQ, () -> compileStatements(body, cont, join, DONE), () -> jumpTo(join), DONE);
+				expr(cond);
+				compileConditionalInverted(0, Opcodes.IFEQ, () -> statements(body, cont, joinLabel, joinLabel), () -> jumpTo(joinLabel), joinLabel);
 			}
 			method.visitLabel(cont);
-			compileStatements(next, cont /*watch out! */, join, DONE);
+			statements(next, cont /*watch out! */, joinLabel, joinLabel);
 			jumpTo(start);
-			method.visitLabel(join);
-			continuation.build();
 		}
 
 		private Void jumpTo(Label join) {
@@ -764,82 +749,68 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private void compileStat_If(IConstructor cond, IList thenBlock, Label continueLabel, Label breakLabel, Builder<?> continuation) {
-			compileStat_IfThenElse(cond, thenBlock, null, continueLabel, breakLabel, continuation);
+		private void ifStat(IConstructor cond, IList thenBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
+			ifThenElseStat(cond, thenBlock, null, continueLabel, breakLabel, joinLabel);
 		}
 
-		private void compileStat_IfThenElse(IConstructor cond, IList thenBlock, IList elseBlock, Label continueLabel, Label breakLabel, Builder<?> continuation) {
-			Builder<?> thenBuilder = () -> compileStatements(thenBlock, continueLabel, breakLabel, DONE);
-			Builder<?> elseBuilder = elseBlock != null ? () -> compileStatements(elseBlock, continueLabel, breakLabel, DONE) : DONE;
+		private void ifThenElseStat(IConstructor cond, IList thenBlock, IList elseBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
+			Builder<?> thenBuilder = () -> statements(thenBlock, continueLabel, breakLabel, joinLabel);
+			Builder<?> elseBuilder = elseBlock != null ? () -> statements(elseBlock, continueLabel, breakLabel, joinLabel) : DONE;
 
-			// here we special case for !=, ==, <=, >=, < and >, null, nonnull, because
+			// here we special case for !=, ==, <=, >=, < and >, because
 			// there are special jump instructions for these operators on the JVM and we don't want to push
 			// a boolean on the stack and then conditionally have to jump on that boolean again:
 			switch (cond.getConstructorType().getName()) {
 			case "true":
-				thenBuilder.build();
-				continuation.build();
+				statements(thenBlock, continueLabel, breakLabel, joinLabel);
 				break;
 			case "false":
-				elseBuilder.build();
-				continuation.build();
+				statements(elseBlock, continueLabel, breakLabel, joinLabel);
 				break;
 			case "eq":
-				compileEq(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				eqExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "ne":
-				compileNe(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				neExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "le":
-				compileLe(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				leExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "gt":
-				compileGt(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				gtExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "ge":
-				compileGe(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
+				geExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "lt":
-				compileLt(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, continuation);
-				return;
-			case "null":
-				if (cond.getConstructorType().getArity() != 1) {
-					throw new IllegalArgumentException("null check without a parameter");
-				}
-				compileNull(AST.$getArg(cond), thenBuilder, elseBuilder, continuation);
-				return;
-			case "nonnull":
-				if (cond.getConstructorType().getArity() != 1) {
-					throw new IllegalArgumentException("nonnull check without a parameter");
-				}
-				compileNull(AST.$getArg(cond), thenBuilder, elseBuilder, continuation);
+				ltExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "neg":
 				// if(!expr) is compiled to IFNE directly without intermediate (inefficient) negation code
-				compileExpression(AST.$getArg(cond));
-				compileConditionalInverted(0, Opcodes.IFNE, thenBuilder, elseBuilder, continuation);
+				expr(AST.$getArg(cond));
+				compileConditionalInverted(0, Opcodes.IFNE, thenBuilder, elseBuilder, joinLabel);
 				return;
 			default:
-				compileExpression(cond);
-				compileConditionalInverted(0, Opcodes.IFEQ, thenBuilder, elseBuilder, continuation);
+				expr(cond);
+				compileConditionalInverted(0, Opcodes.IFEQ, thenBuilder, elseBuilder, joinLabel);
 				return;
 			}
 		}
 
-		private void compileStat_PutStatic(String cls, IConstructor type, String name, IConstructor arg) {
-			compileExpression(arg);
+		private void putStaticStat(String cls, IConstructor type, String name, IConstructor arg) {
+			expr(arg);
 			method.visitFieldInsn(Opcodes.PUTSTATIC, cls, name, Signature.type(type));
 		}
 
-		private void compileStat_PutField(String cls, IConstructor receiver, IConstructor type, String name, IConstructor arg) {
-			compileExpression(receiver);
-			compileExpression(arg);
+		private void putFieldStat(String cls, IConstructor receiver, IConstructor type, String name, IConstructor arg) {
+			expr(receiver);
+			expr(arg);
 			method.visitFieldInsn(Opcodes.PUTFIELD, cls, name, Signature.type(type));
 		}
 
-		private Void compileStat_Store(String name, IConstructor expression) {
+		private Void storeStat(String name, IConstructor expression) {
 			int pos = positionOf(name);
-			compileExpression(expression);
+			expr(expression);
 
 			Switch.type0(variableTypes.get(pos),
 					(z) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
@@ -859,12 +830,12 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private void compileStat_Return(IConstructor stat) {
+		private void returnStat(IConstructor stat) {
 			if (stat.getConstructorType().getArity() == 0) {
 				method.visitInsn(Opcodes.RETURN);
 			}
 			else {
-				IConstructor type = compileExpression(AST.$getArg(stat));
+				IConstructor type = expr(AST.$getArg(stat));
 
 				Switch.type0(type,
 						(z) -> { method.visitInsn(Opcodes.IRETURN); },
@@ -883,8 +854,8 @@ public class ClassCompiler {
 			}
 		}
 
-		private Void compileStat_Do(IConstructor exp) {
-			IConstructor type = compileExpression(exp); 
+		private Void doStat(IConstructor exp) {
+			IConstructor type = expr(exp); 
 			Switch.type0(type, 
 					(z) -> pop(), 
 					(i) -> pop(), 
@@ -910,7 +881,7 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.POP2);
 		}
 
-		private IConstructor compileExpression(IConstructor exp) {
+		private IConstructor expr(IConstructor exp) {
 			switch (exp.getConstructorType().getName()) {
 			case "const" : 
 				return compileExpression_Const(AST.$getType(exp), AST.$getConstant(exp)); 
@@ -954,62 +925,62 @@ public class ClassCompiler {
 					return compileNull();  // null constant
 				}
 				else { 
-					return compileNull(AST.$getArg(exp), pushTrue, pushFalse, DONE); // null check 
+					return compileNull(AST.$getArg(exp), pushTrue, pushFalse, null); // null check 
 				}
 			case "nonnull":
-				return compileNonNull(AST.$getArg(exp), pushTrue, pushFalse, DONE); // null check 
+				return nonnullExp(AST.$getArg(exp), pushTrue, pushFalse, null); // null check 
 			case "true":
-				return compileTrue();
+				return trueExp();
 			case "false":
-				return compileFalse();
+				return falseExp();
 			case "coerce":
-				return compileCoerce(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
+				return coerceExp(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
 			case "eq":
-				return compileEq(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
+				return eqExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 			case "ne":
-				return compileNe(AST.$getLhs(exp), AST.$getRhs(exp), (Builder<?>) pushTrue, (Builder<?>) pushFalse, DONE);
+				return neExp(AST.$getLhs(exp), AST.$getRhs(exp), (Builder<?>) pushTrue, (Builder<?>) pushFalse, null);
 			case "le":
-				return compileLe(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
+				return leExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 			case "gt":
-				return compileGt(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
+				return gtExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 			case "ge":
-				return compileGe(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
+				return geExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 			case "lt":
-				return compileLt(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, DONE);
+				return ltExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 			case "add":
-				return compileAdd(AST.$getLhs(exp), AST.$getRhs(exp));
+				return addExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "div":
-				return compileDiv(AST.$getLhs(exp), AST.$getRhs(exp));
+				return divExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "rem":
-				return compileRem(AST.$getLhs(exp), AST.$getRhs(exp));
+				return remExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "sub":
-				return compileSub(AST.$getLhs(exp), AST.$getRhs(exp));
+				return subExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "mul":
-				return compileMul(AST.$getLhs(exp), AST.$getRhs(exp));
+				return mulExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "and":
-				return compileAnd(AST.$getLhs(exp), AST.$getRhs(exp));
+				return andExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "or":
-				return compileOr(AST.$getLhs(exp), AST.$getRhs(exp));
+				return orExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "xor":
-				return compileXor(AST.$getLhs(exp), AST.$getRhs(exp));
+				return xorExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "neg":
-				return compileNeg(AST.$getArg(exp));
+				return negExp(AST.$getArg(exp));
 			case "inc":
-				return compileInc(AST.$getName(exp), AST.$getInc(exp));
+				return incExp(AST.$getName(exp), AST.$getInc(exp));
 			case "shr":
-				return compileShr(AST.$getLhs(exp), AST.$getRhs(exp));
+				return shrExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "shl":
-				return compileShl(AST.$getLhs(exp), AST.$getRhs(exp));
+				return shlExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "ushr":
-				return compileUShr(AST.$getLhs(exp), AST.$getRhs(exp));
+				return ushrExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "checkcast":
-				return compileCheckCast(AST.$getArg(exp), AST.$getType(exp));
+				return checkCastExp(AST.$getArg(exp), AST.$getType(exp));
 			default: 
 				throw new IllegalArgumentException("unknown expression: " + exp);                                     
 			}
 		}
 
-		private IConstructor compileShl(IConstructor lhs, IConstructor rhs) {
+		private IConstructor shlExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareShiftArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.ISHL),
@@ -1029,14 +1000,14 @@ public class ClassCompiler {
 		}
 
 		private IConstructor prepareShiftArguments(IConstructor lhs, IConstructor rhs) {
-			IConstructor type = compileExpression(lhs);
-			if (compileExpression(rhs).getConstructorType() != Types.integerType().getConstructorType()) {
+			IConstructor type = expr(lhs);
+			if (expr(rhs).getConstructorType() != Types.integerType().getConstructorType()) {
 				throw new IllegalArgumentException("shift should get an integer as second parameter");
 			}
 			return type;
 		}
 
-		private IConstructor compileUShr(IConstructor lhs, IConstructor rhs) {
+		private IConstructor ushrExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareShiftArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IUSHR),
@@ -1055,7 +1026,7 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor compileShr(IConstructor lhs, IConstructor rhs) {
+		private IConstructor shrExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareShiftArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.ISHR),
@@ -1074,12 +1045,12 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor compileInc(String name, int inc) {
+		private IConstructor incExp(String name, int inc) {
 			method.visitIincInsn(positionOf(name), inc);
 			return Types.integerType();
 		}
 
-		private IConstructor compileAdd(IConstructor lhs, IConstructor rhs) {
+		private IConstructor addExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IOR),
@@ -1098,7 +1069,7 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor compileSub(IConstructor lhs, IConstructor rhs) {
+		private IConstructor subExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> { throw new IllegalArgumentException("sub on bool"); },
@@ -1117,7 +1088,7 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor compileRem(IConstructor lhs, IConstructor rhs) {
+		private IConstructor remExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> { throw new IllegalArgumentException("rem on bool"); },
@@ -1136,7 +1107,7 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor compileDiv(IConstructor lhs, IConstructor rhs) {
+		private IConstructor divExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> { throw new IllegalArgumentException("div on bool"); },
@@ -1155,7 +1126,7 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor compileMul(IConstructor lhs, IConstructor rhs) {
+		private IConstructor mulExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IAND),
@@ -1174,7 +1145,7 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor compileAnd(IConstructor lhs, IConstructor rhs) {
+		private IConstructor andExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IAND),
@@ -1193,7 +1164,7 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor compileOr(IConstructor lhs, IConstructor rhs) {
+		private IConstructor orExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IOR),
@@ -1212,7 +1183,7 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor compileXor(IConstructor lhs, IConstructor rhs) {
+		private IConstructor xorExp(IConstructor lhs, IConstructor rhs) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IXOR),
@@ -1231,18 +1202,18 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor compileNeg(IConstructor arg) {
-			IConstructor type = compileExpression(arg);
+		private IConstructor negExp(IConstructor arg) {
+			IConstructor type = expr(arg);
 			Switch.type0(type, 
 					(z) -> { 
 						// TODO: is there really not a better way to negate a boolean on the JVM?
 						Label zeroLabel = new Label();
 						Label contLabel = new Label();
 						method.visitJumpInsn(Opcodes.IFEQ, zeroLabel);
-						compileFalse();
+						falseExp();
 						jumpTo(contLabel);
 						method.visitLabel(zeroLabel);
-						compileTrue();
+						trueExp();
 						method.visitLabel(contLabel);
 					},
 					(i) -> method.visitInsn(Opcodes.INEG), 
@@ -1268,11 +1239,11 @@ public class ClassCompiler {
 			return Types.voidType();
 		}
 
-		private void compileStat_AAStore(IConstructor array, IConstructor index,
+		private void aastoreStat(IConstructor array, IConstructor index,
 				IConstructor arg) {
-			IConstructor type = compileExpression(array);
-			compileExpression(index);
-			compileExpression(arg);
+			IConstructor type = expr(array);
+			expr(index);
+			expr(arg);
 			compileArrayStoreWithArrayIndexValueOnStack(AST.$getArg(type));
 		}
 
@@ -1293,7 +1264,7 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor compileCheckCast(IConstructor arg, IConstructor type) {
+		private IConstructor checkCastExp(IConstructor arg, IConstructor type) {
 			String cons = type.getConstructorType().getName();
 
 			// weird inconsistency in CHECKCAST instruction?
@@ -1311,13 +1282,13 @@ public class ClassCompiler {
 		}
 
 		private IConstructor compileExpression_ALength(IConstructor arg) {
-			compileExpression(arg);
+			expr(arg);
 			method.visitInsn(Opcodes.ARRAYLENGTH);
 			return Types.integerType();
 		}
 
 		private IConstructor compileExpression_NewArraySize(IConstructor type, IConstructor size) {
-			compileExpression(size);
+			expr(size);
 
 			if (!type.getConstructorType().getName().equals("array")) {
 				throw new IllegalArgumentException("arg should be an array type");
@@ -1338,7 +1309,7 @@ public class ClassCompiler {
 			for (IValue elem : elems) {
 				dup();
 				intConstant(i++);
-				compileExpression((IConstructor) elem);
+				expr((IConstructor) elem);
 				compileArrayStoreWithArrayIndexValueOnStack(type);
 			}
 
@@ -1362,18 +1333,18 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor compileLt(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+		private IConstructor ltExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
-					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation),
-					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation), 
-					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation), 
-					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation), 
-					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, continuation), 
-					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGE, thenPart, elsePart, continuation),
-					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGE, thenPart, elsePart, continuation),
-					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGE, thenPart, elsePart, continuation),
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGE, thenPart, elsePart, joinLabel),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGE, thenPart, elsePart, joinLabel),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGE, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); },
@@ -1382,17 +1353,17 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor compileLe(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+		private IConstructor leExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
-					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, continuation),
-					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, continuation), 
-					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, continuation), 
-					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, continuation), 
-					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, continuation), 
-					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGT, thenPart, elsePart, continuation),
-					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGT, thenPart, elsePart, continuation),
-					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGT, thenPart, elsePart, continuation),
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFGT, thenPart, elsePart, joinLabel),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFGT, thenPart, elsePart, joinLabel),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFGT, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException("<= on void"); }, 
 					(c) -> { throw new IllegalArgumentException("<= on class"); }, 
 					(a) -> { throw new IllegalArgumentException("<= on array"); },
@@ -1401,18 +1372,18 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor compileGt(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+		private IConstructor gtExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
-					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation),
-					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation), 
-					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation), 
-					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation), 
-					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, continuation), 
-					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLE, thenPart, elsePart, continuation),
-					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLE, thenPart, elsePart, continuation),
-					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLE, thenPart, elsePart, continuation),
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLE, thenPart, elsePart, joinLabel),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLE, thenPart, elsePart, joinLabel),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLE, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException("> on void"); }, 
 					(c) -> { throw new IllegalArgumentException("> on class"); }, 
 					(a) -> { throw new IllegalArgumentException("> on array"); },
@@ -1421,18 +1392,18 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor compileGe(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+		private IConstructor geExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
-					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation),
-					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation), 
-					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation), 
-					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation), 
-					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, continuation), 
-					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLT, thenPart, elsePart, continuation),
-					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLT, thenPart, elsePart, continuation),
-					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLT, thenPart, elsePart, continuation),
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFLT, thenPart, elsePart, joinLabel),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFLT, thenPart, elsePart, joinLabel),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFLT, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException(">= on void"); }, 
 					(c) -> { throw new IllegalArgumentException(">= on class"); }, 
 					(a) -> { throw new IllegalArgumentException(">= on array"); },
@@ -1441,36 +1412,36 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor compileEq(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+		private IConstructor eqExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			if (lhs.getConstructorType().getName().equals("null")) {
-				return compileNull(rhs, thenPart, elsePart, continuation);
+				return compileNull(rhs, thenPart, elsePart, joinLabel);
 			}
 			else if (rhs.getConstructorType().getName().equals("null")) {
-				return compileNull(lhs, thenPart, elsePart, continuation);
+				return compileNull(lhs, thenPart, elsePart, joinLabel);
 			}
 
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
-					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation),
-					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation), 
-					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation), 
-					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation), 
-					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, continuation), 
-					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFNE, thenPart, elsePart, continuation),
-					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFNE, thenPart, elsePart, continuation),
-					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFNE, thenPart, elsePart, continuation),
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFNE, thenPart, elsePart, joinLabel),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFNE, thenPart, elsePart, joinLabel),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFNE, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException(">= on void"); }, 
-					(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, thenPart, elsePart, continuation), 
-					(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, thenPart, elsePart, continuation),
-					(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, thenPart, elsePart, continuation)
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel), 
+					(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel),
+					(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel)
 					);
 			return Types.booleanType();
 		}
 
 		private IConstructor prepareArguments(IConstructor lhs, IConstructor rhs) {
-			IConstructor type = compileExpression(lhs);
-			if (type.getConstructorType() != compileExpression(rhs).getConstructorType()) {
+			IConstructor type = expr(lhs);
+			if (type.getConstructorType() != expr(rhs).getConstructorType()) {
 				throw new IllegalArgumentException("incomparable types for operator");
 			}
 			return type;
@@ -1490,68 +1461,71 @@ public class ClassCompiler {
 		 * @param opcode       the conditional jump instruction; NB! inverted condition (if you are generating code for EQ then choose NE here!).
 		 * @param thenPart     emit code for the thenPart
 		 * @param elsePart     emit code for the elsePart
-		 * @param continuation emit code for what runs after this conditional
+		 * @param joinLabel emit code for what runs after this conditional
 		 */
-		private void compileConditionalInverted(int compare, int opcode, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
-			// TODO: is this the most efficient encoding? probably not. 
+		private void compileConditionalInverted(int compare, int opcode, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			Label jump = new Label();
-			Label join = new Label();
-
+			Label next = joinLabel == null ? new Label() : joinLabel;
+			
 			if (compare != 0) {
 				method.visitInsn(compare);
 			}
-			method.visitJumpInsn(opcode, jump);
+			
+			method.visitJumpInsn(opcode, elsePart != null ? jump : next);
 			thenPart.build();
-			jumpTo(join);
-			method.visitLabel(jump);
-//			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-			elsePart.build();
-			method.visitLabel(join);
-//			method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-			continuation.build();
+			
+			if (elsePart != null) {
+				jumpTo(next);
+				method.visitLabel(jump);
+				elsePart.build();
+			}
+			
+			if (joinLabel == null) {
+				method.visitLabel(next);
+			}
 		}
 
-		private IConstructor compileNull(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
-			compileExpression(arg);
-			compileConditionalInverted(0, Opcodes.IFNONNULL, thenPart, elsePart, continuation);
+		private IConstructor compileNull(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+			expr(arg);
+			compileConditionalInverted(0, Opcodes.IFNONNULL, thenPart, elsePart, joinLabel);
 			return Types.booleanType();
 		}
 
-		private IConstructor compileNonNull(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
-			compileExpression(arg);
-			compileConditionalInverted(0, Opcodes.IFNULL, thenPart, elsePart, continuation);
+		private IConstructor nonnullExp(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart,Label joinLabel) {
+			expr(arg);
+			compileConditionalInverted(0, Opcodes.IFNULL, thenPart, elsePart, joinLabel);
 			return Types.booleanType();
 		}
 
-		private IConstructor compileNe(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Builder<?> continuation) {
+		private IConstructor neExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			if (lhs.getConstructorType().getName().equals("null")) {
-				return compileNonNull(rhs, thenPart, elsePart, continuation);
+				return nonnullExp(rhs, thenPart, elsePart, joinLabel);
 			}
 			else if (rhs.getConstructorType().getName().equals("null")) {
-				return compileNonNull(lhs, thenPart, elsePart, continuation);
+				return nonnullExp(lhs, thenPart, elsePart, joinLabel);
 			}
 
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
-					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation),
-					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation), 
-					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation), 
-					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation), 
-					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, continuation), 
-					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFEQ, thenPart, elsePart, continuation),
-					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFEQ, thenPart, elsePart, continuation),
-					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFEQ, thenPart, elsePart, continuation),
+					(z) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel),
+					(i) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
+					(s) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
+					(b) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
+					(f) -> compileConditionalInverted(Opcodes.FCMPG, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
+					(d) -> compileConditionalInverted(Opcodes.DCMPG, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
+					(l) -> compileConditionalInverted(Opcodes.LCMP, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException("!= on void"); }, 
-					(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, continuation), 
-					(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, continuation),
-					(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, continuation)
+					(c) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel), 
+					(a) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel),
+					(S) -> compileConditionalInverted(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel)
 					);
 
 			return Types.booleanType();
 		}
 
-		private IConstructor compileCoerce(IConstructor from, IConstructor to, IConstructor arg) {
+		private IConstructor coerceExp(IConstructor from, IConstructor to, IConstructor arg) {
 			Switch.type0(from,
 					(z) -> coerceFromBool(to, arg),
 					(i) -> coerceFromInt(to, arg),
@@ -1572,32 +1546,32 @@ public class ClassCompiler {
 		private void coerceFromString(IConstructor from, IConstructor to, IConstructor arg) {
 			Switch.type0(to, 
 					(z) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "parseBoolean", Signature.stringType, false);
 					}, 
 					(i) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Integer", "parseInt", "I", false);
 					}, 
 					(s) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Short", "parseShort", "S", false);
 					},
 					(b) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Byte", "parseByte", "B", false);
 					}, 
 					(c) -> failedCoercion("string", to), 
 					(f) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Float", "parseFloat", "F", false);
 					}, 
 					(d) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Double", "parseDouble", "D", false);
 					}, 
 					(j) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "parseLong", "J", false);
 					}, 
 					(v) -> failedCoercion("string", to), 
@@ -1650,7 +1624,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -1662,7 +1636,7 @@ public class ClassCompiler {
 			Switch.type0(to,
 					(z) -> {
 						if (cls.equals("java/lang/Boolean")) {
-							compileExpression(from);
+							expr(from);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "booleanValue", "()Z", false);
 						}
 						else {
@@ -1671,7 +1645,7 @@ public class ClassCompiler {
 					},
 					(i) -> {
 						if (cls.equals("java/lang/Integer")) {
-							compileExpression(from);
+							expr(from);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "intValue", "()I", false);
 						}
 						else {
@@ -1680,7 +1654,7 @@ public class ClassCompiler {
 					},
 					(s) -> {
 						if (cls.equals("java/lang/Integer")) {
-							compileExpression(from);
+							expr(from);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "shortValue", "()S", false);
 						}
 						else {
@@ -1689,7 +1663,7 @@ public class ClassCompiler {
 					},
 					(b) -> {
 						if (cls.equals("java/lang/Integer")) {
-							compileExpression(from);
+							expr(from);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "byteValue", "()B", false);
 						}
 						else {
@@ -1699,7 +1673,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion(cls, arg),
 					(f) -> {
 						if (cls.equals("java/lang/Float")) {
-							compileExpression(from);
+							expr(from);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Float", "floatValue", "()F", false);
 						}
 						else {
@@ -1708,7 +1682,7 @@ public class ClassCompiler {
 					},
 					(d) -> {
 						if (cls.equals("java/lang/Double")) {
-							compileExpression(from);
+							expr(from);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Double", "doubleValue", "()D", false);
 						}
 						else {
@@ -1717,7 +1691,7 @@ public class ClassCompiler {
 					},
 					(l) -> {
 						if (cls.equals("java/lang/Long")) {
-							compileExpression(from);
+							expr(from);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Long", "longValue", "()L", false);
 						}
 						else {
@@ -1735,7 +1709,7 @@ public class ClassCompiler {
 					},
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -1755,7 +1729,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -1775,7 +1749,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -1795,7 +1769,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -1815,7 +1789,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -1835,7 +1809,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -1855,18 +1829,18 @@ public class ClassCompiler {
 					(c) -> failedCoercion("reference", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						compileExpression(arg);
+						expr(arg);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
 		}
 
-		private IConstructor compileFalse() {
+		private IConstructor falseExp() {
 			method.visitInsn(Opcodes.ICONST_0);
 			return Types.booleanType();
 		}
 
-		private IConstructor compileTrue() {
+		private IConstructor trueExp() {
 			method.visitInsn(Opcodes.ICONST_1);
 			return Types.booleanType();
 		}
@@ -1877,19 +1851,21 @@ public class ClassCompiler {
 		}
 
 		private IConstructor compileBlock(IList block, IConstructor arg) {
-			compileStatements(block, null, null, DONE);
-			IConstructor type = compileExpression(arg);
+			Label blockEnd = new Label();
+			statements(block, null, null, blockEnd);
+			method.visitLabel(blockEnd);
+			IConstructor type = expr(arg);
 			return type;
 		}
 
 		private IConstructor compileInstanceof(IConstructor arg, String cls) {
-			compileExpression(arg);
+			expr(arg);
 			method.visitTypeInsn(Opcodes.INSTANCEOF, cls);
 			return Types.booleanType();
 		}
 
 		private IConstructor compileGetField(IConstructor receiver, String cls, IConstructor type, String name) {
-			compileExpression(receiver);
+			expr(receiver);
 			method.visitFieldInsn(Opcodes.GETFIELD, cls, name, Signature.type(type));
 			return type;
 		}
@@ -1906,8 +1882,8 @@ public class ClassCompiler {
 		}
 
 		private IConstructor compileExpression_AALoad(IConstructor array, IConstructor index) {
-			IConstructor type = compileExpression(array);
-			compileExpression(index);
+			IConstructor type = expr(array);
+			expr(index);
 			Switch.type0(AST.$getArg(type), 
 					(b) -> method.visitInsn(Opcodes.BALOAD), 
 					(i) -> method.visitInsn(Opcodes.IALOAD), 
@@ -1931,7 +1907,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor compileInvokeSpecial(String cls, IConstructor sig, IConstructor receiver, IList args) {
-			compileExpression(receiver);
+			expr(receiver);
 			compileExpressionList(args);
 
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, AST.$getName(sig), Signature.method(sig), false);
@@ -1939,7 +1915,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor compileInvokeVirtual(String cls, IConstructor sig, IConstructor receiver, IList args) {
-			compileExpression(receiver);
+			expr(receiver);
 			compileExpressionList(args);
 
 			method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, cls, AST.$getName(sig), Signature.method(sig), false);
@@ -1947,7 +1923,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor compileInvokeInterface(String interf, IConstructor sig, IConstructor receiver, IList args) {
-			compileExpression(receiver);
+			expr(receiver);
 			compileExpressionList(args);
 
 			method.visitMethodInsn(Opcodes.INVOKEINTERFACE, interf, AST.$getName(sig), Signature.method(sig), true);
@@ -1959,7 +1935,7 @@ public class ClassCompiler {
 				return null;
 			}
 			else {
-				compileExpression((IConstructor) args.get(0));
+				expr((IConstructor) args.get(0));
 				compileExpressionList(args.delete(0));
 			}
 			return null;
@@ -2109,10 +2085,10 @@ public class ClassCompiler {
 
 		private void booleanConstant(boolean val) {
 			if (val) {
-				compileTrue();
+				trueExp();
 			}
 			else {
-				compileFalse();
+				falseExp();
 			}
 		}
 

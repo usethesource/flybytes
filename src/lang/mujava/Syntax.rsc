@@ -128,12 +128,11 @@ data Stat(loc src = |unknown:///|)
   | \break(str label = "")
   | \continue(str label = "")
   | \while(Exp condition, list[Stat] block)
- // TODO: these are still to be implemented:
-  //| \doWhile(list[Stat] block, Exp condition)
-  
+  | \doWhile(list[Stat] block, Exp condition)
+  | \throw(Exp exception)  
   //| \try(list[Stat] tryBlock, list[Catch] \catchBlock, list[Stat] \finallyBlock)
   //| \switch(Exp \value, list[Case] caseBlocks, list[Stat] defaultBlock)
-  //| \throw(Exp exception)
+
   //| monitor(Exp lock, list[Stat] block)
  
   ;

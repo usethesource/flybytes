@@ -663,6 +663,10 @@ public class ClassCompiler {
 				String whileLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
 				whileStat(whileLabel, AST.$getCondition(stat), AST.$getStatements(stat), continueLabel, breakLabel, joinLabel);
 				break;
+			case "while":
+				String whileLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
+				doWhileStat(whileLabel, AST.$getCondition(stat), AST.$getStatements(stat), continueLabel, breakLabel, joinLabel);
+				break;
 			}
 		}
 
@@ -690,6 +694,33 @@ public class ClassCompiler {
 					null);
 			
 			jumpTo(testConditional); // this might be superfluous
+		}
+		
+		private void doWhileStat(String label, IConstructor cond, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
+			Label nextIteration = new Label();
+			
+			if (label != null) {
+				labels.put("break:" + label, joinLabel);
+				labels.put("continue:" + label, nextIteration);
+			}
+
+			method.visitLabel(nextIteration);
+			
+			statements(body, nextIteration, joinLabel, nextIteration);
+			
+			// deal efficiently with negated conditionals
+			int cmpCode = Opcodes.IFEQ;
+			if (cond.getConstructorType().getName().equals("neg")) {
+				cond = expr(AST.$getArg(cond));
+				cmpCode = Opcodes.IFNE;
+			}
+
+			// while(cond)
+			expr(cond);
+			compileConditionalInverted(0, cmpCode, 
+					() -> jumpTo(nextIteration), 
+					null /* end of loop */, 
+					null);
 		}
 
 		private void breakStat(IConstructor stat, Label join) {

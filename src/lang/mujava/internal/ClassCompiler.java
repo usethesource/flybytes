@@ -720,28 +720,34 @@ public class ClassCompiler {
 		}
 
 		private void forStat(String label, IList init, IConstructor cond, IList next, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
-			statements(init, continueLabel, breakLabel, joinLabel);
-			Label start = new Label();
-			Label cont = new Label();
+			Label testConditional = new Label();
+			Label nextIterationLabel = new Label();
 			
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
-				labels.put("continue:" + label, cont);
+				labels.put("continue:" + label, nextIterationLabel);
 			}
 
-			// TODO: this can be done better
-			method.visitLabel(start);
+			statements(init, continueLabel /*outerloop*/, breakLabel /*outerloop*/, testConditional /*start of inner loop*/);
+			
+			method.visitLabel(testConditional);
+			
+			// deal efficiently with negated conditionals
+			int cmpCode = Opcodes.IFEQ;
 			if (cond.getConstructorType().getName().equals("neg")) {
-				expr(AST.$getArg(cond));
-				compileConditionalInverted(0, Opcodes.IFNE, () -> statements(body, cont, joinLabel, joinLabel), () -> jumpTo(joinLabel), joinLabel);
+				cond = expr(AST.$getArg(cond));
+				cmpCode = Opcodes.IFNE;
 			}
-			else {
-				expr(cond);
-				compileConditionalInverted(0, Opcodes.IFEQ, () -> statements(body, cont, joinLabel, joinLabel), () -> jumpTo(joinLabel), joinLabel);
-			}
-			method.visitLabel(cont);
-			statements(next, cont /*watch out! */, joinLabel, joinLabel);
-			jumpTo(start);
+
+			expr(cond);
+			compileConditionalInverted(0, cmpCode, 
+					() -> statements(body, nextIterationLabel, joinLabel, nextIterationLabel), 
+					() -> jumpTo(joinLabel) /* end of loop */, 
+					null);
+			
+			method.visitLabel(nextIterationLabel);
+			statements(next, nextIterationLabel /*watch out! */, joinLabel, testConditional /* join at the start again */);
+			jumpTo(testConditional); // this might be superfluous
 		}
 
 		private Void jumpTo(Label join) {

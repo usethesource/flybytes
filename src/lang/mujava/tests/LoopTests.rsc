@@ -227,5 +227,4 @@ Class forLoopBreakNestedClass() {
     );
 } 
 
-@ignore
 test bool testBreakNested() = testForClass(forLoopBreakNestedClass());

@@ -9,7 +9,7 @@ import IO;
 
 // do we need to downcast to call methods or not?
 
-private Expression VF = load("VF");
+private Exp VF = load("VF");
 
 Class noUpCastTestClass() =
   class(reference("NoUpcastTestClass"), 

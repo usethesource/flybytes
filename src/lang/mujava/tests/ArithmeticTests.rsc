@@ -9,8 +9,8 @@ import String;
 import IO;
 import util::Math;
 
-alias BinOp = Expression (Expression, Expression);
-alias UnOp = Expression (Expression);
+alias BinOp = Exp (Exp, Exp);
+alias UnOp = Exp (Exp);
 
 Class binOpClass(Type t, BinOp op) {
   expr = op(load("i"), load("j"));

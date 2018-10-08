@@ -9,7 +9,7 @@ import String;
 import IO;
 import util::Math;
 
-alias CompOp = Expression (Expression, Expression);
+alias CompOp = Exp (Exp, Exp);
 
 Class cmpOpClass(Type t, CompOp op) {
   expr = op(load("i"), load("j"));

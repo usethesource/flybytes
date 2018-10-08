@@ -71,15 +71,15 @@ data Class
    ;
 
 data Field
-  = field(Type \type, str name, Expression init = defValue(\type), set[Modifier] modifiers = {\private()});
+  = field(Type \type, str name, Exp init = defValue(\type), set[Modifier] modifiers = {\private()});
          
 data Method
-  = method(Signature desc, list[Formal] formals, list[Statement] block, set[Modifier] modifiers = {\public()})
+  = method(Signature desc, list[Formal] formals, list[Stat] block, set[Modifier] modifiers = {\public()})
   | method(Signature desc, set[Modifier] modifiers={\abstract(), \public()})
-  | static(list[Statement] block)
+  | static(list[Stat] block)
   ;
 
-Method method(Modifier access, Type ret, str name, list[Formal] formals, list[Statement] block)
+Method method(Modifier access, Type ret, str name, list[Formal] formals, list[Stat] block)
   = method(methodDesc(ret, name, [ var.\type | var <- formals]), formals, block, modifiers={access});
 
 data Signature 
@@ -105,208 +105,199 @@ data Type
 data Annotation; // TODO
 
 @doc{optional init expressions will be used at run-time if `null` is passed as actual parameter}
-data Formal = var(Type \type, str name, Expression init = defValue(\type)); 
+data Formal = var(Type \type, str name, Exp init = defValue(\type)); 
 
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
-data Statement(loc src = |unknown:///|)
-  = \store(str name, Expression \value)
-  | \decl(Type \type, str name, Expression init = defValue(\type))
-  | \astore(Expression array, Expression index, Expression arg)
-  | \do(Expression exp) // pops the result of the expression when needed
+data Stat(loc src = |unknown:///|)
+  = \store(str name, Exp \value)
+  | \decl(Type \type, str name, Exp init = defValue(\type))
+  | \astore(Exp array, Exp index, Exp arg)
+  | \do(Exp exp) 
   | \return()
-  | \return(Expression arg)
-  | \putField(Type class, Expression receiver, Type \type, str name, Expression arg)
-  | \putStatic(Type class, str name, Type \type, Expression arg)
-  | \if(Expression condition, list[Statement] thenBlock)
-  | \if(Expression condition, list[Statement] thenBlock, list[Statement] elseBlock)
-  | \for(list[Statement] init, 
-         Expression condition, 
-         list[Statement] next, 
-         list[Statement] statements, str label = "")
-  | 
-    // "goto" caveat: do not jump over otherwise dead code, the muJAVA compiler will choke on 
-    // it because ASM chokes on it while doing dataflow analysis to compute stack map frames.
-    \goto(str label) 
+  | \return(Exp arg)
+  | \putField(Type class, Exp receiver, Type \type, str name, Exp arg)
+  | \putStatic(Type class, str name, Type \type, Exp arg)
+  | \if(Exp condition, list[Stat] thenBlock)
+  | \if(Exp condition, list[Stat] thenBlock, list[Stat] elseBlock)
+  | \for(list[Stat] init, 
+         Exp condition, 
+         list[Stat] next, 
+         list[Stat] statements, str label = "")
+  | \goto(str label) 
   | label(str label)
   | \break(str label = "")
   | \continue(str label = "")
-  //| \while(Expression condition, list[Statement] block)
+  //| \while(Exp condition, list[Stat] block)
  // TODO: these are still to be implemented:
-  //| \while(Expression condition, list[Statement] block)
-  //| \doWhile(list[Statement] block, Expression condition)
+  //| \doWhile(list[Stat] block, Exp condition)
   
-  //| \try(list[Statement] tryBlock, list[Catch] \catchBlock, list[Statement] \finallyBlock)
-  //| \switch(Expression \value, list[Case] caseBlocks, list[Statement] defaultBlock)
-  //| \throw(Expression exception)
-  //| monitor(Expression lock, list[Statement] block)
+  //| \try(list[Stat] tryBlock, list[Catch] \catchBlock, list[Stat] \finallyBlock)
+  //| \switch(Exp \value, list[Case] caseBlocks, list[Stat] defaultBlock)
+  //| \throw(Exp exception)
+  //| monitor(Exp lock, list[Stat] block)
  
   ;
 
 // TODO:
-//data Statement(loc src = |unknown:///|)  
-//  = assertEquals(Expression lhs, Expression rhs)
-//  | assertNotEquals(Expression lhs, Expression rhs)
-//  | assertTrue(Expression e)
-//  | assertFalse(Expression e)
+//data Stat(loc src = |unknown:///|)  
+//  = assertEquals(Exp lhs, Exp rhs)
+//  | assertNotEquals(Exp lhs, Exp rhs)
+//  | assertTrue(Exp e)
+//  | assertFalse(Exp e)
 //  ;
   
-data Case = \case(int label, list[Statement] block);
+data Case = \case(int label, list[Stat] block);
   
-data Catch = \catch(Type \type, str var, list[Statement] block);
+data Catch = \catch(Type \type, str var, list[Stat] block);
 
-data Expression(loc src = |unknown:///|, bool wide = \false())
+data Exp(loc src = |unknown:///|)
   = null()
   | \true()
   | \false()
   | load(str name)
-  | aload(Expression array, Expression index)
+  | aload(Exp array, Exp index)
   | \const(Type \type, value constant)
-  | block(list[Statement] statements, Expression arg)
+  | block(list[Stat] statements, Exp arg)
   
   | /* For invoking static methods of classes or interfaces */
-    invokeStatic(Type class, Signature desc, list[Expression] args)
+    invokeStatic(Type class, Signature desc, list[Exp] args)
   
   | /* If no dynamic dispatch is needed, or searching superclasses is required, and you know which class 
      * implements the method, use this to invoke a method for efficiency's sake. 
      * The invocation is checked at class load time. 
      */
-    invokeSpecial(Type class, Expression receiver, Signature desc, list[Expression] args)
+    invokeSpecial(Type class, Exp receiver, Signature desc, list[Exp] args)
   
   | /* If you do need dynamic dispatch, or the method is implemented in a superclass, and this is
      * not a default method of an interface, use this invocation method. You need to be sure the method
      * exists _somewhere_ reachable from the \class reference type.
      * The invocation checked at class load time. 
      */
-    invokeVirtual(Type class, Expression receiver, Signature desc, list[Expression] args)
+    invokeVirtual(Type class, Exp receiver, Signature desc, list[Exp] args)
   
   | /* For invoking methods you know only from interfaces, such as default methods. 
      * The method can even be absent at runtime in which case this throws a RuntimeException. 
      * The check occurs at the first invocation at run-time. 
      */
-    invokeInterface(Type class, Expression receiver, Signature desc, list[Expression] args)
+    invokeInterface(Type class, Exp receiver, Signature desc, list[Exp] args)
   
   | /* Invoke a super constructor, typically only used in constructor method bodies */
-    invokeSuper(Signature desc, list[Expression] args)
+    invokeSuper(Signature desc, list[Exp] args)
     
-  | newInstance(Type class, Signature desc, list[Expression] args)
-  | getField(Type class, Expression receiver, Type \type, str name)
+  | newInstance(Type class, Signature desc, list[Exp] args)
+  | getField(Type class, Exp receiver, Type \type, str name)
   | getStatic(Type class, Type \type, str name)
-  | instanceof(Expression arg, Type class)
-  | eq(Expression lhs, Expression rhs)
-  | ne(Expression lhs, Expression rhs)
-  | le(Expression lhs, Expression rhs)
-  | gt(Expression lhs, Expression rhs)
-  | ge(Expression lhs, Expression rhs)
-  | lt(Expression lhs, Expression rhs)
-  | newArray(Type \type, Expression size)
-  | newArray(Type \type, list[Expression] args)
-  | alength(Expression arg)
-  | checkcast(Expression arg, Type \type)
-  | coerce(Type from, Type to, Expression arg)
-  | shr(Expression lhs, Expression shift)
-  | shl(Expression lhs, Expression shift)
-  | ushr(Expression lhs, Expression shift)
-  | and(Expression lhs, Expression rhs)
-  | or(Expression lhs, Expression rhs)
-  | xor(Expression lhs, Expression rhs)
-  | add(Expression lhs, Expression rhs)
-  | sub(Expression lhs, Expression rhs)
-  | div(Expression lhs, Expression rhs)
-  | rem(Expression lhs, Expression rhs)
-  | mul(Expression lhs, Expression rhs)
-  | neg(Expression arg)
+  | instanceof(Exp arg, Type class)
+  | eq(Exp lhs, Exp rhs)
+  | ne(Exp lhs, Exp rhs)
+  | le(Exp lhs, Exp rhs)
+  | gt(Exp lhs, Exp rhs)
+  | ge(Exp lhs, Exp rhs)
+  | lt(Exp lhs, Exp rhs)
+  | newArray(Type \type, Exp size)
+  | newArray(Type \type, list[Exp] args)
+  | alength(Exp arg)
+  | checkcast(Exp arg, Type \type)
+  | coerce(Type from, Type to, Exp arg)
+  | shr(Exp lhs, Exp shift)
+  | shl(Exp lhs, Exp shift)
+  | ushr(Exp lhs, Exp shift)
+  | and(Exp lhs, Exp rhs)
+  | or(Exp lhs, Exp rhs)
+  | xor(Exp lhs, Exp rhs)
+  | add(Exp lhs, Exp rhs)
+  | sub(Exp lhs, Exp rhs)
+  | div(Exp lhs, Exp rhs)
+  | rem(Exp lhs, Exp rhs)
+  | mul(Exp lhs, Exp rhs)
+  | neg(Exp arg)
   | inc(str name, int inc)
   ;
  
-Expression defVal(boolean()) = const(boolean(), false);
-Expression defVal(integer()) = const(integer(), 0);
-Expression defVal(long()) = const(long(), 0);
-Expression defVal(byte()) = const(byte(), 0);
-Expression defVal(character()) = const(character(), 0);
-Expression defVal(short()) = const(short(), 0);
-Expression defVal(float()) = const(float(), 0.0);
-Expression defVal(double()) = const(double(), 0.0);
-Expression defVal(reference(str _)) = null();
-Expression defVal(array(Type _)) = null();
-Expression defVal(string()) = null();
+Exp defVal(boolean()) = const(boolean(), false);
+Exp defVal(integer()) = const(integer(), 0);
+Exp defVal(long()) = const(long(), 0);
+Exp defVal(byte()) = const(byte(), 0);
+Exp defVal(character()) = const(character(), 0);
+Exp defVal(short()) = const(short(), 0);
+Exp defVal(float()) = const(float(), 0.0);
+Exp defVal(double()) = const(double(), 0.0);
+Exp defVal(reference(str _)) = null();
+Exp defVal(array(Type _)) = null();
+Exp defVal(string()) = null();
  
  // Below popular some convenience macros for
  // generating methods and constructors:
  
 Type object() = reference("java.lang.Object");
 
-Statement invokeSuper(list[Type] formals, list[Expression] args)
+Stat invokeSuper(list[Type] formals, list[Exp] args)
   = do(invokeSuper(constructorDesc(formals), args));
   
-Statement invokeSuper()
+Stat invokeSuper()
   = invokeSuper([], []);
   
-// generate a main method
-Method main(str args, list[Statement] block) 
+// main method shorthand
+Method main(str args, list[Stat] block) 
   = method(methodDesc(\void(), "main", [array(string())]), 
       [var(array(string()), args)], 
       block, 
       modifiers={\public(), \static(), \final()});
       
-// generate a normal method 
-Method method(Modifier access, Type ret, str name, list[Formal] args, list[Statement] block)
+// normal method shorthand
+Method method(Modifier access, Type ret, str name, list[Formal] args, list[Stat] block)
   = method(methodDesc(ret, name, [a.\type | a <- args]), 
            args, 
            block, 
            modifiers={access});
  
-// generate a static method           
-Method staticMethod(Modifier access, Type ret, str name, list[Formal] args, list[Statement] block)
+// static method shorthand           
+Method staticMethod(Modifier access, Type ret, str name, list[Formal] args, list[Stat] block)
   = method(methodDesc(ret, name, [a.\type | a <- args]), 
            args, 
            block, 
            modifiers={static(), access});
 
-// generate a constructor with argument and code 
+// constructor shorthand with arguments and code 
 //   NB: don't forget to generate super call in the block!    
-Method constructor(Modifier access, list[Formal] formals, list[Statement] block)
+Method constructor(Modifier access, list[Formal] formals, list[Stat] block)
   = method(constructorDesc([ var.\type | var <- formals]), formals, block);
   
-// allocate a new object using the constructor with the given argument types,
-// and passing the given actual parameters      
-Expression new(Type class, list[Type] argTypes, list[Expression] args)
+// "new" short-hand with parameters
+Exp new(Type class, list[Type] argTypes, list[Exp] args)
   = newInstance(class, constructorDesc(argTypes), args);
   
-// allocate a new object via its nullary constructor  
-Expression new(Type class)
+// "new" short-hand, without parameters  
+Exp new(Type class)
   = new(class, [], []);
      
 // Load the standard "this" reference for every object. 
 // NB! This works only inside non-static methods and inside constructors 
-Expression this() = load("this");
+Exp this() = load("this");
 
+// the "<current>" class refers to the class currently being generated
 private Type CURRENT = reference("\<current\>");
 
 // Load a field from the currently defined class
-Expression getField(Type \type, str name)
-  = getField(CURRENT, this(), \type, name);
+Exp getField(Type \type, str name) = getField(CURRENT, this(), \type, name);
  
 // Load a static field from the currently defined class  
-Expression getStatic(Type \type, str name)
-  = getStatic(CURRENT, \type, name);
+Exp getStatic(Type \type, str name) = getStatic(CURRENT, \type, name);
   
 // Store a field in the currently defined class  
-Statement putField(Type \type, str name, Expression arg)
-  = putField(CURRENT, this(), \type, name, arg);  
+Stat putField(Type \type, str name, Exp arg) = putField(CURRENT, this(), \type, name, arg);  
 
 // Store a static field in the currently defined class
-Statement putStatic(Type \type, str name, Expression arg)
-  = putStatic(CURRENT, name, \type, arg);
+Stat putStatic(Type \type, str name, Exp arg) = putStatic(CURRENT, name, \type, arg);
  
-Expression invokeStatic(Signature desc, list[Expression] args) 
-  = invokeStatic(CURRENT, desc, args);
+Exp invokeStatic(Signature desc, list[Exp] args) = invokeStatic(CURRENT, desc, args);
   
-Expression invokeSpecial(Expression receiver, Signature desc, list[Expression] args)
+Exp invokeSpecial(Exp receiver, Signature desc, list[Exp] args)
   = invokeSpecial(CURRENT, receiver, desc, args);
 
-Expression invokeVirtual(Expression receiver, Signature desc, list[Expression] args)
+Exp invokeVirtual(Exp receiver, Signature desc, list[Exp] args)
   = invokeVirtual(CURRENT, receiver, desc, args);
   
-Expression invokeInterface(Expression receiver, Signature desc, list[Expression] args)
+Exp invokeInterface(Exp receiver, Signature desc, list[Exp] args)
   = invokeVirtual(CURRENT, receiver, desc, args);
    

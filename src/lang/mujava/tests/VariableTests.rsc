@@ -57,7 +57,7 @@ test bool floatVariables(real i)
 test bool boolVariableTrue() = testVarClass(primVarTestClass(boolean(), true));
 test bool boolVariableFalse() = testVarClass(primVarTestClass(boolean(), false));
 
-Class objVarTestClass(Type t, Expression v) {
+Class objVarTestClass(Type t, Exp v) {
   rf = \return(\false());
   rt = \return(\true());
   

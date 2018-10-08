@@ -114,7 +114,7 @@ public Class extendClass()
   = class(reference("ExtendedClass"),
        super=reference("TestClass"),
        methods=[
-       //  method(Modifier access, Type ret, str name, list[Variable] args, list[Statement] stats)
+       //  method(Modifier access, Type ret, str name, list[Variable] args, list[Stat] stats)
          method(\public(), boolean(), "testMethod", [], [
             // call a super method
             do(invokeVirtual(this(), methodDesc(\void(), "setField", [integer()]), [const(integer(), 32)])),

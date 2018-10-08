@@ -34,15 +34,15 @@ Class primArrayTestClass(Type t, int len) {
     );
 } 
 
-Expression defVal(integer()) = const(integer(), 0);
-Expression defVal(long()) = const(long(), 0);
-Expression defVal(byte()) = const(byte(), 0);
-Expression defVal(character()) = const(character(), 0);
-Expression defVal(short()) = const(short(), 0);
-Expression defVal(reference(str _)) = null();
-Expression defVal(array(Type _)) = null();
-Expression defVal(string()) = null();
-Expression defVal(boolean()) = const(boolean(), false);
+Exp defVal(integer()) = const(integer(), 0);
+Exp defVal(long()) = const(long(), 0);
+Exp defVal(byte()) = const(byte(), 0);
+Exp defVal(character()) = const(character(), 0);
+Exp defVal(short()) = const(short(), 0);
+Exp defVal(reference(str _)) = null();
+Exp defVal(array(Type _)) = null();
+Exp defVal(string()) = null();
+Exp defVal(boolean()) = const(boolean(), false);
 
 list[Type] primTypes = [integer(), short(), byte(), character(), long()];
 
@@ -60,7 +60,7 @@ test bool primitiveArrays0()
 test bool primitiveArrays1() 
   = all( t <- primTypes, testArrayClass(primArrayTestClass(t, 1)));
   
-Class valArrayTestClass(Type t, int len, Expression val) {
+Class valArrayTestClass(Type t, int len, Exp val) {
   rf = \return(\false());
   rt = \return(\true());
   

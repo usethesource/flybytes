@@ -672,7 +672,65 @@ public class ClassCompiler {
 			case "monitor":
 				monitorStat(AST.$getArg(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
 				break;
+			case "try":
+				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), AST.$getFinally(stat), continueLabel, breakLabel, joinLabel);
+				break;
 			}
+		}
+
+		private void tryStat(IList block, IList catches, IList finallyBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
+			Label tryBlockStart = new Label();
+			Label tryBlockEnd = new Label();
+			Label finallyStart = new Label();
+			Label rethrowHandler = new Label();
+			Label[] handlerStarts = new Label[catches.length()];
+			Label[] handlerEnds = new Label[catches.length()];
+			
+			int i = 0;
+			for (IValue elem : catches) {
+				handlerStarts[i] = new Label();
+				handlerEnds[i] = new Label();
+				
+				IConstructor c = (IConstructor) elem;
+				IConstructor type = AST.$getType(c);
+				String name = AST.$getClassFromType(type, classNode.name);
+				
+				method.visitTryCatchBlock(tryBlockStart, tryBlockEnd, handlerStarts[i], name);
+				
+				if (finallyBlock.length() != 0) {
+					method.visitTryCatchBlock(handlerStarts[i], handlerEnds[i], rethrowHandler, null);
+				}
+				i++;
+			}
+		
+			method.visitLabel(tryBlockStart);
+			statements(block, null, null, null /* break, continue, goto are not supported inside try block */);
+			method.visitLabel(tryBlockEnd);
+			method.visitJumpInsn(Opcodes.GOTO, finallyBlock.length() != 0 ? finallyStart : joinLabel);
+			
+			for (IValue elem : catches) {
+				handlerStarts[i] = new Label();
+				handlerEnds[i] = new Label();
+				
+				IConstructor c = (IConstructor) elem;
+				IConstructor type = AST.$getType(c);
+				String name = AST.$getName(c);
+				IList code = AST.$getBlock(c);
+				declareVariable(type, name, null, false);
+				method.visitVarInsn(Opcodes.ASTORE, positionOf(name));
+				statements(code, null, null, finallyBlock.length() != 0 ? finallyStart : joinLabel);
+				method.visitJumpInsn(Opcodes.GOTO, joinLabel);
+			}
+			
+			method.visitLabel(rethrowHandler);
+			String finallyExceptionName = "exception:" + UUID.randomUUID();
+			declareVariable(Types.throwableType(), finallyExceptionName, null, false);
+			statements(finallyBlock, continueLabel, breakLabel, joinLabel);
+			loadExp(finallyExceptionName);
+			method.visitInsn(Opcodes.ATHROW); // rethrow from the finally block
+
+			method.visitLabel(finallyStart);
+			statements(finallyBlock, continueLabel, breakLabel, joinLabel);
 		}
 
 		private void monitorStat(IConstructor lock, IList block, Label continueLabel, Label breakLabel, Label joinLabel) {
@@ -2426,6 +2484,14 @@ public class ClassCompiler {
 			return exp.get("constant");
 		}
 
+		public static IList $getCatch(IConstructor stat) {
+			return (IList) stat.get("catch");
+		}
+
+		public static IList $getFinally(IConstructor stat) {
+			return (IList) stat.get("finally");
+		}
+		
 		public static String $getLabel(IConstructor stat) {
 			return ((IString) stat.get("label")).getValue();
 		}
@@ -2795,6 +2861,7 @@ public class ClassCompiler {
 		private static final IConstructor INTEGER_CONS = vf.constructor(INTEGER);
 		private static final Type VOID = tf.constructor(store, TYPE, "void");
 		private static final IConstructor VOID_CONS = vf.constructor(VOID);
+		private static final Type REF = tf.constructor(store, TYPE, "reference", tf.stringType(), "name");
 
 		static IConstructor booleanType() {
 			return BOOL_CONS;
@@ -2806,6 +2873,10 @@ public class ClassCompiler {
 
 		static IConstructor voidType() {
 			return VOID_CONS;
+		}
+		
+		static IConstructor throwableType() {
+			return vf.constructor(REF, vf.string("java/lang/Throwable"));
 		}
 	}
 }

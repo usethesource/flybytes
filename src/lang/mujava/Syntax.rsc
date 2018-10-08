@@ -128,28 +128,17 @@ data Stat(loc src = |unknown:///|)
   | label(str label)
   | \break(str label = "")
   | \continue(str label = "")
-  | \while(Exp condition, list[Stat] block)
-  | \doWhile(list[Stat] block, Exp condition)
-  | \throw(Exp exception)
-  | \monitor(Exp arg, list[Stat] block)  
-  //| \try(list[Stat] tryBlock, list[Catch] \catchBlock, list[Stat] \finallyBlock)
+  | \while(Exp condition, list[Stat] block) // TODO test
+  | \doWhile(list[Stat] block, Exp condition) // TODO test
+  | \throw(Exp exception) // TODO test
+  | \monitor(Exp arg, list[Stat] block) // TODO test  
+  | \try(list[Stat] block, list[Catch] \catch, list[Stat] \finally)
   //| \switch(Exp \value, list[Case] caseBlocks, list[Stat] defaultBlock)
-
-  
- 
   ;
 
-// TODO:
-//data Stat(loc src = |unknown:///|)  
-//  = assertEquals(Exp lhs, Exp rhs)
-//  | assertNotEquals(Exp lhs, Exp rhs)
-//  | assertTrue(Exp e)
-//  | assertFalse(Exp e)
-//  ;
-  
 data Case = \case(int label, list[Stat] block);
   
-data Catch = \catch(Type \type, str var, list[Stat] block);
+data Catch = \catch(Type \type, str name, list[Stat] block);
 
 data Exp(loc src = |unknown:///|)
   = null()

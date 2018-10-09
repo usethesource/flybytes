@@ -608,6 +608,9 @@ public class ClassCompiler {
 
 		private void statement(IConstructor stat, Label continueLabel, Label breakLabel, Label joinLabel) {
 			switch (stat.getConstructorType().getName()) {
+			case "incr":
+				incStat(AST.$getName(stat), AST.$getInc(stat));
+				break;
 			case "decl":
 				declStat(stat, joinLabel);
 				break;
@@ -676,6 +679,10 @@ public class ClassCompiler {
 				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), AST.$getFinally(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			}
+		}
+
+		private void incStat(String name, int inc) {
+			method.visitIincInsn(positionOf(name), inc);
 		}
 
 		private void tryStat(IList block, IList catches, IList finallyBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
@@ -1216,6 +1223,7 @@ public class ClassCompiler {
 
 		private IConstructor incExp(String name, int inc) {
 			method.visitIincInsn(positionOf(name), inc);
+			loadExp(name);
 			return Types.integerType();
 		}
 

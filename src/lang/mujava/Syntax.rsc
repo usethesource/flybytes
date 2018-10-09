@@ -61,7 +61,7 @@ data Class
     )  
    ;
     
- data Modifier
+data Modifier
    = \public()
    | \private()
    | \protected()
@@ -114,6 +114,7 @@ data Stat(loc src = |unknown:///|)
   | \decl(Type \type, str name, Exp init = defValue(\type))
   | \astore(Exp array, Exp index, Exp arg)
   | \do(Exp exp) 
+  | \incr(str name, int inc)
   | \return()
   | \return(Exp arg)
   | \putField(Type class, Exp receiver, Type \type, str name, Exp arg)

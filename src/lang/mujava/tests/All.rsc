@@ -12,3 +12,4 @@ extend lang::mujava::tests::NoCastCheckTest;
 extend lang::mujava::tests::VariableTests;
 extend lang::mujava::tests::DefaultParameters;
 extend lang::mujava::tests::GotoTests;
+extend lang::mujava::tests::OtherExpressionTests;

@@ -228,3 +228,50 @@ Class forLoopBreakNestedClass() {
 } 
 
 test bool testBreakNested() = testForClass(forLoopBreakNestedClass());
+
+
+Class whileClass() {
+  rf = \return(\false());
+  rt = \return(\true());
+  
+  return class(reference("WhileClass"),
+      methods=[
+        staticMethod(\public(), boolean(), "testMethod", [],
+        [
+          decl(integer(), "i", init=const(integer(), 0)),
+          \while(lt(load("i"), const(integer(), 10)),
+          [ 
+             incr("i", 1)
+          ]),
+          
+          \return(\eq(load("i"), const(integer(), 10)))
+        ])
+      ]
+    );
+} 
+
+test bool testNormalDoWhile() = testForClass(whileClass());
+
+Class whileClass() {
+  rf = \return(\false());
+  rt = \return(\true());
+  
+  return class(reference("DoWhileClass"),
+      methods=[
+        staticMethod(\public(), boolean(), "testMethod", [],
+        [
+          decl(integer(), "i", init=const(integer(), 0)),
+          decl(integer(), "j", init=const(integer(), 1)),
+          \doWhile(lt(load("i"), const(integer(), 3)),
+          [ 
+             incr("i", 1),
+             store("j", mul(load("j"), const(integer(), 2)))
+          ]),
+          
+          \return(\eq(load("j"), const(integer(), 16)))
+        ])
+      ]
+    );
+} 
+
+test bool testNormalDoWhile() = testForClass(doWhileClass());

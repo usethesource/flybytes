@@ -75,6 +75,9 @@ Mirror double(real v)
   
 Mirror float(real v)
   = val(v).invoke(methodDesc(string(), "floatValue", []), []);
+  
+Mirror boolean(bool v)
+  = val(v).invoke(methodDesc(string(), "getValue", []), []);  
 
 Mirror prim(integer(), int t) = integer(t);
 Mirror prim(short(), int t) = short(t);
@@ -84,6 +87,8 @@ Mirror prim(double(), real t) = double(t);
 Mirror prim(float(), real t) = float(t);
 Mirror prim(string(), str t) = string(t); 
 Mirror prim(character(), int t) = character(t); 
+Mirror prim(boolean(), bool t) = boolean(t); 
+
 
 int integer(Mirror i) = i.toValue(#int);
 int long(Mirror l) = l.toValue(#int);
@@ -93,4 +98,5 @@ str string(Mirror s) = s.toValue(#str);
 real double(Mirror d) = d.toValue(#real);
 real float(Mirror f) = f.toValue(#real);
 real character(Mirror f) = f.toValue(#int);
+real boolean(Mirror f) = f.toValue(#bool);
   

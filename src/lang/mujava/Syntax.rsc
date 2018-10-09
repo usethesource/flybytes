@@ -129,11 +129,11 @@ data Stat(loc src = |unknown:///|)
   | label(str label)
   | \break(str label = "")
   | \continue(str label = "")
-  | \while(Exp condition, list[Stat] block) // TODO test
-  | \doWhile(list[Stat] block, Exp condition) // TODO test
-  | \throw(Exp exception) // TODO test
+  | \while(Exp condition, list[Stat] block) 
+  | \doWhile(list[Stat] block, Exp condition) 
+  | \throw(Exp arg) 
   | \monitor(Exp arg, list[Stat] block) // TODO test  
-  | \try(list[Stat] block, list[Catch] \catch, list[Stat] \finally) // TODO test
+  | \try(list[Stat] block, list[Catch] \catch, list[Stat] \finally) 
   //| \switch(Exp \value, list[Case] caseBlocks, list[Stat] defaultBlock)
   ;
 

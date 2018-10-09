@@ -663,7 +663,7 @@ public class ClassCompiler {
 				break;
 			case "while":
 				String whileLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
-				whileStat(whileLabel, AST.$getCondition(stat), AST.$getStatements(stat), continueLabel, breakLabel, joinLabel);
+				whileStat(whileLabel, AST.$getCondition(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			case "doWhile":
 				String doWhileLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
@@ -715,9 +715,11 @@ public class ClassCompiler {
 			method.visitLabel(tryBlockEnd);
 			method.visitJumpInsn(Opcodes.GOTO, finallyBlock.length() != 0 ? finallyStart : joinLabel);
 			
+			i = 0;
 			for (IValue elem : catches) {
 				handlerStarts[i] = new Label();
 				handlerEnds[i] = new Label();
+				i++;
 				
 				IConstructor c = (IConstructor) elem;
 				IConstructor type = AST.$getType(c);

@@ -26,6 +26,6 @@ Class catchClass() {
     );
 }
 
-test bool testCatch() = loadClass(catchClass())
+test bool testCatch() = loadClass(catchClass(), file=just(|project://mujava/generated/CatchTest.class|))
   .invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#bool);
   

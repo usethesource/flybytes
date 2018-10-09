@@ -686,60 +686,41 @@ public class ClassCompiler {
 		}
 
 		private void tryStat(IList block, IList catches, IList finallyBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label tryBlockStart = new Label();
-			Label tryBlockEnd = new Label();
-			Label finallyStart = new Label();
-			Label rethrowHandler = new Label();
-			Label[] handlerStarts = new Label[catches.length()];
-			Label[] handlerEnds = new Label[catches.length()];
+			Label tryStart = new Label();
+			Label tryEnd = new Label();
+			Label[] handlers = new Label[catches.length()];
 			
-			int i = 0;
-			for (IValue elem : catches) {
-				handlerStarts[i] = new Label();
-				handlerEnds[i] = new Label();
+			for (int i = 0; i < catches.length(); i++) {
+				IConstructor catcher = (IConstructor) catches.get(i);
+				handlers[i] = new Label();
+				IConstructor exceptionType = AST.$getType(catcher);
+				String clsName = AST.$getClassFromType(exceptionType, classNode.name);
+				String varName = AST.$getName(catcher);
+				declareVariable(exceptionType, varName, null, false);
+				method.visitTryCatchBlock(tryStart, tryEnd, handlers[i], clsName);
+			}
+			
+			// the try block itself
+			method.visitLabel(tryStart);
+			statements(block, null, null, joinLabel);
+			method.visitLabel(tryEnd);
+			// jump over the catch blocks
+			method.visitJumpInsn(Opcodes.GOTO, joinLabel);
+			
+			for (int i = 0; i < catches.length(); i++) {
+				IConstructor catcher = (IConstructor) catches.get(i);
+				method.visitLabel(handlers[i]);
+				String varName = AST.$getName(catcher);
+				method.visitVarInsn(Opcodes.ASTORE, positionOf(varName));
+				IList code = AST.$getBlock(catcher);
+				statements(code, null, null, joinLabel);
 				
-				IConstructor c = (IConstructor) elem;
-				IConstructor type = AST.$getType(c);
-				String name = AST.$getClassFromType(type, classNode.name);
-				
-				method.visitTryCatchBlock(tryBlockStart, tryBlockEnd, handlerStarts[i], name);
-				
-				if (finallyBlock.length() != 0) {
-					method.visitTryCatchBlock(handlerStarts[i], handlerEnds[i], rethrowHandler, null);
+				// unless it's the last catch block we have to jump over the other catch blocks
+				// TODO: if the block ends with a RETURN, we shouldn't have to generate this.
+				if (i < catches.length() - 1) {
+					method.visitJumpInsn(Opcodes.GOTO, joinLabel);
 				}
-				i++;
 			}
-		
-			method.visitLabel(tryBlockStart);
-			statements(block, null, null, null /* break, continue, goto are not supported inside try block */);
-			method.visitLabel(tryBlockEnd);
-			method.visitJumpInsn(Opcodes.GOTO, finallyBlock.length() != 0 ? finallyStart : joinLabel);
-			
-			i = 0;
-			for (IValue elem : catches) {
-				handlerStarts[i] = new Label();
-				handlerEnds[i] = new Label();
-				i++;
-				
-				IConstructor c = (IConstructor) elem;
-				IConstructor type = AST.$getType(c);
-				String name = AST.$getName(c);
-				IList code = AST.$getBlock(c);
-				declareVariable(type, name, null, false);
-				method.visitVarInsn(Opcodes.ASTORE, positionOf(name));
-				statements(code, null, null, finallyBlock.length() != 0 ? finallyStart : joinLabel);
-				method.visitJumpInsn(Opcodes.GOTO, joinLabel);
-			}
-			
-			method.visitLabel(rethrowHandler);
-			String finallyExceptionName = "exception:" + UUID.randomUUID();
-			declareVariable(Types.throwableType(), finallyExceptionName, null, false);
-			statements(finallyBlock, continueLabel, breakLabel, joinLabel);
-			loadExp(finallyExceptionName);
-			method.visitInsn(Opcodes.ATHROW); // rethrow from the finally block
-
-			method.visitLabel(finallyStart);
-			statements(finallyBlock, continueLabel, breakLabel, joinLabel);
 		}
 
 		private void monitorStat(IConstructor lock, IList block, Label continueLabel, Label breakLabel, Label joinLabel) {

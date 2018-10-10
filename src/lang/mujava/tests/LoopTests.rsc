@@ -252,7 +252,7 @@ Class whileClass() {
 
 test bool testNormalDoWhile() = testForClass(whileClass());
 
-Class whileClass() {
+Class doWhileClass() {
   rf = \return(\false());
   rt = \return(\true());
   
@@ -262,13 +262,14 @@ Class whileClass() {
         [
           decl(integer(), "i", init=const(integer(), 0)),
           decl(integer(), "j", init=const(integer(), 1)),
-          \doWhile(lt(load("i"), const(integer(), 3)),
-          [ 
+          \doWhile([ 
              incr("i", 1),
              store("j", mul(load("j"), const(integer(), 2)))
-          ]),
+          ],
+          lt(load("i"), const(integer(), 3))
+          ),
           
-          \return(\eq(load("j"), const(integer(), 16)))
+          \return(\eq(load("j"), const(integer(), 8)))
         ])
       ]
     );

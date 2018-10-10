@@ -9,7 +9,7 @@ import String;
 import IO;
 import util::Math;
 
-public Class ifClass(Expression cond) {
+public Class ifClass(Exp cond) {
   name = "IfCmp_<getName(cond)>";
   
   return class(reference(name),
@@ -34,9 +34,9 @@ public Class ifClass(Expression cond) {
 bool testIf(Class c, bool answer) { 
   m = loadClass(c, file=just(|project://mujava/generated| + "<c.\type.name>.class"));
   ifReply = m.invokeStatic(methodDesc(boolean(), "ifTest", []), []).toValue(#bool);
-  //ifElseReply = m.invokeStatic(methodDesc(boolean(), "ifElseTest", []), []).toValue(#bool);
+  ifElseReply = m.invokeStatic(methodDesc(boolean(), "ifElseTest", []), []).toValue(#bool);
   
-  return answer == ifReply; // && answer == ifElseReply;
+  return answer == ifReply && answer == ifElseReply;
 }
 
 test bool testIfTrue() = testIf(ifClass(\true()), true);
@@ -53,7 +53,7 @@ test bool testIfEqBoolFalse() = testIf(ifClass(eq(\true(), \false())), false);
 
 // now some special tests to see if `if(eq(a,b))` which is optimized to `ifeq(a,b)`,
 // and also for the other comparison operators, is compiled correctly:
-private alias BinOp = Expression (Expression, Expression);
+private alias BinOp = Exp (Exp, Exp);
 
 private Class ifCmpClass(Type t, BinOp op) {
   expr = op(load("i"), load("j"));

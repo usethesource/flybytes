@@ -321,8 +321,8 @@ public class ClassCompiler {
 		private void generateDefaultConstructor(ClassNode cn) {
 			method = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
 			method.visitCode();
-			Label l0 = new Label();
-			Label l1 = new Label();
+			Label l0 = new LeveledLabel(0);
+			Label l1 = new LeveledLabel(0);
 			method.visitLocalVariable("this", "L" + cn.name + ";", null, l0, l1, 0);
 
 			// this = new MyClass(...)
@@ -375,8 +375,8 @@ public class ClassCompiler {
 			variableNames = new ArrayList<>();
 			variableDefaults = new ArrayList<>();
 
-			methodStartLabel = new Label();
-			methodEndLabel = new Label();
+			methodStartLabel = new LeveledLabel(0);
+			methodEndLabel = new LeveledLabel(0);
 
 			method.visitCode(); 
 			method.visitLabel(methodStartLabel);
@@ -385,7 +385,7 @@ public class ClassCompiler {
 
 			IList block = AST.$getBlock(cons);
 			if (block != null) {
-				statements(block, null, null, methodEndLabel);
+				statements(0, block, null, null, methodEndLabel);
 			}
 
 			method.visitLabel(methodEndLabel);
@@ -442,11 +442,11 @@ public class ClassCompiler {
 				variableDefaults = new ArrayList<>();
 
 				if (!isStatic) {
-					declareVariable(classType, "this", null, false);
+					declareVariable(0, classType, "this", null, false);
 				}
 
-				methodStartLabel = new Label();
-				methodEndLabel = new Label();
+				methodStartLabel = new LeveledLabel(0);
+				methodEndLabel = new LeveledLabel(0);
 
 				method.visitCode(); 
 				method.visitLabel(methodStartLabel);
@@ -457,7 +457,7 @@ public class ClassCompiler {
 					fieldInitializers(classNode, method);
 				}
 
-				statements(AST.$getBlock(cons), null, null, methodEndLabel);
+				statements(0, AST.$getBlock(cons), null, null, methodEndLabel);
 
 				method.visitLabel(methodEndLabel);
 				
@@ -477,7 +477,7 @@ public class ClassCompiler {
 			classNode.methods.add(method);
 		}
 		
-		private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize) {
+		private void declareVariable(int level, IConstructor type, String name, IConstructor def, boolean alwaysInitialize) {
 			int pos = variableNames.size();
 			
 			variableTypes.add(type);
@@ -505,7 +505,7 @@ public class ClassCompiler {
 					// if somebody passed 'null' as actual parameter and we have something to initialize with here,
 					// then we store that into the variable now. mujava has default parameters!
 					loadExp(name);
-					invertedConditionalFlow(0, Opcodes.IFNONNULL, () -> storeStat(name, def), null, null);
+					invertedConditionalFlow(level, 0, Opcodes.IFNONNULL, () -> storeStat(name, def), null, null);
 				}
 			}
 			
@@ -535,7 +535,7 @@ public class ClassCompiler {
 			for (IValue elem : formals) {
 				IConstructor var = (IConstructor) elem;
 				IConstructor varType = AST.$getType(var);
-				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize);
+				declareVariable(0, varType, AST.$getName(var), AST.$getDefault(var), initialize);
 			}
 		}
 
@@ -592,13 +592,13 @@ public class ClassCompiler {
 					);
 		}
 
-		private Void statements(IList statements, Label continueLabel, Label breakLabel, Label joinLabel) {
+		private Void statements(int level, IList statements, Label continueLabel, Label breakLabel, Label joinLabel) {
 			int i = 0, len = statements.length();
 			for (IValue elem : statements) {
 				// generate the label for where the next statement ends, unless this is the last statement, because
 				// then we rejoin the context and we have a label for that given in the parameter 'joinLabel'
-				Label nextLabel = (++i < len || joinLabel == null) ? new Label() : joinLabel;
-				statement((IConstructor) elem, continueLabel, breakLabel, nextLabel);
+				Label nextLabel = (++i < len || joinLabel == null) ? new LeveledLabel(level) : joinLabel;
+				statement(level, (IConstructor) elem, continueLabel, breakLabel, nextLabel);
 				if (i < len) {
 					method.visitLabel(nextLabel);
 				}
@@ -606,19 +606,19 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private void statement(IConstructor stat, Label continueLabel, Label breakLabel, Label joinLabel) {
+		private void statement(int level, IConstructor stat, Label continueLabel, Label breakLabel, Label joinLabel) {
 			switch (stat.getConstructorType().getName()) {
 			case "incr":
 				incStat(AST.$getName(stat), AST.$getInc(stat));
 				break;
 			case "decl":
-				declStat(stat, joinLabel);
+				declStat(level, stat, joinLabel);
 				break;
 			case "label":
-				labelStat(AST.$getLabel(stat));
+				labelStat(level, AST.$getLabel(stat));
 				break;
 			case "goto":
-				gotoStat(AST.$getLabel(stat), joinLabel);
+				gotoStat(level, AST.$getLabel(stat), joinLabel);
 				break;
 			case "do" : 
 				doStat((IConstructor) stat.get("exp"));
@@ -640,43 +640,43 @@ public class ClassCompiler {
 				// dropping the joinLabel, there is nothing to do after return!
 				break;
 			case "break":
-				breakStat(stat, breakLabel);
+				breakStat(level, stat, breakLabel);
 				// dropping the joinLabel, there is nothing to do after break!
 				break;
 			case "continue":
-				continueStat(stat, continueLabel);
+				continueStat(level, stat, continueLabel);
 				// dropping the joinLabel, there is nothing to do after break!
 				break;
 			
 			case "if":
 				if (stat.getConstructorType().getArity() == 3) {
-					ifThenElseStat(AST.$getCondition(stat), AST.$getThenBlock(stat), AST.$getElseBlock(stat), continueLabel, breakLabel, joinLabel);
+					ifThenElseStat(level, AST.$getCondition(stat), AST.$getThenBlock(stat), AST.$getElseBlock(stat), continueLabel, breakLabel, joinLabel);
 				}
 				else {
 					assert stat.getConstructorType().getArity() == 2;
-					ifStat(AST.$getCondition(stat), AST.$getThenBlock(stat), continueLabel, breakLabel, joinLabel);
+					ifStat(level, AST.$getCondition(stat), AST.$getThenBlock(stat), continueLabel, breakLabel, joinLabel);
 				}
 				break;
 			case "for":
 				String forLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
-				forStat(forLabel, AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continueLabel, breakLabel, joinLabel);
+				forStat(level, forLabel, AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			case "while":
 				String whileLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
-				whileStat(whileLabel, AST.$getCondition(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
+				whileStat(level, whileLabel, AST.$getCondition(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			case "doWhile":
 				String doWhileLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
-				doWhileStat(doWhileLabel, AST.$getCondition(stat), AST.$getStatements(stat), continueLabel, breakLabel, joinLabel);
+				doWhileStat(level, doWhileLabel, AST.$getCondition(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			case "throw":
-				throwStat(AST.$getArg(stat));
+				throwStat(level, AST.$getArg(stat));
 				break;
 			case "monitor":
-				monitorStat(AST.$getArg(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
+				monitorStat(level, AST.$getArg(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			case "try":
-				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), AST.$getFinally(stat), continueLabel, breakLabel, joinLabel);
+				tryStat(level, AST.$getBlock(stat), AST.$getCatch(stat), AST.$getFinally(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			}
 		}
@@ -685,63 +685,84 @@ public class ClassCompiler {
 			method.visitIincInsn(positionOf(name), inc);
 		}
 
-		private void tryStat(IList block, IList catches, IList finallyBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label tryStart = new Label();
-			Label tryEnd = new Label();
+		private void tryStat(int level, IList block, IList catches, IList finallyBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
+			Label tryStart = new LeveledLabel(level);
+			Label tryEnd = new LeveledLabel(level);
 			Label[] handlers = new Label[catches.length()];
+			boolean withFinally = !finallyBlock.isEmpty();
+			String finallyVarName = null;
+			Label finallyHandler = null;
 			
+			// produce handler registration for every catch block
 			for (int i = 0; i < catches.length(); i++) {
 				IConstructor catcher = (IConstructor) catches.get(i);
-				handlers[i] = new Label();
+				handlers[i] = new LeveledLabel(level);
 				IConstructor exceptionType = AST.$getType(catcher);
 				String clsName = AST.$getClassFromType(exceptionType, classNode.name);
 				String varName = AST.$getName(catcher);
-				declareVariable(exceptionType, varName, null, false);
+				declareVariable(level, exceptionType, varName, null, false);
 				method.visitTryCatchBlock(tryStart, tryEnd, handlers[i], clsName);
+			}
+			
+			// and the finally block must be executed even if an uncaught exception is thrown
+			// so there is a handler for that too. And it spans also over the handlers in case
+			// an exception is thrown from a handler:
+			if (withFinally) {
+				finallyHandler = new LeveledLabel(level);
+				finallyVarName = "finally:" + UUID.randomUUID();
+				declareVariable(level, Types.throwableType(), finallyVarName, null, false);
+				method.visitTryCatchBlock(tryStart, tryEnd, finallyHandler, Types.throwableName());
 			}
 			
 			// the try block itself
 			method.visitLabel(tryStart);
-			statements(block, null, null, joinLabel);
+			statements(withFinally ? level + 1 : level, block, continueLabel, breakLabel, joinLabel);
 			method.visitLabel(tryEnd);
 			// jump over the catch blocks
 			method.visitJumpInsn(Opcodes.GOTO, joinLabel);
 			
 			for (int i = 0; i < catches.length(); i++) {
 				IConstructor catcher = (IConstructor) catches.get(i);
+				boolean isLast = i < catches.length() - 1;
+				
 				method.visitLabel(handlers[i]);
 				String varName = AST.$getName(catcher);
 				method.visitVarInsn(Opcodes.ASTORE, positionOf(varName));
 				IList code = AST.$getBlock(catcher);
-				statements(code, null, null, joinLabel);
+				statements(withFinally ? level + 1 : level, code, null, null, joinLabel);
 				
 				// unless it's the last catch block we have to jump over the other catch blocks
 				// TODO: if the block ends with a RETURN, we shouldn't have to generate this.
-				if (i < catches.length() - 1) {
+				if (withFinally || isLast) {
 					method.visitJumpInsn(Opcodes.GOTO, joinLabel);
 				}
 			}
+			
+			if (withFinally) {
+				method.visitLabel(finallyHandler);
+				statements(level, finallyBlock, breakLabel, continueLabel, joinLabel);
+			}
 		}
 
-		private void monitorStat(IConstructor lock, IList block, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label startExceptionBlock = new Label();
-			Label endExceptionBlock = new Label();
-			Label handlerStart = new Label();
-			Label handlerEnd = new Label();
+		private void monitorStat(int level, IConstructor lock, IList block, Label continueLabel, Label breakLabel, Label joinLabel) {
+			Label startExceptionBlock = new LeveledLabel(level);
+			Label endExceptionBlock = new LeveledLabel(level);
+			Label handlerStart = new LeveledLabel(level);
+			Label handlerEnd = new LeveledLabel(level);
 			
 			method.visitTryCatchBlock(startExceptionBlock, endExceptionBlock, handlerStart, null);
 			method.visitTryCatchBlock(handlerStart, handlerEnd, handlerStart, null);
 
 			IConstructor type = expr(lock);
 			String lockVarName = "$lock:" + UUID.randomUUID().toString();
-			declareVariable(type, lockVarName, null, false);
+			declareVariable(level, type, lockVarName, null, false);
 			dup(); // for MONITORENTER
 			method.visitVarInsn(Opcodes.ASTORE, positionOf(lockVarName));
 			method.visitInsn(Opcodes.MONITORENTER);
 			
 			method.visitLabel(startExceptionBlock);
 			method.visitLineNumber(22, startExceptionBlock);
-			statements(block, null, null, null /* no support for break, continue, goto */);
+			statements(level + 1, block, continueLabel, breakLabel, null /* no support for break, continue, goto */);
 			method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
 			method.visitInsn(Opcodes.MONITOREXIT);
 			method.visitLabel(endExceptionBlock);
@@ -754,13 +775,13 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.ATHROW); // rethrow
 		}
 
-		private void throwStat(IConstructor arg) {
+		private void throwStat(int level, IConstructor arg) {
 			expr(arg);
 			method.visitInsn(Opcodes.ATHROW);
 		}
 
-		private void whileStat(String label, IConstructor cond, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label testConditional = new Label();
+		private void whileStat(int level, String label, IConstructor cond, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
+			Label testConditional = new LeveledLabel(level);
 			
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
@@ -777,16 +798,16 @@ public class ClassCompiler {
 			}
 
 			expr(cond);
-			invertedConditionalFlow(0, cmpCode, 
-					() -> statements(body, testConditional, joinLabel, testConditional), 
+			invertedConditionalFlow(level, 0, cmpCode, 
+					() -> statements(level, body, testConditional, joinLabel, testConditional), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
 					null);
 			
 			jumpTo(testConditional); // this might be superfluous
 		}
 		
-		private void doWhileStat(String label, IConstructor cond, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label nextIteration = new Label();
+		private void doWhileStat(int level, String label, IConstructor cond, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
+			Label nextIteration = new LeveledLabel(level);
 			
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
@@ -795,7 +816,7 @@ public class ClassCompiler {
 
 			method.visitLabel(nextIteration);
 			
-			statements(body, nextIteration, joinLabel, nextIteration);
+			statements(level, body, nextIteration, joinLabel, nextIteration);
 			
 			// deal efficiently with negated conditionals
 			int cmpCode = Opcodes.IFEQ;
@@ -806,82 +827,82 @@ public class ClassCompiler {
 
 			// while(cond)
 			expr(cond);
-			invertedConditionalFlow(0, cmpCode, 
+			invertedConditionalFlow(level, 0, cmpCode, 
 					() -> jumpTo(nextIteration), 
 					null /* end of loop */, 
 					null);
 		}
 
-		private void breakStat(IConstructor stat, Label join) {
+		private void breakStat(int level, IConstructor stat, Label join) {
 			if (join == null) {
 				throw new IllegalArgumentException("no loop to break from (or inside an expression or monitor block");
 			}
 			
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
-				gotoStat("break:" + loopLabel, join);
+				gotoStat(level, "break:" + loopLabel, join);
 			}
 			else {
 				method.visitJumpInsn(Opcodes.GOTO, join);
 			}
 		}
 		
-		private void continueStat(IConstructor stat, Label join) {
+		private void continueStat(int level, IConstructor stat, Label join) {
 			if (join == null) {
 				throw new IllegalArgumentException("no loop to continue with (or inside an expression or monitor block");
 			}
 			
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
-				gotoStat("continue:" + loopLabel, join);
+				gotoStat(level, "continue:" + loopLabel, join);
 			}
 			else {
 				method.visitJumpInsn(Opcodes.GOTO, join);
 			}
 		}
 
-		private void gotoStat(String label, Label join) {
+		private void gotoStat(int level, String label, Label join) {
 			if (join == null) {
 				throw new IllegalArgumentException("goto within a monitor block is not supported");
 			}
-			Label l = getOrGenerateLabel(label);
+			Label l = getOrGenerateLabel(level, label);
 			method.visitJumpInsn(Opcodes.GOTO, l);
 		}
 
-		private Label getOrGenerateLabel(String label) {
+		private Label getOrGenerateLabel(int level, String label) {
 			Label l = labels.get(label);
 			
 			if (l == null) {
-				l = new Label();
+				l = new LeveledLabel(level);
 				labels.put(label, l);
 			}
 			
 			return l;
 		}
 
-		private void labelStat(String label) {
-			method.visitLabel(getOrGenerateLabel(label));
+		private void labelStat(int level, String label) {
+			method.visitLabel(getOrGenerateLabel(level, label));
 		}
 
-		private void declStat(IConstructor stat, Label joinLabel) {
+		private void declStat(int level, IConstructor stat, Label joinLabel) {
 			IConstructor def = null;
 			if (stat.asWithKeywordParameters().hasParameter("init")) {
 				def = (IConstructor) stat.asWithKeywordParameters().getParameter("init");
 			}
 			
-			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true);
+			declareVariable(level, AST.$getType(stat), AST.$getName(stat), def, true);
 		}
 
-		private void forStat(String label, IList init, IConstructor cond, IList next, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label testConditional = new Label();
-			Label nextIterationLabel = new Label();
+		private void forStat(int level, String label, IList init, IConstructor cond, IList next, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
+			Label testConditional = new LeveledLabel(level);
+			Label nextIterationLabel = new LeveledLabel(level);
 			
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
 				labels.put("continue:" + label, nextIterationLabel);
 			}
 
-			statements(init, continueLabel /*outerloop*/, breakLabel /*outerloop*/, testConditional /*start of inner loop*/);
+			statements(level, init, continueLabel /*outerloop*/, breakLabel /*outerloop*/, testConditional /*start of inner loop*/);
 			
 			method.visitLabel(testConditional);
 			
@@ -893,13 +914,13 @@ public class ClassCompiler {
 			}
 
 			expr(cond);
-			invertedConditionalFlow(0, cmpCode, 
-					() -> statements(body, nextIterationLabel, joinLabel, nextIterationLabel), 
+			invertedConditionalFlow(level, 0, cmpCode, 
+					() -> statements(level, body, nextIterationLabel, joinLabel, nextIterationLabel), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
 					null);
 			
 			method.visitLabel(nextIterationLabel);
-			statements(next, nextIterationLabel /*watch out! */, joinLabel, testConditional /* join at the start again */);
+			statements(level, next, nextIterationLabel /*watch out! */, joinLabel, testConditional /* join at the start again */);
 			jumpTo(testConditional); // this might be superfluous
 		}
 
@@ -908,50 +929,52 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private void ifStat(IConstructor cond, IList thenBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
-			ifThenElseStat(cond, thenBlock, null, continueLabel, breakLabel, joinLabel);
+		private void ifStat(int level, IConstructor cond, IList thenBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
+			ifThenElseStat(level, cond, thenBlock, null, continueLabel, breakLabel, joinLabel);
 		}
 
-		private void ifThenElseStat(IConstructor cond, IList thenBlock, IList elseBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Builder<?> thenBuilder = () -> statements(thenBlock, continueLabel, breakLabel, joinLabel);
-			Builder<?> elseBuilder = elseBlock != null ? () -> statements(elseBlock, continueLabel, breakLabel, joinLabel) : DONE;
+		private void ifThenElseStat(int level, IConstructor cond, IList thenBlock, IList elseBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
+			Builder<?> thenBuilder = () -> statements(level, thenBlock, continueLabel, breakLabel, joinLabel);
+			Builder<?> elseBuilder = elseBlock != null ? () -> statements(level, elseBlock, continueLabel, breakLabel, joinLabel) : DONE;
 
 			// here we special case for !=, ==, <=, >=, < and >, because
 			// there are special jump instructions for these operators on the JVM and we don't want to push
 			// a boolean on the stack and then conditionally have to jump on that boolean again:
 			switch (cond.getConstructorType().getName()) {
 			case "true":
-				statements(thenBlock, continueLabel, breakLabel, joinLabel);
+				statements(level, thenBlock, continueLabel, breakLabel, joinLabel);
 				break;
 			case "false":
-				statements(elseBlock, continueLabel, breakLabel, joinLabel);
+				if (elseBlock != null) {
+					statements(level, elseBlock, continueLabel, breakLabel, joinLabel);
+				}
 				break;
 			case "eq":
-				eqExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				eqExp(level, AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "ne":
-				neExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				neExp(level, AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "le":
-				leExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				leExp(level, AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "gt":
-				gtExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				gtExp(level, AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "ge":
-				geExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				geExp(level, AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "lt":
-				ltExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				ltExp(level, AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
 				return;
 			case "neg":
 				// if(!expr) is compiled to IFNE directly without intermediate (inefficient) negation code
 				expr(AST.$getArg(cond));
-				invertedConditionalFlow(0, Opcodes.IFNE, thenBuilder, elseBuilder, joinLabel);
+				invertedConditionalFlow(level, 0, Opcodes.IFNE, thenBuilder, elseBuilder, joinLabel);
 				return;
 			default:
 				expr(cond);
-				invertedConditionalFlow(0, Opcodes.IFEQ, thenBuilder, elseBuilder, joinLabel);
+				invertedConditionalFlow(level, 0, Opcodes.IFEQ, thenBuilder, elseBuilder, joinLabel);
 				return;
 			}
 		}
@@ -1078,16 +1101,16 @@ public class ClassCompiler {
 			case "instanceof":
 				return instanceofExp(AST.$getArg(exp), AST.$getClassFromType(exp, classNode.name));
 			case "block":
-				return blockExp(AST.$getStatements(exp), AST.$getArg(exp));
+				return blockExp(0, AST.$getStatements(exp), AST.$getArg(exp));
 			case "null":
 				if (exp.getConstructorType().getArity() == 0) {
 					return nullExp();  // null constant
 				}
 				else { 
-					return isNullTest(AST.$getArg(exp), pushTrue, pushFalse, null); // null check 
+					return isNullTest(0, AST.$getArg(exp), pushTrue, pushFalse, null); // null check 
 				}
 			case "nonnull":
-				return isNonNullTest(AST.$getArg(exp), pushTrue, pushFalse, null); // null check 
+				return isNonNullTest(0, AST.$getArg(exp), pushTrue, pushFalse, null); // null check 
 			case "true":
 				return trueExp();
 			case "false":
@@ -1095,17 +1118,17 @@ public class ClassCompiler {
 			case "coerce":
 				return coerceExp(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
 			case "eq":
-				return eqExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
+				return eqExp(0, AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 			case "ne":
-				return neExp(AST.$getLhs(exp), AST.$getRhs(exp), (Builder<?>) pushTrue, (Builder<?>) pushFalse, null);
+				return neExp(0, AST.$getLhs(exp), AST.$getRhs(exp), (Builder<?>) pushTrue, (Builder<?>) pushFalse, null);
 			case "le":
-				return leExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
+				return leExp(0, AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 			case "gt":
-				return gtExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
+				return gtExp(0, AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 			case "ge":
-				return geExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
+				return geExp(0, AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 			case "lt":
-				return ltExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
+				return ltExp(0, AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 			case "add":
 				return addExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "div":
@@ -1123,7 +1146,7 @@ public class ClassCompiler {
 			case "xor":
 				return xorExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "neg":
-				return negExp(AST.$getArg(exp));
+				return negExp(0, AST.$getArg(exp));
 			case "inc":
 				return incExp(AST.$getName(exp), AST.$getInc(exp));
 			case "shr":
@@ -1362,13 +1385,13 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor negExp(IConstructor arg) {
+		private IConstructor negExp(int level, IConstructor arg) {
 			IConstructor type = expr(arg);
 			Switch.type0(type, 
 					(z) -> { 
 						// TODO: is there really not a better way to negate a boolean on the JVM?
-						Label zeroLabel = new Label();
-						Label contLabel = new Label();
+						Label zeroLabel = new LeveledLabel(level);
+						Label contLabel = new LeveledLabel(level);
 						method.visitJumpInsn(Opcodes.IFEQ, zeroLabel);
 						falseExp();
 						jumpTo(contLabel);
@@ -1493,18 +1516,18 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor ltExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor ltExp(int level, IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFGE, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFGE, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFGE, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel),
+					(i) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
+					(s) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
+					(b) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
+					(c) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
+					(f) -> invertedConditionalFlow(level, Opcodes.FCMPG, Opcodes.IFGE, thenPart, elsePart, joinLabel),
+					(d) -> invertedConditionalFlow(level, Opcodes.DCMPG, Opcodes.IFGE, thenPart, elsePart, joinLabel),
+					(l) -> invertedConditionalFlow(level, Opcodes.LCMP, Opcodes.IFGE, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); },
@@ -1513,17 +1536,17 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor leExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor leExp(int level, IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFGT, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFGT, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFGT, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel),
+					(i) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
+					(s) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
+					(b) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
+					(c) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
+					(f) -> invertedConditionalFlow(level, Opcodes.FCMPG, Opcodes.IFGT, thenPart, elsePart, joinLabel),
+					(d) -> invertedConditionalFlow(level, Opcodes.DCMPG, Opcodes.IFGT, thenPart, elsePart, joinLabel),
+					(l) -> invertedConditionalFlow(level, Opcodes.LCMP, Opcodes.IFGT, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException("<= on void"); }, 
 					(c) -> { throw new IllegalArgumentException("<= on class"); }, 
 					(a) -> { throw new IllegalArgumentException("<= on array"); },
@@ -1532,18 +1555,18 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor gtExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor gtExp(int level, IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFLE, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFLE, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFLE, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel),
+					(i) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
+					(s) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
+					(b) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
+					(c) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
+					(f) -> invertedConditionalFlow(level, Opcodes.FCMPG, Opcodes.IFLE, thenPart, elsePart, joinLabel),
+					(d) -> invertedConditionalFlow(level, Opcodes.DCMPG, Opcodes.IFLE, thenPart, elsePart, joinLabel),
+					(l) -> invertedConditionalFlow(level, Opcodes.LCMP, Opcodes.IFLE, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException("> on void"); }, 
 					(c) -> { throw new IllegalArgumentException("> on class"); }, 
 					(a) -> { throw new IllegalArgumentException("> on array"); },
@@ -1552,18 +1575,18 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor geExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor geExp(int level, IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFLT, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFLT, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFLT, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel),
+					(i) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
+					(s) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
+					(b) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
+					(c) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
+					(f) -> invertedConditionalFlow(level, Opcodes.FCMPG, Opcodes.IFLT, thenPart, elsePart, joinLabel),
+					(d) -> invertedConditionalFlow(level, Opcodes.DCMPG, Opcodes.IFLT, thenPart, elsePart, joinLabel),
+					(l) -> invertedConditionalFlow(level, Opcodes.LCMP, Opcodes.IFLT, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException(">= on void"); }, 
 					(c) -> { throw new IllegalArgumentException(">= on class"); }, 
 					(a) -> { throw new IllegalArgumentException(">= on array"); },
@@ -1572,29 +1595,29 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor eqExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor eqExp(int level, IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			if (lhs.getConstructorType().getName().equals("null")) {
-				return isNullTest(rhs, thenPart, elsePart, joinLabel);
+				return isNullTest(level, rhs, thenPart, elsePart, joinLabel);
 			}
 			else if (rhs.getConstructorType().getName().equals("null")) {
-				return isNullTest(lhs, thenPart, elsePart, joinLabel);
+				return isNullTest(level, lhs, thenPart, elsePart, joinLabel);
 			}
 
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFNE, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFNE, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFNE, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel),
+					(i) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
+					(s) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
+					(b) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
+					(c) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
+					(f) -> invertedConditionalFlow(level, Opcodes.FCMPG, Opcodes.IFNE, thenPart, elsePart, joinLabel),
+					(d) -> invertedConditionalFlow(level, Opcodes.DCMPG, Opcodes.IFNE, thenPart, elsePart, joinLabel),
+					(l) -> invertedConditionalFlow(level, Opcodes.LCMP, Opcodes.IFNE, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException(">= on void"); }, 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel), 
-					(a) -> invertedConditionalFlow(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel),
-					(S) -> invertedConditionalFlow(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel)
+					(c) -> invertedConditionalFlow(level, 0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel), 
+					(a) -> invertedConditionalFlow(level, 0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel),
+					(S) -> invertedConditionalFlow(level, 0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel)
 					);
 			return Types.booleanType();
 		}
@@ -1623,9 +1646,9 @@ public class ClassCompiler {
 		 * @param elsePart     emit code for the elsePart
 		 * @param joinLabel emit code for what runs after this conditional
 		 */
-		private void invertedConditionalFlow(int compare, int opcode, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
-			Label jump = new Label();
-			Label next = joinLabel == null ? new Label() : joinLabel;
+		private void invertedConditionalFlow(int level, int compare, int opcode, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+			Label jump = new LeveledLabel(level);
+			Label next = joinLabel == null ? new LeveledLabel(level) : joinLabel;
 			
 			if (compare != 0) {
 				method.visitInsn(compare);
@@ -1645,41 +1668,41 @@ public class ClassCompiler {
 			}
 		}
 
-		private IConstructor isNullTest(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor isNullTest(int level, IConstructor arg, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			expr(arg);
-			invertedConditionalFlow(0, Opcodes.IFNONNULL, thenPart, elsePart, joinLabel);
+			invertedConditionalFlow(level, 0, Opcodes.IFNONNULL, thenPart, elsePart, joinLabel);
 			return Types.booleanType();
 		}
 
-		private IConstructor isNonNullTest(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart,Label joinLabel) {
+		private IConstructor isNonNullTest(int level, IConstructor arg, Builder<?> thenPart, Builder<?> elsePart,Label joinLabel) {
 			expr(arg);
-			invertedConditionalFlow(0, Opcodes.IFNULL, thenPart, elsePart, joinLabel);
+			invertedConditionalFlow(level, 0, Opcodes.IFNULL, thenPart, elsePart, joinLabel);
 			return Types.booleanType();
 		}
 
-		private IConstructor neExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor neExp(int level, IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
 			if (lhs.getConstructorType().getName().equals("null")) {
-				return isNonNullTest(rhs, thenPart, elsePart, joinLabel);
+				return isNonNullTest(level, rhs, thenPart, elsePart, joinLabel);
 			}
 			else if (rhs.getConstructorType().getName().equals("null")) {
-				return isNonNullTest(lhs, thenPart, elsePart, joinLabel);
+				return isNonNullTest(level, lhs, thenPart, elsePart, joinLabel);
 			}
 
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel),
+					(i) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
+					(s) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
+					(b) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
+					(c) -> invertedConditionalFlow(level, 0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
+					(f) -> invertedConditionalFlow(level, Opcodes.FCMPG, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
+					(d) -> invertedConditionalFlow(level, Opcodes.DCMPG, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
+					(l) -> invertedConditionalFlow(level, Opcodes.LCMP, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
 					(v) -> { throw new IllegalArgumentException("!= on void"); }, 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel), 
-					(a) -> invertedConditionalFlow(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel),
-					(S) -> invertedConditionalFlow(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel)
+					(c) -> invertedConditionalFlow(level, 0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel), 
+					(a) -> invertedConditionalFlow(level, 0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel),
+					(S) -> invertedConditionalFlow(level, 0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel)
 					);
 
 			return Types.booleanType();
@@ -2010,9 +2033,9 @@ public class ClassCompiler {
 			return Types.voidType();
 		}
 
-		private IConstructor blockExp(IList block, IConstructor arg) {
-			Label blockEnd = new Label();
-			statements(block, null, null, blockEnd);
+		private IConstructor blockExp(int level, IList block, IConstructor arg) {
+			Label blockEnd = new LeveledLabel(level);
+			statements(level, block, null, null, blockEnd);
 			method.visitLabel(blockEnd);
 			IConstructor type = expr(arg);
 			return type;
@@ -2866,8 +2889,24 @@ public class ClassCompiler {
 			return VOID_CONS;
 		}
 		
+		static String throwableName() {
+			return "java/lang/Throwable";
+		}
+		
 		static IConstructor throwableType() {
-			return vf.constructor(REF, vf.string("java/lang/Throwable"));
+			return vf.constructor(REF, vf.string(throwableName()));
+		}
+	}
+	
+	private static class LeveledLabel extends Label {
+		private final int finallyNestingLevel;
+		
+		public LeveledLabel(int level) {
+			this.finallyNestingLevel = level;
+		}
+		
+		public int getFinallyNestingLevel() {
+			return finallyNestingLevel;
 		}
 	}
 }

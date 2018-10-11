@@ -125,11 +125,11 @@ data Stat(loc src = |unknown:///|)
          Exp condition, 
          list[Stat] next, 
          list[Stat] statements, str label = "")
-  | \label(str label, list[Stat] block)
+  | \block(str label, list[Stat] block) // break jumps to the end of the block, continue to the start
   | \break(str label = "")
   | \continue(str label = "")
-  | \while(Exp condition, list[Stat] block) 
-  | \doWhile(list[Stat] block, Exp condition) 
+  | \while(Exp condition, list[Stat] block, str label = "") 
+  | \doWhile(list[Stat] block, Exp condition, str label = "") 
   | \throw(Exp arg) 
   | \monitor(Exp arg, list[Stat] block) // TODO test  
   | \try(list[Stat] block, list[Catch] \catch, list[Stat] \finally) 
@@ -147,7 +147,7 @@ data Exp(loc src = |unknown:///|)
   | load(str name)
   | aload(Exp array, Exp index)
   | \const(Type \type, value constant)
-  | block(list[Stat] statements, Exp arg)
+  | sblock(list[Stat] statements, Exp arg)
   
   | /* For invoking static methods of classes or interfaces */
     invokeStatic(Type class, Signature desc, list[Exp] args)

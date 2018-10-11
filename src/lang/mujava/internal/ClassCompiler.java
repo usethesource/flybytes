@@ -658,8 +658,8 @@ public class ClassCompiler {
 			case "decl":
 				declStat(stat, joinLabel);
 				break;
-			case "label":
-				labelStat(AST.$getLabel(stat), AST.$getBlock(stat), joinLabel);
+			case "block":
+				blockStat(AST.$getLabel(stat), AST.$getBlock(stat), joinLabel);
 				break;
 			case "do" : 
 				doStat((IConstructor) stat.get("exp"));
@@ -951,7 +951,7 @@ public class ClassCompiler {
 			return l;
 		}
 
-		private void labelStat(String label, IList body, LeveledLabel joinLabel) {
+		private void blockStat(String label, IList body, LeveledLabel joinLabel) {
 			LeveledLabel again = newLabel(tryFinallyNestingLevel);
 			
 			labels.put("break:" + label, joinLabel);
@@ -1198,8 +1198,8 @@ public class ClassCompiler {
 				return getfieldExp(AST.$getReceiver(exp), AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));
 			case "instanceof":
 				return instanceofExp(AST.$getArg(exp), AST.$getClassFromType(exp, classNode.name));
-			case "block":
-				return blockExp(AST.$getStatements(exp), AST.$getArg(exp));
+			case "sblock":
+				return sblockExp(AST.$getStatements(exp), AST.$getArg(exp));
 			case "null":
 				if (exp.getConstructorType().getArity() == 0) {
 					return nullExp();  // null constant
@@ -2131,7 +2131,7 @@ public class ClassCompiler {
 			return Types.voidType();
 		}
 
-		private IConstructor blockExp(IList block, IConstructor arg) {
+		private IConstructor sblockExp(IList block, IConstructor arg) {
 			LeveledLabel blockEnd = newLabel(tryFinallyNestingLevel);
 			statements(block, null, null, blockEnd);
 			method.visitLabel(blockEnd);

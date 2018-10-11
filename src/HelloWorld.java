@@ -1,29 +1,20 @@
 
 public class HelloWorld {
 	public static void main(String[] args) {
-		System.err.println(g()); // prints "2"
+		System.err.println(g()); 
 	}
 
-	@SuppressWarnings("finally")
 	private static int g() {
-		int i = 0;
-		try {
+		int j = 0;
+		for (int i = 0; i < 10; i++) {
 			try {
-				System.err.println("step 1");
-				throw new IllegalArgumentException();
-			}
-			catch (IllegalArgumentException e) {
-				return 1;
+				System.err.println("j:" + j);
+				continue;
 			}
 			finally {
-				System.err.println("step 2");
-				++i;
-				// LOAD of i is done before RETURN opcode is executed (then i == 2)
-				// Then the FINALLY code is splices 
-				return 2; 
+				j++;
 			}
-		} finally {
-			System.err.println("step 3");
 		}
+		return j;
 	}
 }

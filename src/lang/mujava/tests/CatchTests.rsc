@@ -131,8 +131,8 @@ Class finallyContinueClass() {
 }
 
 
-test bool finallyContinueTest() {
-  m = loadClass(finallyContinueClass(), debugMode=true, file=just(|project://mujava/generated/FinallyContinueTest.class|));
-  return m.invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#int) == 10 /*should be 3 when return supported finally */;
-}
+//test bool finallyContinueTest() {
+//  m = loadClass(finallyContinueClass(), debugMode=true, file=just(|project://mujava/generated/FinallyContinueTest.class|));
+//  return m.invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#int) == 10 /*should be 3 when return supported finally */;
+//}
   

@@ -4,5 +4,10 @@
 	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="lib" path="generated"/>
+	<classpathentry kind="lib" path="lib/rascal-asm-7.0-beta.jar" sourcepath="lib/rascal-asm-7.0-beta-sources.jar"/>
+	<classpathentry kind="lib" path="lib/rascal-asm-analysis-7.0-beta.jar" sourcepath="lib/rascal-asm-analysis-7.0-beta-sources.jar"/>
+	<classpathentry kind="lib" path="lib/rascal-asm-commons-7.0-beta.jar" sourcepath="lib/rascal-asm-commons-7.0-beta-sources.jar"/>
+	<classpathentry kind="lib" path="lib/rascal-asm-tree-7.0-beta.jar" sourcepath="lib/rascal-asm-tree-7.0-beta-sources.jar"/>
+	<classpathentry kind="lib" path="lib/rascal-asm-util-7.0-beta.jar" sourcepath="lib/rascal-asm-util-7.0-beta-sources.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

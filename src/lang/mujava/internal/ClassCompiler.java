@@ -487,17 +487,23 @@ public class ClassCompiler {
 					fieldInitializers(classNode, method);
 				}
 
-				statements(AST.$getBlock(cons), null, null, methodEndLabel);
+				statements(AST.$getBlock(cons), methodStartLabel, methodEndLabel, methodEndLabel);
 
 				method.visitLabel(methodEndLabel);
 				
 				for (int i = 0; i < variableNames.size(); i++) {
 					String varName = variableNames.get(i);
+					
 					if (varName == null) {
 						continue; // empty slot
 					}
 					
-					method.visitLocalVariable(varName, Signature.type(variableTypes.get(i)), null, methodStartLabel, methodEndLabel, i);
+					String varType = Signature.type(variableTypes.get(i));
+					
+					if (debug) {
+						out.println("visiting local var: " + varName);
+					}
+					method.visitLocalVariable(varName, varType, null, methodStartLabel, methodEndLabel, i);
 				}
 				
 				if (debug) {
@@ -515,6 +521,9 @@ public class ClassCompiler {
 		private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize) {
 			int pos = variableNames.size();
 			
+			if (debug) {
+				out.println("decl: " + type + " " + name + " = " + def);
+			}
 			variableTypes.add(type);
 			variableNames.add(name);
 			variableDefaults.add(def);
@@ -632,7 +641,7 @@ public class ClassCompiler {
 			for (IValue elem : statements) {
 				// generate the label for where the next statement ends, unless this is the last statement, because
 				// then we rejoin the context and we have a label for that given in the parameter 'joinLabel'
-				LeveledLabel nextLabel = (++i < len || joinLabel == null) ? newLabel(tryFinallyNestingLevel) : joinLabel;
+				LeveledLabel nextLabel = (++i < len) ? newLabel(tryFinallyNestingLevel) : joinLabel;
 				statement((IConstructor) elem, continueLabel, breakLabel, nextLabel);
 				if (i < len) {
 					method.visitLabel(nextLabel);
@@ -736,10 +745,8 @@ public class ClassCompiler {
 				IConstructor catcher = (IConstructor) catches.get(i);
 				handlers[i] = newLabel(tryFinallyNestingLevel);
 				IConstructor exceptionType = AST.$getType(catcher);
-				String clsName = AST.$getClassFromType(exceptionType, classNode.name);
 				String varName = AST.$getName(catcher);
 				declareVariable(exceptionType, varName, null, false);
-				method.visitTryCatchBlock(tryStart, tryEnd, handlers[i], clsName);
 			}
 			
 			// and the finally block must be executed even if an uncaught exception is thrown
@@ -749,7 +756,6 @@ public class ClassCompiler {
 				finallyHandler = newLabel(tryFinallyNestingLevel);
 				finallyVarName = "finally:" + UUID.randomUUID();
 				declareVariable(Types.throwableType(), finallyVarName, null, false);
-				method.visitTryCatchBlock(tryStart, tryEnd, finallyHandler, Types.throwableName());
 				finallyCode = () -> statements(finallyBlock, breakLabel, continueLabel, joinLabel);
 				pushFinally(finallyCode);
 			}
@@ -762,6 +768,7 @@ public class ClassCompiler {
 			// jump over the catch blocks
 			method.visitJumpInsn(Opcodes.GOTO, joinLabel);
 			
+			// generate blocks for each handler
 			for (int i = 0; i < catches.length(); i++) {
 				IConstructor catcher = (IConstructor) catches.get(i);
 				boolean isLast = i < catches.length() - 1;
@@ -784,10 +791,24 @@ public class ClassCompiler {
 				}
 			}
 			
+			// generate the finally block at the end
 			if (withFinally) {
 				method.visitLabel(finallyHandler);
 				finallyCode.build();
 				popFinally();
+			}
+			
+			// declare all the handler ranges
+			for (int i = 0; i < catches.length(); i++) {
+				IConstructor catcher = (IConstructor) catches.get(i);
+				IConstructor exceptionType = AST.$getType(catcher);
+				String clsName = AST.$getClassFromType(exceptionType, classNode.name);
+				method.visitTryCatchBlock(tryStart, tryEnd, handlers[i], clsName);
+			}
+			
+			// declare the finally range
+			if (withFinally) {
+				
 			}
 		}
 

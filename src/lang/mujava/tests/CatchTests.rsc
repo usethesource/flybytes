@@ -111,15 +111,12 @@ Class finallyContinueClass() {
                     \continue()
                     //\return( const(integer(), 10))
                   ],
-                  [ \catch(reference("java.lang.IllegalArgumentException"), "e", [
-                     //incr("j", 1),
-                      \continue() // next iteration, but don't forget about finally!
-                      //\return( const(integer(), 10))
-                    ])
+                  [ 
                   ],
                   [ // finally
-                    //incr("j", 1),
-                    \return( const(integer(), 66))
+                    incr("j", 1)
+                    //store("j", add(const(integer(), 1), load("j")))
+                    //\return( const(integer(), 66))
                   ]
                   )
                  ]
@@ -132,7 +129,7 @@ Class finallyContinueClass() {
 
 
 test bool finallyContinueTest() {
-  m = loadClass(finallyContinueClass(), debugMode=true, file=just(|project://mujava/generated/FinallyContinueTest.class|));
+  m = loadClass(finallyContinueClass(), debugMode=false, file=just(|project://mujava/generated/FinallyContinueTest.class|));
   return m.invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#int) == 10 /*should be 3 when return supported finally */;
 }
   

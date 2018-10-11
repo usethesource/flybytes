@@ -107,16 +107,11 @@ Class finallyContinueClass() {
                 // loop body
                 [ 
                   \try([
-                    //\throw(new(reference("java.lang.IllegalArgumentException")))
-                    \continue()
-                    //\return( const(integer(), 10))
+                    \continue() // loop again, but go past the finally block first!
                   ],
-                  [ 
-                  ],
+                  [ ],
                   [ // finally
                     incr("j", 1)
-                    //store("j", add(const(integer(), 1), load("j")))
-                    //\return( const(integer(), 66))
                   ]
                   )
                  ]

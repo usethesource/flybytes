@@ -718,7 +718,7 @@ public class ClassCompiler {
 				monitorStat(AST.$getArg(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			case "try":
-				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), AST.$getFinally(stat), continueLabel, breakLabel, joinLabel);
+				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			}
 		}
@@ -727,7 +727,7 @@ public class ClassCompiler {
 			method.visitIincInsn(positionOf(name), inc);
 		}
 
-		private void tryStat(IList block, IList catches, IList finallyBlock, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+		private void tryStat(IList block, IList catches, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			if (block.length() == 0) {
 				// JVM can not deal with empty catch ranges anyway
 				return;
@@ -736,80 +736,65 @@ public class ClassCompiler {
 			Label tryStart = newLabel(tryFinallyNestingLevel);
 			Label tryEnd = newLabel(tryFinallyNestingLevel);
 			Label[] handlers = new LeveledLabel[catches.length()];
-			boolean withFinally = !finallyBlock.isEmpty();
+			
 			String finallyVarName = null;
-			Label finallyHandler = joinLabel;
 			Builder<?> finallyCode = null;
 			
 			// produce handler registration for every catch block
 			for (int i = 0; i < catches.length(); i++) {
 				IConstructor catcher = (IConstructor) catches.get(i);
+				boolean isFinally = AST.$is("finally", catcher);
+				boolean isLast = i == catches.length() - 1;
 				handlers[i] = newLabel(tryFinallyNestingLevel);
-				IConstructor exceptionType = AST.$getType(catcher);
-				String varName = AST.$getName(catcher);
-				declareVariable(exceptionType, varName, null, false);
-			}
-			
-			// and the finally block must be executed even if an uncaught exception is thrown
-			// so there is a handler for that too. And it spans also over the handlers in case
-			// an exception is thrown from a handler:
-			if (withFinally) {
-				finallyHandler = newLabel(tryFinallyNestingLevel);
-				finallyVarName = "finally:" + UUID.randomUUID();
-				declareVariable(Types.throwableType(), finallyVarName, null, false);
-				finallyCode = () -> statements(finallyBlock, breakLabel, continueLabel, joinLabel);
-				pushFinally(finallyCode);
+				
+				if (isLast && isFinally) {
+					finallyVarName = "finally:" + UUID.randomUUID();
+					declareVariable(Types.throwableType(), finallyVarName, null, false);
+					finallyCode = () -> statements(AST.$getBlock(catcher), breakLabel, continueLabel, joinLabel);
+					pushFinally(finallyCode);
+				}
+				else if (isFinally) {
+					throw new IllegalArgumentException("finally block should be the last handler");
+				}
+				else {
+					IConstructor exceptionType = AST.$getType(catcher);
+					String varName = AST.$getName(catcher);
+					declareVariable(exceptionType, varName, null, false);
+				}
 			}
 			
 			// the try block itself
 			method.visitLabel(tryStart);
 			statements(block, continueLabel, breakLabel, joinLabel);
-			
 			method.visitLabel(tryEnd);
+			
 			// jump over the catch blocks
 			method.visitJumpInsn(Opcodes.GOTO, joinLabel);
 			
 			// generate blocks for each handler
 			for (int i = 0; i < catches.length(); i++) {
 				IConstructor catcher = (IConstructor) catches.get(i);
-				boolean isLast = i < catches.length() - 1;
+				boolean isFinally = AST.$is("finally", catcher);
+				boolean isLast = i == catches.length() - 1;
 				
-				method.visitLabel(handlers[i]);
-				String varName = AST.$getName(catcher);
-				method.visitVarInsn(Opcodes.ASTORE, positionOf(varName));
-				IList code = AST.$getBlock(catcher);
-				if (code.isEmpty()) {
-					method.visitInsn(Opcodes.NOP); // empty catch blocks may wreak havoc
+				if (isLast && isFinally) {
+					method.visitLabel(handlers[i]);
+					finallyCode.build();
+					popFinally();
 				}
-				else {
-					statements(code, continueLabel, breakLabel, joinLabel);
+				else { // normal catch handler
+					method.visitLabel(handlers[i]);
+					String varName = AST.$getName(catcher);
+					IConstructor exceptionType = AST.$getType(catcher);
+					String clsName = AST.$getClassFromType(exceptionType, classNode.name);
+					method.visitVarInsn(Opcodes.ASTORE, positionOf(varName));
+					statements(AST.$getBlock(catcher), continueLabel, breakLabel, joinLabel);
+					method.visitTryCatchBlock(tryStart, tryEnd, handlers[i], clsName);
+					
+					if (!isLast) { // jump over the other handlers
+						method.visitJumpInsn(Opcodes.GOTO, joinLabel);
+					}
 				}
-				
-				// unless it's the last catch block we have to jump over the other catch blocks
-				// TODO: if the block ends with a RETURN, we shouldn't have to generate this.
-				if (withFinally || isLast) {
-					method.visitJumpInsn(Opcodes.GOTO, joinLabel);
-				}
-			}
-			
-			// generate the finally block at the end
-			if (withFinally) {
-				method.visitLabel(finallyHandler);
-				finallyCode.build();
-				popFinally();
-			}
-			
-			// declare all the handler ranges
-			for (int i = 0; i < catches.length(); i++) {
-				IConstructor catcher = (IConstructor) catches.get(i);
-				IConstructor exceptionType = AST.$getType(catcher);
-				String clsName = AST.$getClassFromType(exceptionType, classNode.name);
-				method.visitTryCatchBlock(tryStart, tryEnd, handlers[i], clsName);
-			}
-			
-			// declare the finally range
-			if (withFinally) {
-				
 			}
 		}
 

@@ -16,9 +16,6 @@ Class catchClass() {
              \catch(reference("java.lang.ArithmeticException"), "e", [
                \return(const(boolean(), true))
              ])
-           ],
-           [
-             // finally
            ]
            ),
            \return(const(boolean(), false))
@@ -49,9 +46,6 @@ Class multipleCatchClass() {
              \catch(reference("java.lang.IllegalArgumentException"), "f", [
                \return(const(integer(), 2))
              ])
-           ],
-           [
-             // finally
            ]
            ),
            \return(const(boolean(), false))
@@ -77,10 +71,10 @@ Class finallyClass() {
            [ 
              \catch(reference("java.lang.ArithmeticException"), "e", [
                \return(const(integer(), 2))
+             ]),
+             \finally([
+               \return(const(integer(), 3))
              ])
-           ],
-           [ // finally
-             \return(const(integer(), 3))
            ]
            ),
            \return(const(integer(), 4))
@@ -108,13 +102,12 @@ Class finallyContinueClass() {
                 [ 
                   \try([
                     \continue() // loop again, but go past the finally block first!
-                  ],
-                  [ ],
-                  [ // finally
-                    incr("j", 1)
-                  ]
-                  )
-                 ]
+                  ],[
+                    \finally([ // finally
+                      incr("j", 1)
+                    ])
+                  ])
+                ]
                 ),
            \return(load("j"))
         ])
@@ -142,11 +135,11 @@ Class finallyBreakClass() {
                   \try([
                     \break() // loop again, but go past the finally block first!
                   ],
-                  [ ],
-                  [ // finally
-                    incr("j", 1)
-                  ]
-                  )
+                  [
+                    \finally([
+                      incr("j", 1)
+                    ])
+                  ])
                  ]
                 ),
            \return(load("j"))

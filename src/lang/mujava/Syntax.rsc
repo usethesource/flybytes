@@ -132,13 +132,19 @@ data Stat(loc src = |unknown:///|)
   | \doWhile(list[Stat] block, Exp condition, str label = "") 
   | \throw(Exp arg) 
   | \monitor(Exp arg, list[Stat] block) // TODO test  
-  | \try(list[Stat] block, list[Catch] \catch, list[Stat] \finally) 
-  //| \switch(Exp \value, list[Case] caseBlocks, list[Stat] defaultBlock)
+  | \try(list[Stat] block, list[Handler] \catch) 
+  // | \switch(Exp \value, list[Case] caseBlocks)
   ;
 
-data Case = \case(int label, list[Stat] block);
+data Case 
+  = \case(int label, list[Stat] block)
+  | \default(list[Stat] block)
+  ;
   
-data Catch = \catch(Type \type, str name, list[Stat] block);
+data Handler 
+  = \catch(Type \type, str name, list[Stat] block)
+  | \finally(list[Stat] block)
+  ;
 
 data Exp(loc src = |unknown:///|)
   = null()

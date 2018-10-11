@@ -16,8 +16,8 @@ Class GotoClass1()
                \continue(label="again")
              ],[
                \break()
-             ],label="again")
-          ]),
+             ])
+          ],label="again"),
           \return(eq(load("i"), const(integer(), 10)))          
         ])
       ]

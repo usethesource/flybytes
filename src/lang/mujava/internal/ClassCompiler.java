@@ -859,7 +859,7 @@ public class ClassCompiler {
 			invertedConditionalFlow(0, cmpCode, 
 					() -> statements(body, testConditional, joinLabel, testConditional), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
-					null);
+					testConditional);
 			
 			jumpTo(testConditional); // this might be superfluous
 		}
@@ -888,7 +888,7 @@ public class ClassCompiler {
 			invertedConditionalFlow(0, cmpCode, 
 					() -> jumpTo(nextIteration), 
 					null /* end of loop */, 
-					null);
+					joinLabel);
 		}
 
 		private void breakStat(IConstructor stat, LeveledLabel join) {
@@ -978,7 +978,7 @@ public class ClassCompiler {
 			invertedConditionalFlow(0, cmpCode, 
 					() -> statements(body, nextIterationLabel, joinLabel, nextIterationLabel), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
-					null);
+					nextIterationLabel);
 			
 			method.visitLabel(nextIterationLabel);
 			statements(next, nextIterationLabel /*watch out! */, joinLabel, testConditional /* join at the start again */);

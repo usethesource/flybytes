@@ -10,13 +10,13 @@ Class GotoClass1()
         staticMethod(\public(), boolean(), "testMethod", [],
         [ 
           decl(integer(), "i", init=const(integer(), 0)),
-          block("again",[
+          block([
              \if (lt(load("i"), const(integer(), 10)), [
                incr("i", 1),
                \continue(label="again")
              ],[
                \break()
-             ])
+             ],label="again")
           ]),
           \return(eq(load("i"), const(integer(), 10)))          
         ])

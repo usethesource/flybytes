@@ -125,7 +125,7 @@ data Stat(loc src = |unknown:///|)
          Exp condition, 
          list[Stat] next, 
          list[Stat] statements, str label = "")
-  | \block(str label, list[Stat] block) // break jumps to the end of the block, continue to the start
+  | \block(list[Stat] block, str label = "") // break jumps to the end of the block, continue to the start
   | \break(str label = "")
   | \continue(str label = "")
   | \while(Exp condition, list[Stat] block, str label = "") 

@@ -659,7 +659,8 @@ public class ClassCompiler {
 				declStat(stat, joinLabel);
 				break;
 			case "block":
-				blockStat(AST.$getLabel(stat), AST.$getBlock(stat), joinLabel);
+				String blockLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
+				blockStat(blockLabel, AST.$getBlock(stat), joinLabel);
 				break;
 			case "do" : 
 				doStat((IConstructor) stat.get("exp"));

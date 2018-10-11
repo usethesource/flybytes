@@ -10,7 +10,7 @@ Class GotoClass1()
         staticMethod(\public(), boolean(), "testMethod", [],
         [ 
           decl(integer(), "i", init=const(integer(), 0)),
-          label("again",[
+          block("again",[
              \if (lt(load("i"), const(integer(), 10)), [
                incr("i", 1),
                \continue(label="again")

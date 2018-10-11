@@ -650,10 +650,7 @@ public class ClassCompiler {
 				declStat(stat, joinLabel);
 				break;
 			case "label":
-				labelStat(AST.$getLabel(stat));
-				break;
-			case "goto":
-				gotoStat(AST.$getLabel(stat));
+				labelStat(AST.$getLabel(stat), AST.$getBlock(stat), joinLabel);
 				break;
 			case "do" : 
 				doStat((IConstructor) stat.get("exp"));
@@ -900,7 +897,7 @@ public class ClassCompiler {
 			
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
-				target = getOrGenerateLabel(tryFinallyNestingLevel.size(), "break:" + loopLabel);
+				target = getLabel(tryFinallyNestingLevel.size(), "break:" + loopLabel);
 			}
 			
 			emitFinally(target.getFinallyNestingLevel());
@@ -916,33 +913,31 @@ public class ClassCompiler {
 			
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
-				target = getOrGenerateLabel(tryFinallyNestingLevel.size(), "continue:" + loopLabel);
+				target = getLabel(tryFinallyNestingLevel.size(), "continue:" + loopLabel);
 			}
 			
 			emitFinally(target.getFinallyNestingLevel());
 			method.visitJumpInsn(Opcodes.GOTO, target);
 		}
 
-		private void gotoStat(String label) {
-			LeveledLabel l = getOrGenerateLabel(tryFinallyNestingLevel.size(), label);
-
-			emitFinally(l.getFinallyNestingLevel());
-			method.visitJumpInsn(Opcodes.GOTO, l);
-		}
-
-		private LeveledLabel getOrGenerateLabel(int level, String label) {
+		private LeveledLabel getLabel(int level, String label) {
 			LeveledLabel l = labels.get(label);
 			
 			if (l == null) {
-				l = new LeveledLabel(level);
-				labels.put(label, l);
+				throw new IllegalArgumentException("unknown label: " + label);
 			}
 			
 			return l;
 		}
 
-		private void labelStat(String label) {
-			method.visitLabel(getOrGenerateLabel(tryFinallyNestingLevel.size(), label));
+		private void labelStat(String label, IList body, LeveledLabel joinLabel) {
+			LeveledLabel again = newLabel(tryFinallyNestingLevel);
+			
+			labels.put("break:" + label, joinLabel);
+			labels.put("continue:" + label, again);
+
+			method.visitLabel(again);
+			statements(body, again, joinLabel, joinLabel);
 		}
 
 		private void declStat(IConstructor stat, LeveledLabel joinLabel) {
@@ -981,7 +976,9 @@ public class ClassCompiler {
 					nextIterationLabel);
 			
 			method.visitLabel(nextIterationLabel);
-			statements(next, nextIterationLabel /*watch out! */, joinLabel, testConditional /* join at the start again */);
+			LeveledLabel endNext = newLabel(tryFinallyNestingLevel);
+			statements(next, continueLabel /*outerloop */, breakLabel /*outerloop*/, endNext);
+			method.visitLabel(endNext);
 			jumpTo(testConditional); // this might be superfluous
 		}
 

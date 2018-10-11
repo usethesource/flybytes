@@ -74,7 +74,7 @@ Class finallyClass() {
              do(div(const(integer(),1), const(integer(), 0))),
              \return(const(integer(), 1))
            ],
-           [ // Type \type, str name, list[Stat] block
+           [ 
              \catch(reference("java.lang.ArithmeticException"), "e", [
                \return(const(integer(), 2))
              ])
@@ -91,7 +91,48 @@ Class finallyClass() {
 
 
 test bool finallyTest() {
-  m = loadClass(finallyClass(), file=just(|project://mujava/generated/MultipleCatchTest.class|));
-  return m.invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#int) == 2 /*should be 3 when return supported finally */;
+  m = loadClass(finallyClass(), file=just(|project://mujava/generated/FinallyTest.class|));
+  return m.invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#int) == 3 /*should be 3 when return supported finally */;
+}
+
+Class finallyContinueClass() {
+  return class(reference("FinallyContinueTest"),
+      methods=[
+        staticMethod(\public(), integer(), "testMethod", [], [
+           decl(integer(), "j", init=const(integer(), 0)),
+           \for([decl(integer(), "i" ,init=const(integer(), 0))], // init
+                lt(load("i"), const(integer(), 10)), // cond
+                [incr("i", 1)], // next
+                
+                // loop body
+                [ 
+                  \try([
+                    //\throw(new(reference("java.lang.IllegalArgumentException")))
+                    \continue()
+                    //\return( const(integer(), 10))
+                  ],
+                  [ \catch(reference("java.lang.IllegalArgumentException"), "e", [
+                     //incr("j", 1),
+                      \continue() // next iteration, but don't forget about finally!
+                      //\return( const(integer(), 10))
+                    ])
+                  ],
+                  [ // finally
+                    //incr("j", 1),
+                    \return( const(integer(), 66))
+                  ]
+                  )
+                 ]
+                ),
+           \return(load("j"))
+        ])
+      ]
+    );
+}
+
+
+test bool finallyContinueTest() {
+  m = loadClass(finallyContinueClass(), debugMode=true, file=just(|project://mujava/generated/FinallyContinueTest.class|));
+  return m.invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#int) == 10 /*should be 3 when return supported finally */;
 }
   

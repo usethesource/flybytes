@@ -20,6 +20,8 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.util.CheckClassAdapter;
+import org.objectweb.asm.util.TraceClassVisitor;
 import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.uri.URIResolverRegistry;
@@ -56,12 +58,16 @@ public class ClassCompiler {
 		this.vf = vf;
 	}
 
-	public void compileClass(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
+	public void compileClass(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IBool debugMode, IEvaluatorContext ctx) {
 		this.out = ctx.getStdOut();
 
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES + ClassWriter.COMPUTE_MAXS);
-			new Compile(cw, AST.$getVersionCode(version), out).compileClass(cls);
+			ClassVisitor cv = cw;
+			if (debugMode.getValue()) {
+				cv = new CheckClassAdapter(new TraceClassVisitor(cw, out));
+			}
+			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 
 			output.write(cw.toByteArray());
 		} catch (Throwable e) {
@@ -70,7 +76,7 @@ public class ClassCompiler {
 		}
 	}
 
-	public IMap loadClasses(IList classes, IConstructor prefix, IList classpath, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
+	public IMap loadClasses(IList classes, IConstructor prefix, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode, IEvaluatorContext ctx) {
 		ClassMapLoader l = new ClassMapLoader(getClass().getClassLoader());
 		
 		ISourceLocation classFolder = null;
@@ -84,7 +90,12 @@ public class ClassCompiler {
 			String name = AST.$getName(AST.$getType(cls));
 
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
-			new Compile(cw, AST.$getVersionCode(version), out).compileClass(cls);
+			ClassVisitor cv = cw;
+			if (debugMode.getValue()) {
+				cv = new CheckClassAdapter(new TraceClassVisitor(cw, out));
+			}
+			
+			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 			byte[] bytes = cw.toByteArray();
 			
 			l.putBytes(name, cw.toByteArray());
@@ -114,13 +125,18 @@ public class ClassCompiler {
 		}
 	}
 	
-	public IValue loadClass(IConstructor cls, IConstructor output, IList classpath, IBool enableAsserts, IConstructor version, IEvaluatorContext ctx) {
+	public IValue loadClass(IConstructor cls, IConstructor output, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode, IEvaluatorContext ctx) {
 		this.out = ctx.getStdOut();
 
 		try {
 			String className = AST.$getName(AST.$getType(cls));
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
-			new Compile(cw, AST.$getVersionCode(version), out).compileClass(cls);
+			ClassVisitor cv = cw;
+			
+			if (debugMode.getValue()) {
+				cv = new TraceClassVisitor(new CheckClassAdapter(cw), out);
+			}
+			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 
 			Class<?> loaded = loadSingleClass(className, cw);
 
@@ -241,20 +257,23 @@ public class ClassCompiler {
 		private boolean isInterface;
 		private Map<String, IConstructor> fieldInitializers = new HashMap<>();
 		private Map<String, IConstructor> staticFieldInitializers = new HashMap<>();
-		private Label methodStartLabel;
-		private Label methodEndLabel;
+		private LeveledLabel methodStartLabel;
+		private LeveledLabel methodEndLabel;
 		private MethodNode method;
-		private ArrayList<Builder<?>> level = new ArrayList<>();
+		private ArrayList<Builder<?>> tryFinallyNestingLevel = new ArrayList<>();
 		private IConstructor classType;
 		private ClassNode classNode;
 		private final Builder<?> pushTrue = () -> trueExp();
 		private final Builder<?> pushFalse = () -> falseExp();
-		private Map<String, Label> labels;
+		private Map<String, LeveledLabel> labels;
+		private boolean emittingFinally = false;
+		private final boolean debug;
 
-		public Compile(ClassVisitor cw, int version, PrintWriter out) {
+		public Compile(ClassVisitor cw, int version, PrintWriter out, boolean debug) {
 			this.cw = cw;
 			this.version = version;
 			this.out = out;
+			this.debug = debug;
 		}
 
 		public void compileClass(IConstructor o) {
@@ -338,7 +357,12 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.RETURN);
 			method.visitLabel(l1);
 
-			method.visitMaxs(0, 0);
+			if (debug) {
+				method.visitMaxs(Short.MAX_VALUE, Short.MAX_VALUE);
+			}
+			else {
+				method.visitMaxs(0, 0);
+			}
 			method.visitEnd();
 			classNode.methods.add(method);
 		}
@@ -391,7 +415,12 @@ public class ClassCompiler {
 
 			method.visitLabel(methodEndLabel);
 			method.visitInsn(Opcodes.RETURN);
-			method.visitMaxs(0, 0);
+			if (debug) {
+				method.visitMaxs(Short.MAX_VALUE, Short.MAX_VALUE);
+			}
+			else {
+				method.visitMaxs(0, 0);
+			}
 			method.visitEnd();
 
 			classNode.methods.add(method);
@@ -471,7 +500,12 @@ public class ClassCompiler {
 					method.visitLocalVariable(varName, Signature.type(variableTypes.get(i)), null, methodStartLabel, methodEndLabel, i);
 				}
 				
-				method.visitMaxs(0, 0);
+				if (debug) {
+					method.visitMaxs(Short.MAX_VALUE, Short.MAX_VALUE);
+				}
+				else {
+					method.visitMaxs(0, 0);
+				}
 			}
 			
 			method.visitEnd(); // also needed for abstract methods
@@ -593,12 +627,12 @@ public class ClassCompiler {
 					);
 		}
 
-		private Void statements(IList statements, Label continueLabel, Label breakLabel, Label joinLabel) {
+		private Void statements(IList statements, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			int i = 0, len = statements.length();
 			for (IValue elem : statements) {
 				// generate the label for where the next statement ends, unless this is the last statement, because
 				// then we rejoin the context and we have a label for that given in the parameter 'joinLabel'
-				Label nextLabel = (++i < len || joinLabel == null) ? newLabel(level) : joinLabel;
+				LeveledLabel nextLabel = (++i < len || joinLabel == null) ? newLabel(tryFinallyNestingLevel) : joinLabel;
 				statement((IConstructor) elem, continueLabel, breakLabel, nextLabel);
 				if (i < len) {
 					method.visitLabel(nextLabel);
@@ -607,7 +641,7 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private void statement(IConstructor stat, Label continueLabel, Label breakLabel, Label joinLabel) {
+		private void statement(IConstructor stat, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			switch (stat.getConstructorType().getName()) {
 			case "incr":
 				incStat(AST.$getName(stat), AST.$getInc(stat));
@@ -619,7 +653,7 @@ public class ClassCompiler {
 				labelStat(AST.$getLabel(stat));
 				break;
 			case "goto":
-				gotoStat(AST.$getLabel(stat), joinLabel);
+				gotoStat(AST.$getLabel(stat));
 				break;
 			case "do" : 
 				doStat((IConstructor) stat.get("exp"));
@@ -686,19 +720,24 @@ public class ClassCompiler {
 			method.visitIincInsn(positionOf(name), inc);
 		}
 
-		private void tryStat(IList block, IList catches, IList finallyBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label tryStart = newLabel(level);
-			Label tryEnd = newLabel(level);
-			Label[] handlers = new Label[catches.length()];
+		private void tryStat(IList block, IList catches, IList finallyBlock, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+			if (block.length() == 0) {
+				// JVM can not deal with empty catch ranges anyway
+				return;
+			}
+			
+			Label tryStart = newLabel(tryFinallyNestingLevel);
+			Label tryEnd = newLabel(tryFinallyNestingLevel);
+			Label[] handlers = new LeveledLabel[catches.length()];
 			boolean withFinally = !finallyBlock.isEmpty();
 			String finallyVarName = null;
-			Label finallyHandler = null;
+			Label finallyHandler = joinLabel;
 			Builder<?> finallyCode = null;
 			
 			// produce handler registration for every catch block
 			for (int i = 0; i < catches.length(); i++) {
 				IConstructor catcher = (IConstructor) catches.get(i);
-				handlers[i] = newLabel(level);
+				handlers[i] = newLabel(tryFinallyNestingLevel);
 				IConstructor exceptionType = AST.$getType(catcher);
 				String clsName = AST.$getClassFromType(exceptionType, classNode.name);
 				String varName = AST.$getName(catcher);
@@ -710,16 +749,16 @@ public class ClassCompiler {
 			// so there is a handler for that too. And it spans also over the handlers in case
 			// an exception is thrown from a handler:
 			if (withFinally) {
-				finallyHandler = newLabel(level);
+				finallyHandler = newLabel(tryFinallyNestingLevel);
 				finallyVarName = "finally:" + UUID.randomUUID();
 				declareVariable(Types.throwableType(), finallyVarName, null, false);
 				method.visitTryCatchBlock(tryStart, tryEnd, finallyHandler, Types.throwableName());
 				finallyCode = () -> statements(finallyBlock, breakLabel, continueLabel, joinLabel);
+				pushFinally(finallyCode);
 			}
 			
 			// the try block itself
 			method.visitLabel(tryStart);
-			pushFinally(finallyCode);
 			statements(block, continueLabel, breakLabel, joinLabel);
 			
 			method.visitLabel(tryEnd);
@@ -734,7 +773,12 @@ public class ClassCompiler {
 				String varName = AST.$getName(catcher);
 				method.visitVarInsn(Opcodes.ASTORE, positionOf(varName));
 				IList code = AST.$getBlock(catcher);
-				statements(code, null, null, joinLabel);
+				if (code.isEmpty()) {
+					method.visitInsn(Opcodes.NOP); // empty catch blocks may wreak havoc
+				}
+				else {
+					statements(code, continueLabel, breakLabel, joinLabel);
+				}
 				
 				// unless it's the last catch block we have to jump over the other catch blocks
 				// TODO: if the block ends with a RETURN, we shouldn't have to generate this.
@@ -743,27 +787,26 @@ public class ClassCompiler {
 				}
 			}
 			
-			popFinally();
-			
 			if (withFinally) {
 				method.visitLabel(finallyHandler);
-				statements(finallyBlock, breakLabel, continueLabel, joinLabel);
+				finallyCode.build();
+				popFinally();
 			}
 		}
 
 		private Builder<?> popFinally() {
-			return level.remove(level.size() - 1);
+			return tryFinallyNestingLevel.remove(tryFinallyNestingLevel.size() - 1);
 		}
 
 		private boolean pushFinally(Builder<?> finallyCode) {
-			return level.add(finallyCode);
+			return tryFinallyNestingLevel.add(finallyCode);
 		}
 
-		private void monitorStat(IConstructor lock, IList block, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label startExceptionBlock = newLabel(level);
-			Label endExceptionBlock = newLabel(level);
-			Label handlerStart = newLabel(level);
-			Label handlerEnd = newLabel(level);
+		private void monitorStat(IConstructor lock, IList block, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+			Label startExceptionBlock = newLabel(tryFinallyNestingLevel);
+			Label endExceptionBlock = newLabel(tryFinallyNestingLevel);
+			Label handlerStart = newLabel(tryFinallyNestingLevel);
+			Label handlerEnd = newLabel(tryFinallyNestingLevel);
 			
 			method.visitTryCatchBlock(startExceptionBlock, endExceptionBlock, handlerStart, null);
 			method.visitTryCatchBlock(handlerStart, handlerEnd, handlerStart, null);
@@ -795,8 +838,8 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.ATHROW);
 		}
 
-		private void whileStat(String label, IConstructor cond, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label testConditional = newLabel(level);
+		private void whileStat(String label, IConstructor cond, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+			LeveledLabel testConditional = newLabel(tryFinallyNestingLevel);
 			
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
@@ -821,8 +864,8 @@ public class ClassCompiler {
 			jumpTo(testConditional); // this might be superfluous
 		}
 		
-		private void doWhileStat(String label, IConstructor cond, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label nextIteration = newLabel(level);
+		private void doWhileStat(String label, IConstructor cond, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+			LeveledLabel nextIteration = newLabel(tryFinallyNestingLevel);
 			
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
@@ -848,44 +891,47 @@ public class ClassCompiler {
 					null);
 		}
 
-		private void breakStat(IConstructor stat, Label join) {
+		private void breakStat(IConstructor stat, LeveledLabel join) {
 			if (join == null) {
 				throw new IllegalArgumentException("no loop to break from (or inside an expression or monitor block");
 			}
 			
+			LeveledLabel target = join;
+			
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
-				gotoStat("break:" + loopLabel, join);
+				target = getOrGenerateLabel(tryFinallyNestingLevel.size(), "break:" + loopLabel);
 			}
-			else {
-				method.visitJumpInsn(Opcodes.GOTO, join);
-			}
+			
+			emitFinally(target.getFinallyNestingLevel());
+			method.visitJumpInsn(Opcodes.GOTO, target);
 		}
 		
-		private void continueStat(IConstructor stat, Label join) {
+		private void continueStat(IConstructor stat, LeveledLabel join) {
 			if (join == null) {
 				throw new IllegalArgumentException("no loop to continue with (or inside an expression or monitor block");
 			}
 			
+			LeveledLabel target = join;
+			
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
-				gotoStat("continue:" + loopLabel, join);
+				target = getOrGenerateLabel(tryFinallyNestingLevel.size(), "continue:" + loopLabel);
 			}
-			else {
-				method.visitJumpInsn(Opcodes.GOTO, join);
-			}
+			
+			emitFinally(target.getFinallyNestingLevel());
+			method.visitJumpInsn(Opcodes.GOTO, target);
 		}
 
-		private void gotoStat(String label, Label join) {
-			if (join == null) {
-				throw new IllegalArgumentException("goto within a monitor block is not supported");
-			}
-			Label l = getOrGenerateLabel(level.size(), label);
+		private void gotoStat(String label) {
+			LeveledLabel l = getOrGenerateLabel(tryFinallyNestingLevel.size(), label);
+
+			emitFinally(l.getFinallyNestingLevel());
 			method.visitJumpInsn(Opcodes.GOTO, l);
 		}
 
-		private Label getOrGenerateLabel(int level, String label) {
-			Label l = labels.get(label);
+		private LeveledLabel getOrGenerateLabel(int level, String label) {
+			LeveledLabel l = labels.get(label);
 			
 			if (l == null) {
 				l = new LeveledLabel(level);
@@ -896,10 +942,10 @@ public class ClassCompiler {
 		}
 
 		private void labelStat(String label) {
-			method.visitLabel(getOrGenerateLabel(level.size(), label));
+			method.visitLabel(getOrGenerateLabel(tryFinallyNestingLevel.size(), label));
 		}
 
-		private void declStat(IConstructor stat, Label joinLabel) {
+		private void declStat(IConstructor stat, LeveledLabel joinLabel) {
 			IConstructor def = null;
 			if (stat.asWithKeywordParameters().hasParameter("init")) {
 				def = (IConstructor) stat.asWithKeywordParameters().getParameter("init");
@@ -908,9 +954,9 @@ public class ClassCompiler {
 			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true);
 		}
 
-		private void forStat(String label, IList init, IConstructor cond, IList next, IList body, Label continueLabel, Label breakLabel, Label joinLabel) {
-			Label testConditional = newLabel(level);
-			Label nextIterationLabel = newLabel(level);
+		private void forStat(String label, IList init, IConstructor cond, IList next, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+			LeveledLabel testConditional = newLabel(tryFinallyNestingLevel);
+			LeveledLabel nextIterationLabel = newLabel(tryFinallyNestingLevel);
 			
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
@@ -944,11 +990,11 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private void ifStat(IConstructor cond, IList thenBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
+		private void ifStat(IConstructor cond, IList thenBlock, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			ifThenElseStat(cond, thenBlock, null, continueLabel, breakLabel, joinLabel);
 		}
 
-		private void ifThenElseStat(IConstructor cond, IList thenBlock, IList elseBlock, Label continueLabel, Label breakLabel, Label joinLabel) {
+		private void ifThenElseStat(IConstructor cond, IList thenBlock, IList elseBlock, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			Builder<?> thenBuilder = () -> statements(thenBlock, continueLabel, breakLabel, joinLabel);
 			Builder<?> elseBuilder = elseBlock != null ? () -> statements(elseBlock, continueLabel, breakLabel, joinLabel) : DONE;
 
@@ -1033,7 +1079,12 @@ public class ClassCompiler {
 			}
 			else {
 				IConstructor type = expr(AST.$getArg(stat));
-
+				
+				// return, or break or continue from the finally block,
+				// must not execute current finally again (infinite loop),
+				// so pop that and push it back when done.
+				emitFinally(0);
+				
 				Switch.type0(type,
 						(z) -> { method.visitInsn(Opcodes.IRETURN); },
 						(i) -> { method.visitInsn(Opcodes.IRETURN); },
@@ -1048,6 +1099,20 @@ public class ClassCompiler {
 						(a) -> { /* array */ method.visitInsn(Opcodes.ARETURN); },
 						(S) -> { /* string */ method.visitInsn(Opcodes.ARETURN); }
 						);
+			}
+		}
+
+		private void emitFinally(int toLevel) {
+			// emit code for finally blocks in reverse order
+			// during this build, the finally stack must NOT be active itself
+			if (!emittingFinally) {
+				emittingFinally  = true;
+
+				for (int i = tryFinallyNestingLevel.size() - 1; i >= 0 && i >= toLevel; i--) {
+					tryFinallyNestingLevel.get(i).build();
+				}
+				
+				emittingFinally = false;
 			}
 		}
 
@@ -1405,8 +1470,8 @@ public class ClassCompiler {
 			Switch.type0(type, 
 					(z) -> { 
 						// TODO: is there really not a better way to negate a boolean on the JVM?
-						Label zeroLabel = newLabel(level);
-						Label contLabel = newLabel(level);
+						Label zeroLabel = newLabel(tryFinallyNestingLevel);
+						Label contLabel = newLabel(tryFinallyNestingLevel);
 						method.visitJumpInsn(Opcodes.IFEQ, zeroLabel);
 						falseExp();
 						jumpTo(contLabel);
@@ -1531,7 +1596,7 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor ltExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor ltExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, LeveledLabel joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
@@ -1551,7 +1616,7 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor leExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor leExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, LeveledLabel joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 			Switch.type0(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel),
@@ -1570,7 +1635,7 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor gtExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor gtExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, LeveledLabel joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
@@ -1590,7 +1655,7 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor geExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor geExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, LeveledLabel joinLabel) {
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			Switch.type0(type, 
@@ -1610,7 +1675,7 @@ public class ClassCompiler {
 			return Types.booleanType();
 		}
 
-		private IConstructor eqExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor eqExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, LeveledLabel joinLabel) {
 			if (lhs.getConstructorType().getName().equals("null")) {
 				return isNullTest(rhs, thenPart, elsePart, joinLabel);
 			}
@@ -1661,9 +1726,9 @@ public class ClassCompiler {
 		 * @param elsePart     emit code for the elsePart
 		 * @param joinLabel emit code for what runs after this conditional
 		 */
-		private void invertedConditionalFlow(int compare, int opcode, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
-			Label jump = newLabel(level);
-			Label next = joinLabel == null ? newLabel(level) : joinLabel;
+		private void invertedConditionalFlow(int compare, int opcode, Builder<?> thenPart, Builder<?> elsePart, LeveledLabel joinLabel) {
+			Label jump = newLabel(tryFinallyNestingLevel);
+			Label next = joinLabel == null ? newLabel(tryFinallyNestingLevel) : joinLabel;
 			
 			if (compare != 0) {
 				method.visitInsn(compare);
@@ -1683,19 +1748,19 @@ public class ClassCompiler {
 			}
 		}
 
-		private IConstructor isNullTest(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor isNullTest(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart, LeveledLabel joinLabel) {
 			expr(arg);
 			invertedConditionalFlow(0, Opcodes.IFNONNULL, thenPart, elsePart, joinLabel);
 			return Types.booleanType();
 		}
 
-		private IConstructor isNonNullTest(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart,Label joinLabel) {
+		private IConstructor isNonNullTest(IConstructor arg, Builder<?> thenPart, Builder<?> elsePart, LeveledLabel joinLabel) {
 			expr(arg);
 			invertedConditionalFlow(0, Opcodes.IFNULL, thenPart, elsePart, joinLabel);
 			return Types.booleanType();
 		}
 
-		private IConstructor neExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, Label joinLabel) {
+		private IConstructor neExp(IConstructor lhs, IConstructor rhs, Builder<?> thenPart, Builder<?> elsePart, LeveledLabel joinLabel) {
 			if (lhs.getConstructorType().getName().equals("null")) {
 				return isNonNullTest(rhs, thenPart, elsePart, joinLabel);
 			}
@@ -2049,7 +2114,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor blockExp(IList block, IConstructor arg) {
-			Label blockEnd = newLabel(level);
+			LeveledLabel blockEnd = newLabel(tryFinallyNestingLevel);
 			statements(block, null, null, blockEnd);
 			method.visitLabel(blockEnd);
 			IConstructor type = expr(arg);

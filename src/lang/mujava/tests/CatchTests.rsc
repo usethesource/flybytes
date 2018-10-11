@@ -127,4 +127,37 @@ test bool finallyContinueTest() {
   m = loadClass(finallyContinueClass(), debugMode=false, file=just(|project://mujava/generated/FinallyContinueTest.class|));
   return m.invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#int) == 10 /*should be 3 when return supported finally */;
 }
+
+Class finallyBreakClass() {
+  return class(reference("FinallyBreakTest"),
+      methods=[
+        staticMethod(\public(), integer(), "testMethod", [], [
+           decl(integer(), "j", init=const(integer(), 0)),
+           \for([decl(integer(), "i" ,init=const(integer(), 0))], // init
+                lt(load("i"), const(integer(), 10)), // cond
+                [incr("i", 1)], // next
+                
+                // loop body
+                [ 
+                  \try([
+                    \break() // loop again, but go past the finally block first!
+                  ],
+                  [ ],
+                  [ // finally
+                    incr("j", 1)
+                  ]
+                  )
+                 ]
+                ),
+           \return(load("j"))
+        ])
+      ]
+    );
+}
+
+
+test bool finallyBreakTest() {
+  m = loadClass(finallyBreakClass(), debugMode=false, file=just(|project://mujava/generated/FinallyBreakTest.class|));
+  return m.invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#int) == 1;
+}
   

@@ -75,7 +75,7 @@ test bool simpleDefaultSwitch2Auto() = testSwitchClass(switchDefaultClass(auto()
 test bool simpleDefaultSwitch3Auto() = testSwitchClass(switchDefaultClass(auto()), 0, -1);
 
 Class switchCompactClass(SwitchOption option) 
-  = class(reference("SwitchDefaultClass_<getName(option)>"),
+  = class(reference("SwitchCompactClass_<getName(option)>"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [var(integer(), "par")],
         [ 
@@ -96,6 +96,24 @@ Class switchCompactClass(SwitchOption option)
               \return(const(integer(), 4))
             ]),
              \case(5, [
+              \return(const(integer(), 5))
+            ]),
+             \case(7, [
+              \return(const(integer(), 5))
+            ]),
+             \case(8, [
+              \return(const(integer(), 5))
+            ]),
+             \case(9, [
+              \return(const(integer(), 5))
+            ]),
+             \case(10, [
+              \return(const(integer(), 5))
+            ]),
+             \case(11, [
+              \return(const(integer(), 5))
+            ]),
+             \case(12, [
               \return(const(integer(), 5))
             ]),
             \default([

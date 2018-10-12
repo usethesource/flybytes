@@ -715,7 +715,7 @@ public class ClassCompiler {
 				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			case "switch":
-				String option = stat.asWithKeywordParameters().hasParameter("option") ? ((IConstructor) stat.asWithKeywordParameters().getParameter("option")).getConstructorType().getName() : "auto";
+				String option = stat.asWithKeywordParameters().hasParameter("option") ? ((IConstructor) stat.asWithKeywordParameters().getParameter("option")).getConstructorType().getName() : "lookup";
 				switchStat(option, AST.$getArg(stat), AST.$getCases(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			}
@@ -729,11 +729,20 @@ public class ClassCompiler {
 			case "lookup":
 				lookupSwitch(arg, cases, continueLabel, joinLabel);
 				return;
+			case "auto":
+				autoSwitch(arg, cases, continueLabel, joinLabel);
+				return;
 			}
-			
-			autoSwitch(arg, cases, continueLabel, joinLabel);
+
+			lookupSwitch(arg, cases, continueLabel, joinLabel);
+			return;
 		}
 
+		/**
+		 * Since there is a choice, we mimick the Java compilers heuristics here. However, it must 
+		 * be said that the JVM JIT compiler may optimize either instruction to use any kind of 
+		 * implementations and nowadays it thus best to generate the smallest code using a lookup table. 
+		 */
 		private void autoSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel) {
 			int max = Integer.MAX_VALUE;
 			int min = Integer.MIN_VALUE;
@@ -754,14 +763,14 @@ public class ClassCompiler {
 			// we're exactly mimicking Java compiler, see 
 			// http://hg.openjdk.java.net/jdk8/jdk8/langtools/file/30db5e0aaf83/src/share/classes/com/sun/tools/javac/jvm/Gen.java#l1153
 			
-			long wordCost = 4 + ((long) max - min + 1); 
-			long comparisonsCost  = 3; 
-			long lookupWordCost = 3 + 2 * (long) labelCount;
-			long lookupComparisonCost = labelCount;
-			long tableSwitchCost = wordCost + 3 * comparisonsCost;
-			long lookupSwitchCost = lookupWordCost + 3 * lookupComparisonCost;
+			long tableSpaceCost = 4 + (long) (max - min + 1); 
+			long tableTimeCost  = 3; 
+			long lookupSpaceCost = 3 + 2 * (long) labelCount;
+			long lookupTimeCost = labelCount;
+			long tableCost = tableSpaceCost + 3 * tableTimeCost;
+			long lookupCost = lookupSpaceCost + 3 * lookupTimeCost;
 			
-			if (labelCount > 0 && tableSwitchCost <= lookupSwitchCost) {
+			if (labelCount > 0 && tableCost <= lookupCost) {
 				tableSwitch(arg, cases, continueLabel, joinLabel);
 			}
 			else {
@@ -771,13 +780,9 @@ public class ClassCompiler {
 		
 		private static class CaseLabel extends Label {
 			final int key;
-			final Label label;
-			final IList code;
 			
-			public CaseLabel(int key, Label label, IList code) {
+			public CaseLabel(int key) {
 				this.key = key;
-				this.label = label;
-				this.code = code;
 			}
 		}
 
@@ -813,7 +818,7 @@ public class ClassCompiler {
 					}
 				}
 				else {
-					labels.add(new CaseLabel(AST.$getKey(c), new Label(), AST.$getBlock(c)));
+					labels.add(new CaseLabel(AST.$getKey(c)));
 				}
 			}
 				

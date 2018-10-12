@@ -113,14 +113,14 @@ test bool compactDefaultSwitch2Table() = testSwitchClass(switchCompactClass(tabl
 test bool compactDefaultSwitch3Table() = testSwitchClass(switchCompactClass(table()), 2, 2);
 test bool compactDefaultSwitch4Table() = testSwitchClass(switchCompactClass(table()), 6, 5);
 
-//test bool compactDefaultSwitch1Lookup() = testSwitchClass(switchCompactClass(lookup()),  0, 0);
-//test bool compactDefaultSwitch2Lookup() = testSwitchClass(switchCompactClass(lookup()),  1, 1);
-//test bool compactDefaultSwitch3Lookup() = testSwitchClass(switchCompactClass(lookup()),  2, 2);
-//test bool compactDefaultSwitch4Lookup() = testSwitchClass(switchCompactClass(lookup()),  6, 5);
-//
-//test bool compactDefaultSwitch1Auto() = testSwitchClass(switchCompactClass(auto()), 0, 0);
-//test bool compactDefaultSwitch2Auto() = testSwitchClass(switchCompactClass(auto()), 1, 1);
-//test bool compactDefaultSwitch3Auto() = testSwitchClass(switchCompactClass(auto()), 2, 2);
-//test bool compactDefaultSwitch4Auto() = testSwitchClass(switchCompactClass(auto()), 6, 5);
+test bool compactDefaultSwitch1Lookup() = testSwitchClass(switchCompactClass(lookup()),  0, 0);
+test bool compactDefaultSwitch2Lookup() = testSwitchClass(switchCompactClass(lookup()),  1, 1);
+test bool compactDefaultSwitch3Lookup() = testSwitchClass(switchCompactClass(lookup()),  2, 2);
+test bool compactDefaultSwitch4Lookup() = testSwitchClass(switchCompactClass(lookup()),  6, 5);
+
+test bool compactDefaultSwitch1Auto() = testSwitchClass(switchCompactClass(auto()), 0, 0);
+test bool compactDefaultSwitch2Auto() = testSwitchClass(switchCompactClass(auto()), 1, 1);
+test bool compactDefaultSwitch3Auto() = testSwitchClass(switchCompactClass(auto()), 2, 2);
+test bool compactDefaultSwitch4Auto() = testSwitchClass(switchCompactClass(auto()), 6, 5);
 
 

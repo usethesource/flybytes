@@ -768,6 +768,18 @@ public class ClassCompiler {
 				lookupSwitch(arg, cases, continueLabel, joinLabel);
 			}
 		}
+		
+		private static class CaseLabel extends Label {
+			final int key;
+			final Label label;
+			final IList code;
+			
+			public CaseLabel(int key, Label label, IList code) {
+				this.key = key;
+				this.label = label;
+				this.code = code;
+			}
+		}
 
 		/** 
 		 * Generates a LOOKUPSWITCH instruction, which jumps to each case in O(log(n)) where n is the
@@ -785,8 +797,7 @@ public class ClassCompiler {
 		 * is a sparse and/or more or less uniformally distributed set (like hashcode's of Strings for example).
 		 */
 		private void lookupSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel) {
-			ArrayList<Integer> keys = new ArrayList<>();
-			ArrayList<Label> labels = new ArrayList<>();
+			ArrayList<CaseLabel> labels = new ArrayList<>();
 			Label defaultLabel = new Label();
 			boolean hasDef = false;
 			
@@ -802,22 +813,21 @@ public class ClassCompiler {
 					}
 				}
 				else {
-					int key = AST.$getKey(c);
-					Label caseLabel = new Label();
-					
-					// NB! the lookupswitch wants the cases in reverse order!
-					keys.add(0, key);
-					labels.add(0, caseLabel);
+					labels.add(new CaseLabel(AST.$getKey(c), new Label(), AST.$getBlock(c)));
 				}
 			}
 				
 			
 			// first put the key value on the stack
 			expr(arg);
-						
-			// here come the handlers
-			int[] keyArray = keys.stream().mapToInt(i->i).toArray();
-			Label[] labelArray = labels.toArray(new Label[0]);
+					
+			@SuppressWarnings("unchecked")
+			ArrayList<CaseLabel> sorted = (ArrayList<CaseLabel>) labels.clone();
+			sorted.sort((a,b) -> Integer.compare(a.key, b.key));
+			
+			// here come the handlers, in sorted order
+			int[] keyArray = sorted.stream().mapToInt(l->l.key).toArray();
+			Label[] labelArray = sorted.toArray(new Label[0]);
 			
 			// NOTE: this only works correctly if the jump labels have already been visited			
 			method.visitLookupSwitchInsn(defaultLabel, keyArray, labelArray);
@@ -831,8 +841,7 @@ public class ClassCompiler {
 					method.visitLabel(defaultLabel);
 				}
 				else {
-					int reverseInd = cases.length() - i - (hasDef?2:1);
-					method.visitLabel(labelArray[reverseInd]);
+					method.visitLabel(labels.get(i));
 				}
 
 				LeveledLabel endCase = newLabel(tryFinallyNestingLevel);

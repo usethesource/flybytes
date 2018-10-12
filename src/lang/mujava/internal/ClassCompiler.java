@@ -729,10 +729,43 @@ public class ClassCompiler {
 			case "lookup":
 				lookupSwitch(arg, cases, continueLabel, joinLabel);
 				return;
-			case "auto": // TODO heuristics
-		    default:
+			}
+			
+			autoSwitch(arg, cases, continueLabel, joinLabel);
+		}
+
+		private void autoSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel) {
+			int max = Integer.MAX_VALUE;
+			int min = Integer.MIN_VALUE;
+			long labelCount = 0;
+			
+			for (int i = 0; i < cases.length(); i++) {
+				IConstructor c = (IConstructor) cases.get(i);
+				boolean isDefault = AST.$is("default", c);
+				
+				if (!isDefault) {
+					int key = AST.$getKey(c);
+					min = Math.min(key, min);
+					max = Math.max(key, max);
+					labelCount++;
+				}
+			}
+			
+			// we're exactly mimicking Java compiler, see 
+			// http://hg.openjdk.java.net/jdk8/jdk8/langtools/file/30db5e0aaf83/src/share/classes/com/sun/tools/javac/jvm/Gen.java#l1153
+			
+			long wordCost = 4 + ((long) max - min + 1); 
+			long comparisonsCost  = 3; // comparisons
+			long lookupWordCost = 3 + 2 * (long) labelCount;
+			long lookupComparisonCost = labelCount;
+			long tableSwitchCost = wordCost + 3 * comparisonsCost;
+			long lookupSwitchCost = lookupWordCost + 3 * lookupComparisonCost;
+			
+			if (labelCount > 0 && tableSwitchCost <= lookupSwitchCost) {
+				tableSwitch(arg, cases, continueLabel, joinLabel);
+			}
+			else {
 				lookupSwitch(arg, cases, continueLabel, joinLabel);
-				return;
 			}
 		}
 

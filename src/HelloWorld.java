@@ -8,7 +8,7 @@ public class HelloWorld {
 		switch (x) {
 		case 12: return 1;
 		case 42: return 2;
-		default: return x - 1;
 		}
+		return x - 1;
 	}
 }

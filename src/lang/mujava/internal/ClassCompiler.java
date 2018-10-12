@@ -13,6 +13,8 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.rascalmpl.interpreter.IEvaluatorContext;
+import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.objectweb.asm.ClassVisitor;
 import org.rascalmpl.objectweb.asm.ClassWriter;
 import org.rascalmpl.objectweb.asm.Label;
@@ -22,8 +24,6 @@ import org.rascalmpl.objectweb.asm.tree.FieldNode;
 import org.rascalmpl.objectweb.asm.tree.MethodNode;
 import org.rascalmpl.objectweb.asm.util.CheckClassAdapter;
 import org.rascalmpl.objectweb.asm.util.TraceClassVisitor;
-import org.rascalmpl.interpreter.IEvaluatorContext;
-import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.uri.URIResolverRegistry;
 import org.rascalmpl.uri.URIUtil;
 import org.rascalmpl.values.ValueFactoryFactory;
@@ -721,6 +721,66 @@ public class ClassCompiler {
 		}
 
 		private void switchStat(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+//			tableSwitch(arg, cases, continueLabel, joinLabel);
+			lookupSwitch(arg, cases, continueLabel, joinLabel);
+		}
+		
+		private void lookupSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel) {
+			ArrayList<Integer> keys = new ArrayList<>();
+			ArrayList<Label> labels = new ArrayList<>();
+			LeveledLabel defaultLabel = joinLabel;
+			boolean hasDef = false;
+			
+			for (int i = 0; i < cases.length(); i++) {
+				IConstructor c = (IConstructor) cases.get(i);
+				
+				if (AST.$is("default", c)) {
+					defaultLabel = newLabel(tryFinallyNestingLevel);
+					hasDef = true;
+					
+					if (i != cases.length() - 1) {
+						throw new IllegalArgumentException("default handler should be the last of the cases");
+					}
+				}
+				else {
+					keys.add(AST.$getKey(c));
+					labels.add(newLabel(tryFinallyNestingLevel));
+				}
+			}
+				
+			
+			// first put the key value on the stack
+			expr(arg);
+						
+			// then we generate the switch tabel
+			int[] keyArray = keys.stream().mapToInt(i -> i).toArray();
+			Label[] labelArray = labels.stream().toArray(Label[]::new);
+			labels.stream().forEach((l) -> out.println(l));
+			out.println("keycount: " + keyArray.length);
+			out.println("labelCount:" + labelArray.length);
+			
+			method.visitLookupSwitchInsn(defaultLabel, keyArray, labelArray);
+			
+			// here come the handlers
+			for (int i = 0; i < cases.length(); i++) {
+				IConstructor c = (IConstructor) cases.get(i);
+				boolean isDef = AST.$is("default", c);
+
+				if (isDef) {
+					method.visitLabel(defaultLabel);
+				}
+				else {
+					method.visitLabel(labels.get(i));
+				}
+
+				LeveledLabel endCase = newLabel(tryFinallyNestingLevel);
+				statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase);
+				method.visitLabel(endCase);
+			}
+		}
+
+
+		private void tableSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel) {
 			int min = Integer.MAX_VALUE;
 			int max = Integer.MIN_VALUE;
 			boolean hasDefault = false;

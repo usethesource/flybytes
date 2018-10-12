@@ -89,6 +89,15 @@ Class switchCompactClass(SwitchOption option)
             \case(2, [
               \return(const(integer(), 2))
             ]),
+             \case(3, [
+              \return(const(integer(), 3))
+            ]),
+             \case(4, [
+              \return(const(integer(), 4))
+            ]),
+             \case(5, [
+              \return(const(integer(), 5))
+            ]),
             \default([
               \return(sub(load("par"), const(integer(), 1)))
             ])
@@ -99,17 +108,19 @@ Class switchCompactClass(SwitchOption option)
     );
     
 
-//test bool compactDefaultSwitch1Table() = testSwitchClass(switchCompactClass(table()), 0, 0);
-//test bool compactDefaultSwitch2Table() = testSwitchClass(switchCompactClass(table()), 1, 1);
-//test bool compactDefaultSwitch2Table() = testSwitchClass(switchCompactClass(table()), 2, 2);
-//test bool compactDefaultSwitch3Table() = testSwitchClass(switchCompactClass(table()), 3, 2);
-//
+test bool compactDefaultSwitch1Table() = testSwitchClass(switchCompactClass(table()), 0, 0);
+test bool compactDefaultSwitch2Table() = testSwitchClass(switchCompactClass(table()), 1, 1);
+test bool compactDefaultSwitch3Table() = testSwitchClass(switchCompactClass(table()), 2, 2);
+test bool compactDefaultSwitch4Table() = testSwitchClass(switchCompactClass(table()), 6, 5);
+
 //test bool compactDefaultSwitch1Lookup() = testSwitchClass(switchCompactClass(lookup()),  0, 0);
 //test bool compactDefaultSwitch2Lookup() = testSwitchClass(switchCompactClass(lookup()),  1, 1);
 //test bool compactDefaultSwitch3Lookup() = testSwitchClass(switchCompactClass(lookup()),  2, 2);
-//test bool compactDefaultSwitch3Lookup() = testSwitchClass(switchCompactClass(lookup()),  3, 2);
+//test bool compactDefaultSwitch4Lookup() = testSwitchClass(switchCompactClass(lookup()),  6, 5);
 //
 //test bool compactDefaultSwitch1Auto() = testSwitchClass(switchCompactClass(auto()), 0, 0);
 //test bool compactDefaultSwitch2Auto() = testSwitchClass(switchCompactClass(auto()), 1, 1);
 //test bool compactDefaultSwitch3Auto() = testSwitchClass(switchCompactClass(auto()), 2, 2);
-//test bool compactDefaultSwitch3Auto() = testSwitchClass(switchCompactClass(auto()), 3, 2);
+//test bool compactDefaultSwitch4Auto() = testSwitchClass(switchCompactClass(auto()), 6, 5);
+
+

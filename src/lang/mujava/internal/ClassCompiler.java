@@ -755,7 +755,7 @@ public class ClassCompiler {
 			// http://hg.openjdk.java.net/jdk8/jdk8/langtools/file/30db5e0aaf83/src/share/classes/com/sun/tools/javac/jvm/Gen.java#l1153
 			
 			long wordCost = 4 + ((long) max - min + 1); 
-			long comparisonsCost  = 3; // comparisons
+			long comparisonsCost  = 3; 
 			long lookupWordCost = 3 + 2 * (long) labelCount;
 			long lookupComparisonCost = labelCount;
 			long tableSwitchCost = wordCost + 3 * comparisonsCost;

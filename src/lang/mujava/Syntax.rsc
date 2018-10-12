@@ -133,9 +133,15 @@ data Stat(loc src = |unknown:///|)
   | \throw(Exp arg) 
   | \monitor(Exp arg, list[Stat] block) // TODO test  
   | \try(list[Stat] block, list[Handler] \catch) 
-  | \switch(Exp arg, list[Case] cases) // TODO test
+  | \switch(Exp arg, list[Case] cases, SwitchOption option = auto()) 
   ;
 
+data SwitchOption
+  = table()
+  | lookup()
+  | auto()
+  ;
+  
 data Case 
   = \case(int key, list[Stat] block)
   | \default(list[Stat] block)

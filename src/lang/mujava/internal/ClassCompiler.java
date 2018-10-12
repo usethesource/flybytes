@@ -715,40 +715,27 @@ public class ClassCompiler {
 				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			case "switch":
-				switchStat(AST.$getArg(stat), AST.$getCases(stat), continueLabel, breakLabel, joinLabel);
+				String option = stat.asWithKeywordParameters().hasParameter("option") ? ((IConstructor) stat.asWithKeywordParameters().getParameter("option")).getConstructorType().getName() : "auto";
+				switchStat(option, AST.$getArg(stat), AST.$getCases(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			}
 		}
 
-		private void switchStat(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
-			boolean useTableSwitch = false;
-			
-			if (useTableSwitch) {
+		private void switchStat(String option, IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+			switch (option) {
+			case "table":
 				tableSwitch(arg, cases, continueLabel, joinLabel);
-			}
-			else {
+				return;
+			case "lookup":
 				lookupSwitch(arg, cases, continueLabel, joinLabel);
-//				debugSwitch();
+				return;
+			case "auto": // TODO heuristics
+		    default:
+				lookupSwitch(arg, cases, continueLabel, joinLabel);
+				return;
 			}
 		}
 
-		private void debugSwitch() {
-			method.visitVarInsn(Opcodes.ILOAD, 0);
-			Label case1 = new Label();
-			Label case2 = new Label();
-			Label defH = new Label();
-			method.visitLookupSwitchInsn(defH, new int[] { 12, 42 }, new Label[] { case1, case2 });
-			method.visitLabel(case1);
-			method.visitIntInsn(Opcodes.BIPUSH, 12);
-			method.visitInsn(Opcodes.IRETURN);
-			method.visitLabel(case2);
-			method.visitIntInsn(Opcodes.BIPUSH, 42);
-			method.visitInsn(Opcodes.IRETURN);
-			method.visitLabel(defH);
-			method.visitInsn(Opcodes.ICONST_0);
-			method.visitInsn(Opcodes.IRETURN);
-		}
-		
 		/** 
 		 * Generates a LOOKUPSWITCH instruction, which jumps to each case in O(log(n)) where n is the
 		 * number of cases, that is if you ignore the cost of far away memory lookup and cache misses. 
@@ -774,7 +761,6 @@ public class ClassCompiler {
 				IConstructor c = (IConstructor) cases.get(i);
 				
 				if (AST.$is("default", c)) {
-					out.println("new default label is " + defaultLabel);
 					defaultLabel = new Label();
 					hasDef = true;
 					
@@ -785,7 +771,6 @@ public class ClassCompiler {
 				else {
 					int key = AST.$getKey(c);
 					Label caseLabel = new Label();
-					out.println("registered case: " + caseLabel + " for key: " + key);
 					
 					// NB! the lookupswitch wants the cases in reverse order!
 					keys.add(0, key);
@@ -795,7 +780,6 @@ public class ClassCompiler {
 				
 			
 			// first put the key value on the stack
-			out.println("push the key");
 			expr(arg);
 						
 			// here come the handlers
@@ -811,12 +795,10 @@ public class ClassCompiler {
 				boolean isDef = AST.$is("default", c);
 
 				if (isDef) {
-					out.println("!!!!visiting def label");
 					method.visitLabel(defaultLabel);
 				}
 				else {
-					int reverseInd = cases.length() - i - 1;
-					out.println("printing case label " + labelArray[reverseInd] + "; key: " + AST.$getKey(c));
+					int reverseInd = cases.length() - i - (hasDef?2:1);
 					method.visitLabel(labelArray[reverseInd]);
 				}
 

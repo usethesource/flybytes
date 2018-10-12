@@ -500,9 +500,6 @@ public class ClassCompiler {
 					
 					String varType = Signature.type(variableTypes.get(i));
 					
-					if (debug) {
-						out.println("visiting local var: " + varName);
-					}
 					method.visitLocalVariable(varName, varType, null, methodStartLabel, methodEndLabel, i);
 				}
 				
@@ -521,9 +518,6 @@ public class ClassCompiler {
 		private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize) {
 			int pos = variableNames.size();
 			
-			if (debug) {
-				out.println("decl: " + type + " " + name + " = " + def);
-			}
 			variableTypes.add(type);
 			variableNames.add(name);
 			variableDefaults.add(def);
@@ -740,7 +734,6 @@ public class ClassCompiler {
 				
 				if (!isDefault) {
 					int key = AST.$getKey(c);
-					out.println("case " + i + " = " + key);
 					min = Math.min(key, min);
 					max = Math.max(key, max);
 				}
@@ -753,12 +746,6 @@ public class ClassCompiler {
 				}
 			}
 				
-			out.println("min: " + min);
-			out.println("max: " + max);
-			out.println("hasDef: " + hasDefault);
-			out.println("cases: " + cases.length());
-			out.println("max-min: " + (max - min));
-			
 			LeveledLabel defaultLabel = hasDefault ? newLabel(tryFinallyNestingLevel) : joinLabel;
 			Label[] labels = new LeveledLabel[max - min + 1];
 			

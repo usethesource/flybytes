@@ -760,20 +760,20 @@ public class ClassCompiler {
 			out.println("max-min: " + (max - min));
 			
 			LeveledLabel defaultLabel = hasDefault ? newLabel(tryFinallyNestingLevel) : joinLabel;
-			LeveledLabel[] labels = new LeveledLabel[max - min + 1];
+			Label[] labels = new LeveledLabel[max - min + 1];
 			
 			for (int i = 0; i < labels.length; i++) {
-				for (int j = 0; j < cases.length(); j++) {
-					IConstructor c = (IConstructor) cases.get(j);
-					if (AST.$is("default", c)) {
-						continue;
-					}
-					else if (AST.$getKey(c) == i) {
-						labels[i] = newLabel(tryFinallyNestingLevel);
-					}
-					else {
-						labels[i] = defaultLabel;
-					}
+				labels[i] = defaultLabel; // they all jump to default
+			}
+			
+			// unless there is case to jump to:
+			for (int j = 0; j < cases.length(); j++) {
+				IConstructor c = (IConstructor) cases.get(j);
+				if (AST.$is("default", c)) {
+					continue;
+				}
+				else {
+					labels[AST.$getKey(c) - min] = newLabel(tryFinallyNestingLevel);
 				}
 			}
 			
@@ -784,24 +784,20 @@ public class ClassCompiler {
 			method.visitTableSwitchInsn(min, max, defaultLabel, labels);
 			
 			// here come the handlers
-			for (int i = 0; i < labels.length; i++) {
-				for (int j = 0; j < cases.length(); j++) {
-					IConstructor c = (IConstructor) cases.get(j);
-					boolean isDef = AST.$is("default", c);
-					
-					if (isDef || AST.$getKey(c) == i) {
-						if (isDef) {
-							method.visitLabel(defaultLabel);
-						}
-						else {
-							method.visitLabel(labels[i]);
-						}
-						
-						LeveledLabel endCase = newLabel(tryFinallyNestingLevel);
-						statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase /* fall through! */);
-						method.visitLabel(endCase);
-					}
+			for (int i = 0; i < cases.length(); i++) {
+				IConstructor c = (IConstructor) cases.get(i);
+				boolean isDef = AST.$is("default", c);
+
+				if (isDef) {
+					method.visitLabel(defaultLabel);
 				}
+				else {
+					method.visitLabel(labels[AST.$getKey(c) - min]);
+				}
+
+				LeveledLabel endCase = newLabel(tryFinallyNestingLevel);
+				statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase);
+				method.visitLabel(endCase);
 			}
 		}
 

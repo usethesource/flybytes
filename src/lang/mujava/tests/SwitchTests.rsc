@@ -15,10 +15,6 @@ Class switchClass()
             \case(12, [
               \return(const(integer(), 12))
             ])
-            //,
-            //\default([
-            //  \return(sub(load("par"), const(integer(), 1)))
-            //])
           ]),
           \return(const(integer(), 0))          
         ])

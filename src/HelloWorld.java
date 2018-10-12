@@ -6,9 +6,9 @@ public class HelloWorld {
 
 	private static int g(int x) {
 		switch (x) {
-		case 12: return 1;
-		case 42: return 2;
+		case 42: return 42;
+		case 12: return 12;
 		}
-		return x - 1;
+		return 0;
 	}
 }

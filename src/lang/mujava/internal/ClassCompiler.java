@@ -721,21 +721,61 @@ public class ClassCompiler {
 		}
 
 		private void switchStat(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
-//			tableSwitch(arg, cases, continueLabel, joinLabel);
-			lookupSwitch(arg, cases, continueLabel, joinLabel);
+			boolean useTableSwitch = false;
+			
+			if (useTableSwitch) {
+				tableSwitch(arg, cases, continueLabel, joinLabel);
+			}
+			else {
+				lookupSwitch(arg, cases, continueLabel, joinLabel);
+//				debugSwitch();
+			}
+		}
+
+		private void debugSwitch() {
+			method.visitVarInsn(Opcodes.ILOAD, 0);
+			Label case1 = new Label();
+			Label case2 = new Label();
+			Label defH = new Label();
+			method.visitLookupSwitchInsn(defH, new int[] { 12, 42 }, new Label[] { case1, case2 });
+			method.visitLabel(case1);
+			method.visitIntInsn(Opcodes.BIPUSH, 12);
+			method.visitInsn(Opcodes.IRETURN);
+			method.visitLabel(case2);
+			method.visitIntInsn(Opcodes.BIPUSH, 42);
+			method.visitInsn(Opcodes.IRETURN);
+			method.visitLabel(defH);
+			method.visitInsn(Opcodes.ICONST_0);
+			method.visitInsn(Opcodes.IRETURN);
 		}
 		
+		/** 
+		 * Generates a LOOKUPSWITCH instruction, which jumps to each case in O(log(n)) where n is the
+		 * number of cases, that is if you ignore the cost of far away memory lookup and cache misses. 
+		 * The actual cost might be more in reality, but it's very close to log(n) comparisons to find the 
+		 * right jump label and a goto instruction. 
+		 * 
+		 * The table is stored in a sparse manner, so only the actual labels and their handlers
+		 * are stored. This gives good cache performance. 
+		 *  
+		 * The case handlers are registered in order and have
+		 * "fall-through" semantics by default.
+		 * 
+		 * lookpSwitch is best to call if the case labels are not consecutive integers, the total set of integers
+		 * is a sparse and/or more or less uniformally distributed set (like hashcode's of Strings for example).
+		 */
 		private void lookupSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel) {
 			ArrayList<Integer> keys = new ArrayList<>();
 			ArrayList<Label> labels = new ArrayList<>();
-			LeveledLabel defaultLabel = joinLabel;
+			Label defaultLabel = new Label();
 			boolean hasDef = false;
 			
 			for (int i = 0; i < cases.length(); i++) {
 				IConstructor c = (IConstructor) cases.get(i);
 				
 				if (AST.$is("default", c)) {
-					defaultLabel = newLabel(tryFinallyNestingLevel);
+					out.println("new default label is " + defaultLabel);
+					defaultLabel = new Label();
 					hasDef = true;
 					
 					if (i != cases.length() - 1) {
@@ -743,43 +783,68 @@ public class ClassCompiler {
 					}
 				}
 				else {
-					keys.add(AST.$getKey(c));
-					labels.add(newLabel(tryFinallyNestingLevel));
+					int key = AST.$getKey(c);
+					Label caseLabel = new Label();
+					out.println("registered case: " + caseLabel + " for key: " + key);
+					
+					// NB! the lookupswitch wants the cases in reverse order!
+					keys.add(0, key);
+					labels.add(0, caseLabel);
 				}
 			}
 				
 			
 			// first put the key value on the stack
+			out.println("push the key");
 			expr(arg);
 						
-			// then we generate the switch tabel
-			int[] keyArray = keys.stream().mapToInt(i -> i).toArray();
-			Label[] labelArray = labels.stream().toArray(Label[]::new);
-			labels.stream().forEach((l) -> out.println(l));
-			out.println("keycount: " + keyArray.length);
-			out.println("labelCount:" + labelArray.length);
-			
-			method.visitLookupSwitchInsn(defaultLabel, keyArray, labelArray);
-			
 			// here come the handlers
+			int[] keyArray = keys.stream().mapToInt(i->i).toArray();
+			Label[] labelArray = labels.toArray(new Label[0]);
+			
+			// NOTE: this only works correctly if the jump labels have already been visited			
+			method.visitLookupSwitchInsn(defaultLabel, keyArray, labelArray);
+						
+			// the case code must be printed in the original order for fall-through semantics
 			for (int i = 0; i < cases.length(); i++) {
 				IConstructor c = (IConstructor) cases.get(i);
 				boolean isDef = AST.$is("default", c);
 
 				if (isDef) {
+					out.println("!!!!visiting def label");
 					method.visitLabel(defaultLabel);
 				}
 				else {
-					method.visitLabel(labels.get(i));
+					int reverseInd = cases.length() - i - 1;
+					out.println("printing case label " + labelArray[reverseInd] + "; key: " + AST.$getKey(c));
+					method.visitLabel(labelArray[reverseInd]);
 				}
 
 				LeveledLabel endCase = newLabel(tryFinallyNestingLevel);
 				statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase);
 				method.visitLabel(endCase);
 			}
+			
+			if (!hasDef) {
+				method.visitLabel(defaultLabel);
+			}
+			
 		}
 
 
+		/** 
+		 * Generates a TABLESWITCH instruction, which jumps to each case in O(1), that is if you ignore
+		 * the cost of far away memory lookup and cache misses. The actual cost may depend on actual memory 
+		 * addresses, but it's pretty close to a regular single conditional jump instruction. 
+		 * 
+		 * The table is filled from the minimum label to
+		 * the maximum label with jumps to the default case, and only in the slots for the actual cases jumps
+		 * to the respective case handlers are made. The case handlers are registered in order and have
+		 * "fall-through" semantics by default.
+		 * 
+		 * tableSwitch is best to call if the case labels are consecutive integers and if there are not so many 
+		 * as to trigger a cache misses all the time.
+		 */
 		private void tableSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel) {
 			int min = Integer.MAX_VALUE;
 			int max = Integer.MIN_VALUE;
@@ -820,6 +885,7 @@ public class ClassCompiler {
 					continue;
 				}
 				else {
+					// overwrite the default label with the case label
 					labels[AST.$getKey(c) - min] = newLabel(tryFinallyNestingLevel);
 				}
 			}

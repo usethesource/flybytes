@@ -133,11 +133,11 @@ data Stat(loc src = |unknown:///|)
   | \throw(Exp arg) 
   | \monitor(Exp arg, list[Stat] block) // TODO test  
   | \try(list[Stat] block, list[Handler] \catch) 
-  // | \switch(Exp \value, list[Case] caseBlocks)
+  | \switch(Exp arg, list[Case] cases) // TODO test
   ;
 
 data Case 
-  = \case(int label, list[Stat] block)
+  = \case(int key, list[Stat] block)
   | \default(list[Stat] block)
   ;
   

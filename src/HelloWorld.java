@@ -5,16 +5,12 @@ public class HelloWorld {
 	}
 
 	private static int g() {
-		int j = 0;
-		for (int i = 0; i < 10; i++) {
-			try {
-				System.err.println("j:" + j);
-				continue;
-			}
-			finally {
-				j++;
-			}
+		int x = 2;
+		switch (x) {
+		case 0: x = 3;
+		case 1: return 2;
+		case 2: return 3;
+		default: return 4;
 		}
-		return j;
 	}
 }

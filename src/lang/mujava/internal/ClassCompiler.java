@@ -720,6 +720,88 @@ public class ClassCompiler {
 			case "try":
 				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), continueLabel, breakLabel, joinLabel);
 				break;
+			case "switch":
+				switchStat(AST.$getArg(stat), AST.$getCases(stat), continueLabel, breakLabel, joinLabel);
+				break;
+			}
+		}
+
+		private void switchStat(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+			int min = Integer.MAX_VALUE;
+			int max = Integer.MIN_VALUE;
+			boolean hasDefault = false;
+
+			// first we collect information about the cases in the switch, and check 
+			// if the default is in the right place
+			for (int i = 0; i < cases.length(); i++) {
+				IConstructor c = (IConstructor) cases.get(i);
+				boolean isLast = i == cases.length() - 1;
+				boolean isDefault = AST.$is("default", c);
+				
+				if (!isDefault) {
+					int key = AST.$getKey(c);
+					out.println("case " + i + " = " + key);
+					min = Math.min(key, min);
+					max = Math.max(key, max);
+				}
+				else {
+					hasDefault = true;
+					
+					if (!isLast) {
+						throw new IllegalArgumentException("default handler should be the last of the cases");
+					}
+				}
+			}
+				
+			out.println("min: " + min);
+			out.println("max: " + max);
+			out.println("hasDef: " + hasDefault);
+			out.println("cases: " + cases.length());
+			out.println("max-min: " + (max - min));
+			
+			LeveledLabel defaultLabel = hasDefault ? newLabel(tryFinallyNestingLevel) : joinLabel;
+			LeveledLabel[] labels = new LeveledLabel[max - min + 1];
+			
+			for (int i = 0; i < labels.length; i++) {
+				for (int j = 0; j < cases.length(); j++) {
+					IConstructor c = (IConstructor) cases.get(j);
+					if (AST.$is("default", c)) {
+						continue;
+					}
+					else if (AST.$getKey(c) == i) {
+						labels[i] = newLabel(tryFinallyNestingLevel);
+					}
+					else {
+						labels[i] = defaultLabel;
+					}
+				}
+			}
+			
+			// first put the key value on the stack
+			expr(arg);
+						
+			// then we generate the switch tabel
+			method.visitTableSwitchInsn(min, max, defaultLabel, labels);
+			
+			// here come the handlers
+			for (int i = 0; i < labels.length; i++) {
+				for (int j = 0; j < cases.length(); j++) {
+					IConstructor c = (IConstructor) cases.get(j);
+					boolean isDef = AST.$is("default", c);
+					
+					if (isDef || AST.$getKey(c) == i) {
+						if (isDef) {
+							method.visitLabel(defaultLabel);
+						}
+						else {
+							method.visitLabel(labels[i]);
+						}
+						
+						LeveledLabel endCase = newLabel(tryFinallyNestingLevel);
+						statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase /* fall through! */);
+						method.visitLabel(endCase);
+					}
+				}
 			}
 		}
 
@@ -727,6 +809,14 @@ public class ClassCompiler {
 			method.visitIincInsn(positionOf(name), inc);
 		}
 
+		/**
+		 * Try/catch/finally is the most complex statement-type to compile, in particular 
+		 * because it interacts heavily with return, and (labeled) break and continue statements.
+		 * 
+		 * We lean heavily on MethodNode to collect all the information about the catch blocks where
+		 * we find it in the AST, such that later when streaming this MethoeNode to bytecode the 
+		 * handlers are printed in the right order.
+		 */
 		private void tryStat(IList block, IList catches, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			if (block.length() == 0) {
 				// JVM can not deal with empty catch ranges anyway
@@ -2582,8 +2672,16 @@ public class ClassCompiler {
 	 */
 	public static class AST {
 
+		public static int $getKey(IConstructor exp) {
+			return ((IInteger) exp.get("key")).intValue();
+		}
+		
 		public static IValue $getConstant(IConstructor exp) {
 			return exp.get("constant");
+		}
+
+		public static IList $getCases(IConstructor stat) {
+			return (IList) stat.get("cases");
 		}
 
 		public static IList $getCatch(IConstructor stat) {

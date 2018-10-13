@@ -1034,6 +1034,12 @@ public class ClassCompiler {
 			return tryFinallyNestingLevel.add(finallyCode);
 		}
 
+		/** 
+		 * Generating a monitor block is a matter of wrapping a block in MONITORENTER and MONITOREXIT,
+		 * but the existence of jump instructions such as throw, return, break and continue interacts with
+		 * this simplicity. We generate two nested try-catch blocks to make sure that in all cases when
+		 * the monitored block ends, the monitor is indeed closed using MONITOREXIT.
+		 */
 		private void monitorStat(IConstructor lock, IList block, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			if (block.isEmpty()) {
 				return;

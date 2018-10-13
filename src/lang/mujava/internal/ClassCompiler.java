@@ -1035,67 +1035,48 @@ public class ClassCompiler {
 		}
 
 		private void monitorStat(IConstructor lock, IList block, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
-//			Label startExceptionBlock = newLabel(tryFinallyNestingLevel);
-//			Label endExceptionBlock = newLabel(tryFinallyNestingLevel);
-//			Label handlerStart = newLabel(tryFinallyNestingLevel);
-//			Label handlerEnd = newLabel(tryFinallyNestingLevel);
-//			
-//			method.visitTryCatchBlock(startExceptionBlock, endExceptionBlock, handlerStart, null);
-//			method.visitTryCatchBlock(handlerStart, handlerEnd, handlerStart, null);
-//
-//			IConstructor type = expr(lock);
-//			String lockVarName = "$lock:" + UUID.randomUUID().toString();
-//			declareVariable(type, lockVarName, null, false);
-//			dup(); // for MONITORENTER
-//			method.visitVarInsn(Opcodes.ASTORE, positionOf(lockVarName));
-//			method.visitInsn(Opcodes.MONITORENTER);
-//			
-//			method.visitLabel(startExceptionBlock);
-//			method.visitLineNumber(22, startExceptionBlock);
-//			statements(block, continueLabel, breakLabel, null /* no support for break, continue, goto */);
-//			method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
-//			method.visitInsn(Opcodes.MONITOREXIT);
-//			method.visitLabel(endExceptionBlock);
-//
-//			method.visitJumpInsn(Opcodes.GOTO, joinLabel); // nothing happened
-//			method.visitLabel(handlerStart);
-//			method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
-//			method.visitInsn(Opcodes.MONITOREXIT); // an exception happened, exit the monitor
-//			method.visitLabel(handlerEnd);
-//			method.visitInsn(Opcodes.ATHROW); // rethrow
-			
-			if (block.length() == 0) {
-				// JVM can not deal with empty catch ranges anyway
+			if (block.isEmpty()) {
 				return;
 			}
 			
-			Label tryStart = newLabel(tryFinallyNestingLevel);
-			Label tryEnd = newLabel(tryFinallyNestingLevel);
+			LeveledLabel startExceptionBlock = newLabel(tryFinallyNestingLevel);
+			LeveledLabel endExceptionBlock = newLabel(tryFinallyNestingLevel);
+			LeveledLabel handlerStart = newLabel(tryFinallyNestingLevel);
+			LeveledLabel handlerEnd = newLabel(tryFinallyNestingLevel);
 			
+			method.visitTryCatchBlock(startExceptionBlock, endExceptionBlock, handlerStart, null);
+			method.visitTryCatchBlock(handlerStart, handlerEnd, handlerStart, null);
+
+			IConstructor type = expr(lock);
 			String lockVarName = "$lock:" + UUID.randomUUID().toString();
-			String finallyVarName = "finally:" + UUID.randomUUID();
-			declareVariable(Types.throwableType(), finallyVarName, null, false);
-			
-			Builder<?> finallyCode = () -> { 
+			Builder<Void> finallyCode = () -> {
 				method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
-			    method.visitInsn(Opcodes.MONITOREXIT);
-			    return null;
+				method.visitInsn(Opcodes.MONITOREXIT);	
+				return null;
 			};
 			
-			pushFinally(finallyCode);
-			
-			// the try block itself
-			method.visitLabel(tryStart);
-			IConstructor type = expr(lock);
 			declareVariable(type, lockVarName, null, false);
 			dup(); // for MONITORENTER
 			method.visitVarInsn(Opcodes.ASTORE, positionOf(lockVarName));
 			method.visitInsn(Opcodes.MONITORENTER);
-			statements(block, continueLabel, breakLabel, joinLabel);
-			method.visitLabel(tryEnd);
 			
-			finallyCode.build();
+			method.visitLabel(startExceptionBlock);
+			method.visitLineNumber(22, startExceptionBlock);
+			pushFinally(finallyCode);
+			statements(block, continueLabel, breakLabel, endExceptionBlock);
 			popFinally();
+			method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
+			method.visitInsn(Opcodes.MONITOREXIT);
+			method.visitLabel(endExceptionBlock);
+
+			method.visitJumpInsn(Opcodes.GOTO, joinLabel); // nothing happened
+			
+			// an exception happened, exit the monitor, and rethrow the exception
+			method.visitLabel(handlerStart);
+			method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
+			method.visitInsn(Opcodes.MONITOREXIT); 
+			method.visitLabel(handlerEnd);
+			method.visitInsn(Opcodes.ATHROW); // rethrow
 		}
 
 		private void throwStat(IConstructor arg) {

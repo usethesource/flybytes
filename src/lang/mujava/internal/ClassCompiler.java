@@ -334,7 +334,7 @@ public class ClassCompiler {
 			if (!hasStaticInitializer && !staticFieldInitializers.isEmpty()) {
 				staticInitializer(classNode, null);
 			}
-
+			
 			classNode.accept(cw);
 		}
 
@@ -1066,7 +1066,7 @@ public class ClassCompiler {
 			declareVariable(type, lockVarName, null, false);
 			// keep the lock object ready for MONITORENTER:
 			dup(); 
-			// store lock object var
+			// store lock object var for later use
 			method.visitVarInsn(Opcodes.ASTORE, positionOf(lockVarName));
 			// enter the monitor using the lock object on the stack
 			method.visitInsn(Opcodes.MONITORENTER);

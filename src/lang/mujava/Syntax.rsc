@@ -125,13 +125,13 @@ data Stat(loc src = |unknown:///|)
          Exp condition, 
          list[Stat] next, 
          list[Stat] statements, str label = "")
-  | \block(list[Stat] block, str label = "") // break jumps to the end of the block, continue to the start
+  | \block(list[Stat] block, str label = "") 
   | \break(str label = "")
   | \continue(str label = "")
   | \while(Exp condition, list[Stat] block, str label = "") 
   | \doWhile(list[Stat] block, Exp condition, str label = "") 
   | \throw(Exp arg) 
-  | \monitor(Exp arg, list[Stat] block) // TODO test  
+  | \monitor(Exp arg, list[Stat] block)  
   | \try(list[Stat] block, list[Handler] \catch) 
   | \switch(Exp arg, list[Case] cases, SwitchOption option = lookup(/*for best performance on current JVMs*/)) 
   ;

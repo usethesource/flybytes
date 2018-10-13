@@ -1047,7 +1047,6 @@ public class ClassCompiler {
 			method.visitTryCatchBlock(startExceptionBlock, endExceptionBlock, handlerStart, null);
 			method.visitTryCatchBlock(handlerStart, handlerEnd, handlerStart, null);
 
-			IConstructor type = expr(lock);
 			String lockVarName = "$lock:" + UUID.randomUUID().toString();
 			Builder<Void> finallyCode = () -> {
 				method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
@@ -1055,21 +1054,32 @@ public class ClassCompiler {
 				return null;
 			};
 			
+			// compute the lock object
+			IConstructor type = expr(lock);
+			// declare lock object var for later usage in the sinks of the control flow
 			declareVariable(type, lockVarName, null, false);
-			dup(); // for MONITORENTER
+			// keep the lock object ready for MONITORENTER:
+			dup(); 
+			// store lock object var
 			method.visitVarInsn(Opcodes.ASTORE, positionOf(lockVarName));
+			// enter the monitor using the lock object on the stack
 			method.visitInsn(Opcodes.MONITORENTER);
-			
+
+			// the block 
 			method.visitLabel(startExceptionBlock);
-			method.visitLineNumber(22, startExceptionBlock);
+			// register finally handlers for use by return, continue, break and throw:
 			pushFinally(finallyCode);
+			// compile the code in the block
 			statements(block, continueLabel, breakLabel, endExceptionBlock);
+			// unregister the finally handler
 			popFinally();
+			// nothing happened so we can exit the monitor cleanly
 			method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
 			method.visitInsn(Opcodes.MONITOREXIT);
 			method.visitLabel(endExceptionBlock);
 
-			method.visitJumpInsn(Opcodes.GOTO, joinLabel); // nothing happened
+			// end of monitor, jump over the catch block to continue with the rest
+			method.visitJumpInsn(Opcodes.GOTO, joinLabel); 
 			
 			// an exception happened, exit the monitor, and rethrow the exception
 			method.visitLabel(handlerStart);

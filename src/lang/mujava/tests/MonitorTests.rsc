@@ -4,9 +4,8 @@ import lang::mujava::Syntax;
 import lang::mujava::Compiler;
 import Node;
 
-// these are really just some smoke tests to see if the code generator does not crash.
-// need to add tests which test if the monitor is left using MONITOREXIT even if a break, return or
-// throw happened.
+// These test check if the monitor is properly closed in all kinds of situations; break, throw and return.
+// If not, than the bytecode verifier should throw a IllegalMonitorStateException.
 
 Class monitorBreakClass() 
   = class(reference("MonitorBreak"),
@@ -41,6 +40,29 @@ Class monitorReturnClass()
         ])
       ]
     );
+    
+Class monitorThrowClass() 
+  = class(reference("MonitorThrow"),
+      methods=[
+        staticMethod(\public(), integer(), "testMethod", [var(integer(), "par")],
+        [ 
+          \try([
+            \for([decl(integer(), "i", init=iconst(0))], lt(load("i"), iconst(10)), [incr("i",1)], [
+               monitor(new(object()), [
+                 \if(eq(rem(load("i"),iconst(2)),iconst(0)), [
+                   \throw(new(reference("java.lang.IllegalArgumentException")))
+                 ])
+               ])
+            ]),
+            \return(iconst(-1))
+          ],[
+            \catch(reference("java.lang.IllegalArgumentException"), "e", [
+              \return(load("par"))
+            ])
+          ])          
+        ])
+      ]
+    );    
         
 bool testMonitorClass(Class c, int input, int result) { 
   m = loadClass(c, file=just(|project://mujava/generated/<c.\type.name>.class|));
@@ -49,4 +71,5 @@ bool testMonitorClass(Class c, int input, int result) {
 
 test bool monitorBreakTest() = testMonitorClass(monitorBreakClass(), 10, 10);
 test bool monitorReturnTest() = testMonitorClass(monitorReturnClass(), 10, 10);
+test bool monitorUncaughtThrowTest() = testMonitorClass(monitorThrowClass(), 10, 10);
 

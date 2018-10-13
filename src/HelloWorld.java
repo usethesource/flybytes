@@ -5,10 +5,13 @@ public class HelloWorld {
 	}
 
 	private static int g(int x) {
-		switch (x) {
-		case 42: return 42;
-		case 12: return 12;
+		for (int i = 0; i < 10; i++) {
+			synchronized(new Object()) {
+				if (i % 2 == 0) {
+					break;
+				}
+			}
 		}
-		return 0;
+		return x;
 	}
 }

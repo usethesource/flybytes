@@ -303,3 +303,10 @@ Exp invokeVirtual(Exp receiver, Signature desc, list[Exp] args)
 Exp invokeInterface(Exp receiver, Signature desc, list[Exp] args)
   = invokeVirtual(CURRENT, receiver, desc, args);
    
+Exp iconst(int i) = const(integer(), i);
+Exp sconst(int i) = const(short(), i);
+Exp bconst(int i) = const(byte(), i);
+Exp cconst(int i) = const(character(), i);
+Exp zconst(bool i) = const(boolean(), i);
+Exp jconst(int i) = const(long(), i);
+   

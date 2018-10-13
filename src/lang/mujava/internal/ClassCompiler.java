@@ -1088,7 +1088,7 @@ public class ClassCompiler {
 			method.visitLabel(tryStart);
 			IConstructor type = expr(lock);
 			declareVariable(type, lockVarName, null, false);
-//			dup(); // for MONITORENTER
+			dup(); // for MONITORENTER
 			method.visitVarInsn(Opcodes.ASTORE, positionOf(lockVarName));
 			method.visitInsn(Opcodes.MONITORENTER);
 			statements(block, continueLabel, breakLabel, joinLabel);

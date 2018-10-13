@@ -45,8 +45,8 @@ test bool testIfFalse() = testIf(ifClass(\false()), false);
 test bool testIfMethodTrue() = testIf(ifClass(invokeStatic(methodDesc(boolean(),"methodTrue",[]),[])), true);
 test bool testIfMethodFalse() = testIf(ifClass(invokeStatic(methodDesc(boolean(),"methodFalse",[]),[])), false);
 
-test bool testIfEqTrue() = testIf(ifClass(eq(const(integer(),1),const(integer(),1))), true);
-test bool testIfEqFalse() = testIf(ifClass(eq(const(integer(),2),const(integer(),1))), false);
+test bool testIfEqTrue() = testIf(ifClass(eq(iconst(1),iconst(1))), true);
+test bool testIfEqFalse() = testIf(ifClass(eq(iconst(2),iconst(1))), false);
 
 test bool testIfEqBoolTrue() = testIf(ifClass(eq(\true(), \true())), true);
 test bool testIfEqBoolFalse() = testIf(ifClass(eq(\true(), \false())), false);

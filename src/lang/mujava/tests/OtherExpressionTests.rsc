@@ -7,9 +7,9 @@ Class incExpClass() {
   return class(reference("IncTest"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [], [
-           decl(integer(), "i", init=const(integer(), 1)),
+           decl(integer(), "i", init=iconst(1)),
            do(inc("i", 1)),
-           \return(eq(load("i"), const(integer(), 2)))
+           \return(eq(load("i"), iconst(2)))
         ])
       ]
     );
@@ -22,9 +22,9 @@ Class incStatClass() {
   return class(reference("IncTest"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [], [
-           decl(integer(), "i", init=const(integer(), 1)),
+           decl(integer(), "i", init=iconst(1)),
            incr("i", 1),
-           \return(eq(load("i"), const(integer(), 2)))
+           \return(eq(load("i"), iconst(2)))
         ])
       ]
     );

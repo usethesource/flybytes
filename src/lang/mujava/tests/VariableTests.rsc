@@ -84,4 +84,4 @@ Class objVarTestClass(Type t, Exp v) {
     );
 } 
 
-test bool stringVariable() = testVarClass(objVarTestClass(string(), const(string(), "Hello")));
+test bool stringVariable() = testVarClass(objVarTestClass(string(), sconst("Hello")));

@@ -6,7 +6,7 @@ import lang::mujava::Compiler;
 Class defParamClass() {
   return class(reference("DefParam"),
       methods=[
-        staticMethod(\public(), string(), "testMethod", [var(string(), "i", init=const(string(), "hello!"))],[
+        staticMethod(\public(), string(), "testMethod", [var(string(), "i", init=sconst("hello!"))],[
            \return(load("i"))
         ])
       ]

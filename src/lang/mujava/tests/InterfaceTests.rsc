@@ -21,19 +21,19 @@ Class implInvokeInterface()
   = class(reference("Impl_A"),
       methods=[
         method(\public(), \boolean(), "testMethod", [], [
-          \return(and(eq(invokeInterface(this(), methodDesc(\integer(), "methodA",[]), []), const(integer(), 1)),
-                      eq(invokeInterface(this(), methodDesc(\integer(), "methodB",[]), []), const(integer(), 2))
+          \return(and(eq(invokeInterface(this(), methodDesc(\integer(), "methodA",[]), []), iconst(1)),
+                      eq(invokeInterface(this(), methodDesc(\integer(), "methodB",[]), []), iconst(2))
                  ))
         ]), 
         
         // override
         method(\public(), \integer(), "methodA", [], [
-          \return(const(integer(), 1))
+          \return(iconst(1))
         ]),
         
         // override
         method(\public(), \integer(), "methodB", [], [
-          \return(const(integer(), 2))
+          \return(iconst(2))
         ])
       ]
    );
@@ -43,19 +43,19 @@ Class implInvokeVirtual()
       interfaces=[reference("Interface_A"), reference("Interface_B")],
       methods=[
         method(\public(), \boolean(), "testMethod", [], [
-          \return(and(eq(invokeVirtual(this(), methodDesc(\integer(), "methodA",[]), []), const(integer(), 1)),
-                      eq(invokeVirtual(this(), methodDesc(\integer(), "methodB",[]), []), const(integer(), 2))
+          \return(and(eq(invokeVirtual(this(), methodDesc(\integer(), "methodA",[]), []), iconst(1)),
+                      eq(invokeVirtual(this(), methodDesc(\integer(), "methodB",[]), []), iconst(2))
                  ))
         ]), 
         
         // override
         method(\public(), \integer(), "methodA", [], [
-          \return(const(integer(), 1))
+          \return(iconst(1))
         ]),
         
         // override
         method(\public(), \integer(), "methodB", [], [
-          \return(const(integer(), 2))
+          \return(iconst(2))
         ])
       ]
    );   
@@ -88,7 +88,7 @@ Class interfDefault()
   = interface(reference("Interface_Default"),
       methods=[
         method(\public(), \integer(), "defaultMethod", [], [
-          \return(const(integer(), -17))
+          \return(iconst(-17))
         ])
       ]
     );
@@ -98,7 +98,7 @@ Class implInvokeDefault()
      interfaces=[reference("Interface_Default")],
       methods=[
         method(\public(), \boolean(), "testMethod", [], [
-          \return(eq(invokeInterface(this(), methodDesc(\integer(), "defaultMethod",[]), []), const(integer(), -17))
+          \return(eq(invokeInterface(this(), methodDesc(\integer(), "defaultMethod",[]), []), iconst(-17))
                  )
         ]) 
       ]

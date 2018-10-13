@@ -14,3 +14,4 @@ extend lang::mujava::tests::DefaultParameters;
 extend lang::mujava::tests::GotoTests;
 extend lang::mujava::tests::OtherExpressionTests;
 extend lang::mujava::tests::CatchTests;
+extend lang::mujava::tests::MonitorTests;

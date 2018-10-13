@@ -4,7 +4,7 @@ import lang::mujava::Syntax;
 
 // index an array variable using a constant  
 Exp index(str array, int index)
-   = index(array, const(integer(), index));
+   = index(array, iconst(index));
    
 // index an array variable using the result of an expression as index
 Exp index(str array, Exp index)

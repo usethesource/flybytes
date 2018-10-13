@@ -9,16 +9,16 @@ Class catchClass() {
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [], [
            \try([
-             do(div(const(integer(),1), const(integer(), 0))),
-             \return(const(boolean(), false))
+             do(div(iconst(1), iconst(0))),
+             \return(\false())
            ],
            [ // Type \type, str name, list[Stat] block
              \catch(reference("java.lang.ArithmeticException"), "e", [
-               \return(const(boolean(), true))
+               \return(\true())
              ])
            ]
            ),
-           \return(const(boolean(), false))
+           \return(\false())
         ])
       ]
     );
@@ -33,7 +33,7 @@ Class multipleCatchClass() {
         staticMethod(\public(), integer(), "testMethod", [var(boolean(), "switch")], [
            \try([
              \if (load("switch"), [
-               \do(div(const(integer(),1), const(integer(), 0)))
+               \do(div(iconst(1), iconst(0)))
              ],[
                \throw(new(reference("java.lang.IllegalArgumentException")))
              ]),
@@ -41,14 +41,14 @@ Class multipleCatchClass() {
            ],
            [ // Type \type, str name, list[Stat] block
              \catch(reference("java.lang.ArithmeticException"), "e", [
-               \return(const(integer(), 1))
+               \return(iconst(1))
              ]),
              \catch(reference("java.lang.IllegalArgumentException"), "f", [
-               \return(const(integer(), 2))
+               \return(iconst(2))
              ])
            ]
            ),
-           \return(const(boolean(), false))
+           \return(\false())
         ])
       ]
     );
@@ -65,19 +65,19 @@ Class finallyClass() {
       methods=[
         staticMethod(\public(), integer(), "testMethod", [], [
            \try([
-             do(div(const(integer(),1), const(integer(), 0))),
-             \return(const(integer(), 1))
+             do(div(iconst(1), iconst(0))),
+             \return(iconst(1))
            ],
            [ 
              \catch(reference("java.lang.ArithmeticException"), "e", [
-               \return(const(integer(), 2))
+               \return(iconst(2)
              ]),
              \finally([
-               \return(const(integer(), 3))
+               \return(iconst(3))
              ])
            ]
            ),
-           \return(const(integer(), 4))
+           \return(iconst(4))
         ])
       ]
     );
@@ -93,9 +93,9 @@ Class finallyContinueClass() {
   return class(reference("FinallyContinueTest"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [], [
-           decl(integer(), "j", init=const(integer(), 0)),
-           \for([decl(integer(), "i" ,init=const(integer(), 0))], // init
-                lt(load("i"), const(integer(), 10)), // cond
+           decl(integer(), "j", init=iconst(0)),
+           \for([decl(integer(), "i" ,init=iconst(0))], // init
+                lt(load("i"), iconst(10)), // cond
                 [incr("i", 1)], // next
                 
                 // loop body
@@ -125,9 +125,9 @@ Class finallyBreakClass() {
   return class(reference("FinallyBreakTest"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [], [
-           decl(integer(), "j", init=const(integer(), 0)),
-           \for([decl(integer(), "i" ,init=const(integer(), 0))], // init
-                lt(load("i"), const(integer(), 10)), // cond
+           decl(integer(), "j", init=iconst(0)),
+           \for([decl(integer(), "i" ,init=iconst(0))], // init
+                lt(load("i"), iconst(10)), // cond
                 [incr("i", 1)], // next
                 
                 // loop body

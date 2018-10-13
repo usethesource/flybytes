@@ -11,13 +11,13 @@ Class switchClass(SwitchOption option)
         [ 
           \switch(load("par"), [
             \case(42, [
-              \return(const(integer(), 42))
+              \return(iconst(42))
             ]),
             \case(12, [
-              \return(const(integer(), 12))
+              \return(iconst(12))
             ])
           ],option=option),
-          \return(const(integer(), 0))          
+          \return(iconst(0))          
         ])
       ]
     );
@@ -47,16 +47,16 @@ Class switchDefaultClass(SwitchOption option)
         [ 
           \switch(load("par"), [
             \case(42, [
-              \return(const(integer(), 42))
+              \return(iconst(42))
             ]),
             \case(12, [
-              \return(const(integer(), 12))
+              \return(iconst(12))
             ]),
             \default([
-              \return(sub(load("par"), const(integer(), 1)))
+              \return(sub(load("par"), iconst(1)))
             ])
           ],option=option),
-          \return(const(integer(), 0))          
+          \return(iconst(0))          
         ])
       ]
     );
@@ -81,46 +81,46 @@ Class switchCompactClass(SwitchOption option)
         [ 
           \switch(load("par"), [
             \case(0, [
-              \return(const(integer(), 0))
+              \return(iconst(0))
             ]),
             \case(1, [
-              \return(const(integer(), 1))
+              \return(iconst(1))
             ]),
             \case(2, [
-              \return(const(integer(), 2))
+              \return(iconst(2))
             ]),
              \case(3, [
-              \return(const(integer(), 3))
+              \return(iconst(3))
             ]),
              \case(4, [
-              \return(const(integer(), 4))
+              \return(iconst(4))
             ]),
              \case(5, [
-              \return(const(integer(), 5))
+              \return(iconst(5))
             ]),
              \case(7, [
-              \return(const(integer(), 5))
+              \return(iconst(5))
             ]),
              \case(8, [
-              \return(const(integer(), 5))
+              \return(iconst(5))
             ]),
              \case(9, [
-              \return(const(integer(), 5))
+              \return(iconst(5))
             ]),
              \case(10, [
-              \return(const(integer(), 5))
+              \return(iconst(5))
             ]),
              \case(11, [
-              \return(const(integer(), 5))
+              \return(iconst(5))
             ]),
              \case(12, [
-              \return(const(integer(), 5))
+              \return(iconst(5))
             ]),
             \default([
-              \return(sub(load("par"), const(integer(), 1)))
+              \return(sub(load("par"), iconst(1)))
             ])
           ],option=option),
-          \return(const(integer(), 0))          
+          \return(iconst(0))          
         ])
       ]
     );

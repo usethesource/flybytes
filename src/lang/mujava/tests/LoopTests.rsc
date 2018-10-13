@@ -17,16 +17,16 @@ Class forLoopClass() {
           \for(
           [ // init block
              // Type[] tmp = new Type[len];
-             decl(array(integer()), "tmp", init=newArray(array(integer()), const(integer(), 10))),
+             decl(array(integer()), "tmp", init=newArray(array(integer()), iconst(10))),
              // int i = 0;
-             decl(integer(), "i", init=const(integer(), 0))
+             decl(integer(), "i", init=iconst(0))
           ],
           
           // i < tmp.length 
           lt(load("i"), alength(load("tmp"))),
           
           [ // i = i + 1
-            store("i", add(load("i"), const(integer(), 1))) 
+            store("i", add(load("i"), iconst(1))) 
           ],
           
           [ // tmp[i] = i;
@@ -55,40 +55,40 @@ Class NestedFor() {
         [
           \for(
           [ // int i = 0, k = 0
-             decl(integer(), "i", init=const(integer(), 0)),
-             decl(integer(), "k", init=const(integer(), 0))
+             decl(integer(), "i", init=iconst(0)),
+             decl(integer(), "k", init=iconst(0))
           ],
           
           // cond: i < 10
-          lt(load("i"), const(integer(), 10)),
+          lt(load("i"), iconst(10)),
           
           [ // next: i = i + 1
-            store("i", add(load("i"), const(integer(), 1))) 
+            store("i", add(load("i"), iconst(1))) 
           ],
           
           [ 
             \for(
             [ // int j = 0
-                decl(integer(), "j", init=const(integer(), 0))
+                decl(integer(), "j", init=iconst(0))
             ],
           
             // cond: j < 10
-            lt(load("j"), const(integer(), 10)),
+            lt(load("j"), iconst(10)),
           
             [ // next: j = j + 1
-              store("j", add(load("j"), const(integer(), 1))) 
+              store("j", add(load("j"), iconst(1))) 
             ],
           
             [ 
               // k = k + 1 
-              store("k", add(load("k"), const(integer(), 1)))
+              store("k", add(load("k"), iconst(1)))
             ]
             )
           ]
           ),
           
           // return k == 100; 
-          \return(eq(load("k"), const(integer(), 100)))
+          \return(eq(load("k"), iconst(100)))
         ])
       ]
     );
@@ -106,25 +106,25 @@ Class forLoopBreakClass() {
         [
           \for(
           [ // int = 0;
-             decl(integer(), "i", init=const(integer(), 0))
+             decl(integer(), "i", init=iconst(0))
           ],
           
           // cond: i < 10
-          lt(load("i"), const(integer(), 10)),
+          lt(load("i"), iconst(10)),
           
           [ // next: i = i + 1
-            store("i", add(load("i"), const(integer(), 1))) 
+            store("i", add(load("i"), iconst(1))) 
           ],
           
           [ // if (i == 5) break;
-            \if (eq(load("i"), const(integer(), 5)),[ 
+            \if (eq(load("i"), iconst(5)),[ 
               \break()
             ])
           ]
           ),
           
           // return i == 5; 
-          \return(eq(load("i"), const(integer(), 5)))
+          \return(eq(load("i"), iconst(5)))
         ])
       ]
     );
@@ -142,28 +142,28 @@ Class forLoopContinueClass() {
         [
           \for(
           [ // int i = 0, j = 0;
-             decl(integer(), "i", init=const(integer(), 0)),
-             decl(integer(), "j", init=const(integer(), 0))
+             decl(integer(), "i", init=iconst(0)),
+             decl(integer(), "j", init=iconst(0))
           ],
           
           // cond: i < 10
-          lt(load("i"), const(integer(), 10)),
+          lt(load("i"), iconst(10)),
           
           [ // next: i = i + 1
-            store("i", add(load("i"), const(integer(), 1))) 
+            store("i", add(load("i"), iconst(1))) 
           ],
           
           [ // if (i % 2 == 0) break;
-            \if (eq(rem(load("i"), const(integer(), 2)), const(integer(), 0)),[ 
+            \if (eq(rem(load("i"), iconst(2)), iconst(0)),[ 
               \continue()
             ]),
             // j = j + 1; // count uneven numbers between 0 and 9
-            store("j", add(load("j"), const(integer(), 1)))
+            store("j", add(load("j"), iconst(1)))
           ]
           ),
           
           // return j == 5; (0, 2, 4, 6, and 8 ) 
-          \return(eq(load("j"), const(integer(), 5)))
+          \return(eq(load("j"), iconst(5)))
         ])
       ]
     );
@@ -177,51 +177,51 @@ Class forLoopBreakNestedClass() {
         staticMethod(\public(), boolean(), "testMethod", [],
         [
           // int k = 0
-           decl(integer(), "k", init=const(integer(), 0)),
+           decl(integer(), "k", init=iconst(0)),
           \for(
           [ // int i = 0
-             decl(integer(), "i", init=const(integer(), 0))
+             decl(integer(), "i", init=iconst(0))
           ],
           
           // cond: i < 10
-          lt(load("i"), const(integer(), 10)),
+          lt(load("i"), iconst(10)),
           
           [ // next: i = i + 1
-            store("i", add(load("i"), const(integer(), 1))) 
+            store("i", add(load("i"), iconst(1))) 
           ],
           
           [ 
             \for(
             [ // int j = 0
-                decl(integer(), "j", init=const(integer(), 0))
+                decl(integer(), "j", init=iconst(0))
             ],
           
             // cond: j < 10
-            lt(load("j"), const(integer(), 10)),
+            lt(load("j"), iconst(10)),
           
             [ // next: j = j + 1
-              store("j", add(load("j"), const(integer(), 1))) 
+              store("j", add(load("j"), iconst(1))) 
             ],
           
             [ // if (i == 5) break outer;
-              \if(eq(load("i"), const(integer(), 5)), [
+              \if(eq(load("i"), iconst(5)), [
                 \break(label="outer")
               ]),
               
               // k = k + 1 
-              store("k", add(load("k"), const(integer(), 1)))
+              store("k", add(load("k"), iconst(1)))
             ],
             label="inner"
             ),
             
             // k = k + 1 (should be skipped after break(label=outer) above)
-            store("k", add(load("k"), const(integer(), 1)))
+            store("k", add(load("k"), iconst(1)))
           ],
           label="outer"
           ),
           
           // return k == 55; 
-          \return(eq(load("k"), const(integer(), 55)))
+          \return(eq(load("k"), iconst(55)))
         ])
       ]
     );
@@ -238,13 +238,13 @@ Class whileClass() {
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
-          decl(integer(), "i", init=const(integer(), 0)),
-          \while(lt(load("i"), const(integer(), 10)),
+          decl(integer(), "i", init=iconst(0)),
+          \while(lt(load("i"), iconst(10)),
           [ 
              incr("i", 1)
           ]),
           
-          \return(\eq(load("i"), const(integer(), 10)))
+          \return(\eq(load("i"), iconst(10)))
         ])
       ]
     );
@@ -260,16 +260,16 @@ Class doWhileClass() {
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
-          decl(integer(), "i", init=const(integer(), 0)),
-          decl(integer(), "j", init=const(integer(), 1)),
+          decl(integer(), "i", init=iconst(0)),
+          decl(integer(), "j", init=iconst(1)),
           \doWhile([ 
              incr("i", 1),
-             store("j", mul(load("j"), const(integer(), 2)))
+             store("j", mul(load("j"), iconst(2)))
           ],
-          lt(load("i"), const(integer(), 3))
+          lt(load("i"), iconst(3))
           ),
           
-          \return(\eq(load("j"), const(integer(), 8)))
+          \return(\eq(load("j"), iconst(8)))
         ])
       ]
     );

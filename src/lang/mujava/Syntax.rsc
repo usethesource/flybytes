@@ -309,4 +309,8 @@ Exp bconst(int i) = const(byte(), i);
 Exp cconst(int i) = const(character(), i);
 Exp zconst(bool i) = const(boolean(), i);
 Exp jconst(int i) = const(long(), i);
+Exp sconst(str i) = const(string(), i);
+Exp dconst(real i) = const(double(), i);
+Exp fconst(real i) = const(float(), i);
+
    

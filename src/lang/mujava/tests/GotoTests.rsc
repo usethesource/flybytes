@@ -9,16 +9,16 @@ Class GotoClass1()
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [ 
-          decl(integer(), "i", init=const(integer(), 0)),
+          decl(integer(), "i", init=iconst(0)),
           block([
-             \if (lt(load("i"), const(integer(), 10)), [
+             \if (lt(load("i"), iconst(10)), [
                incr("i", 1),
                \continue(label="again")
              ],[
                \break()
              ])
           ],label="again"),
-          \return(eq(load("i"), const(integer(), 10)))          
+          \return(eq(load("i"), iconst(10)))          
         ])
       ]
     );

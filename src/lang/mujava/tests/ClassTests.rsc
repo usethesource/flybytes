@@ -117,10 +117,10 @@ public Class extendClass()
        //  method(Modifier access, Type ret, str name, list[Variable] args, list[Stat] stats)
          method(\public(), boolean(), "testMethod", [], [
             // call a super method
-            do(invokeVirtual(this(), methodDesc(\void(), "setField", [integer()]), [const(integer(), 32)])),
+            do(invokeVirtual(this(), methodDesc(\void(), "setField", [integer()]), [iconst(32)])),
             
             // get a super field
-            \return(eq(getField(integer(), "field"), const(integer(), 32)))
+            \return(eq(getField(integer(), "field"), iconst(32)))
          ])
        ]
   );
@@ -174,11 +174,11 @@ public Class helloWorld = class(HELLO,
        decl(integer(), "m"),
        
        // test storing numbers in local variables
-       store("i", const(integer(), 245)),
-       store("j", const(long(), 350000)),
-       store("k", const(float(), 10.5)),
-       store("l", const(double(), 3456.3456)),
-       store("m", const(integer(), 244)),
+       store("i", iconst(245)),
+       store("j", jconst(350000)),
+       store("k", fconst(10.5)),
+       store("l", dconst(3456.3456)),
+       store("m", iconst(244)),
        
        // test loading numbers
        do(load("i")),
@@ -189,12 +189,11 @@ public Class helloWorld = class(HELLO,
        
        // print the 3 elements of the argument list:
        \if(gt(load("i"), load("m")), [
-         stdout(aload(load("s"), const(integer(), 0))),
-         stdout(aload(load("s"), const(integer(), 1))),
-         stdout(aload(load("s"), const(integer(), 2)))
+         stdout(aload(load("s"), iconst(0))),
+         stdout(aload(load("s"), iconst(1))),
+         stdout(aload(load("s"), iconst(2)))
        ]),
        
-       //\return(long(), load("j"))
        \return()
      ])
     ]

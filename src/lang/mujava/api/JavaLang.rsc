@@ -14,9 +14,9 @@ Type Float() = reference("java.lang.Float");
 
 Type Iterator() = reference("java.lang.Iterator");
 Type Iterable() = reference("java.lang.Iterable");
-MethodDesc Iterable_iterator() = methodDesc(Iterator(), "iterator", []);
-MethodDesc Iterator_next() = methodDesc(object(), "next", []);
-MethodDesc Iterator_hasNext() = methodDesc(boolean(), "hasNext", []);
+Signature Iterable_iterator() = methodDesc(Iterator(), "iterator", []);
+Signature Iterator_next() = methodDesc(object(), "next", []);
+Signature Iterator_hasNext() = methodDesc(boolean(), "hasNext", []);
 
 Mirror StringMirror() = classMirror("java.lang.String");
 Mirror BooleanMirror() = classMirror("java.lang.Boolean");

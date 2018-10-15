@@ -1,5 +1,6 @@
 package lang.mujava.internal;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -47,6 +48,7 @@ public class Mirror {
 	private final FunctionType invokeStaticFunc;
 	private final FunctionType getStaticFunc;
 	private final FunctionType newInstanceFunc;
+	private final FunctionType getAnnotationFunc;
 	private final Type objectCons;
 	private final FunctionType invokeFunc;
 	private final FunctionType getFieldFunc;
@@ -67,6 +69,7 @@ public class Mirror {
 		this.invokeStaticFunc = (FunctionType) classCons.getFieldType(1);
 		this.getStaticFunc = (FunctionType) classCons.getFieldType(2);
 		this.newInstanceFunc = (FunctionType) classCons.getFieldType(3);
+		this.getAnnotationFunc = (FunctionType) classCons.getFieldType(4);
 		
 		this.objectCons = store.lookupConstructor(Mirror, "object").iterator().next();
 		this.invokeFunc = (FunctionType) objectCons.getFieldType(1);
@@ -85,7 +88,8 @@ public class Mirror {
 				vf.string(className),
 				invokeStatic(className, cls),
 				getStatic(className, cls),
-				newInstance(className, cls)
+				newInstance(className, cls),
+				getAnnotation(className, cls)
 				);
 	}
 	
@@ -361,6 +365,27 @@ public class Mirror {
 					return ResultFactory.makeResult(Mirror, mirrorObject(result), ctx);
 				} catch (IllegalAccessException | IllegalArgumentException
 					 | SecurityException | NoSuchFieldException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		};
+	}
+	
+	private IValue getAnnotation(String className, Class<?> cls) {
+		return new MirrorCallBack<Class<?>>(cls, getAnnotationFunc, ctx) {
+			@Override
+			public int getArity() {
+				return 1;
+			} 
+
+			@Override
+			Result<IValue> call(Type[] formals, IValue[] actuals) {
+				try {
+					Class<?> annoClass = Signature.binaryClass((IConstructor) actuals[0]);
+					@SuppressWarnings({ "unchecked", "rawtypes" })
+					Annotation anno = getWrapped().getAnnotation((Class) annoClass);
+					return  ResultFactory.makeResult(Mirror, mirrorObject(anno), ctx);
+				} catch (IllegalArgumentException | SecurityException | ClassNotFoundException e) {
 					throw new RuntimeException(e);
 				}
 			}

@@ -15,7 +15,8 @@ data Mirror
   = class(str class, 
         Mirror (Signature method, list[Mirror] args) invokeStatic,
         Mirror (str name) getStatic,
-        Mirror (Signature constructor, list[Mirror] args) newInstance)
+        Mirror (Signature constructor, list[Mirror] args) newInstance,
+        Mirror (Type \type) getAnnotation)
   | object(Mirror classMirror, 
         Mirror (Signature method, list[Mirror] args) invoke,
         Mirror (str name) getField,

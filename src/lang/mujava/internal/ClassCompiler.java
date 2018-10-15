@@ -15,6 +15,7 @@ import java.util.function.Function;
 
 import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
+import org.rascalmpl.objectweb.asm.AnnotationVisitor;
 import org.rascalmpl.objectweb.asm.ClassVisitor;
 import org.rascalmpl.objectweb.asm.ClassWriter;
 import org.rascalmpl.objectweb.asm.Label;
@@ -335,7 +336,81 @@ public class ClassCompiler {
 				staticInitializer(classNode, null);
 			}
 			
+			if (kws.hasParameter("annotations")) {
+				annotations(classNode, AST.$getAnnotations(kws));
+			}
+			
 			classNode.accept(cw);
+		}
+
+		private void annotations(ClassNode cn, IList annotations) {
+			for (IValue elem : annotations) {
+				boolean visible = AST.$getAtRuntime((IConstructor) elem);
+				String descriptor = Signature.type(AST.$getType((IConstructor) elem));
+				annotation(cn.visitAnnotation(descriptor, visible), (IConstructor) elem);
+			}
+		}
+
+		private void annotation(AnnotationVisitor node, IConstructor anno) {
+			String name = AST.$getName(anno);
+			IConstructor type = AST.$getType(anno);
+			Object val = object(type, AST.$getVal(anno));
+			String descriptor = Signature.type(type);
+			
+			AnnotationVisitor av = node.visitAnnotation(name, descriptor);
+			
+			Switch.type0(type, 
+					(z) -> av.visit(name, val),
+					(i) -> av.visit(name, val),
+					(s) -> av.visit(name, val),
+					(b) -> av.visit(name, val),
+					(c) -> av.visit(name, val),
+					(f) -> av.visit(name, val),
+					(d) -> av.visit(name, val),
+					(l) -> av.visit(name, val),
+					(v) -> av.visit(name, val),
+					(C) -> av.visitEnum(name, descriptor, (String) val),
+					(a) -> {
+						AnnotationVisitor aav = av.visitArray(null);
+						for (Object elem : (Object[]) val) {
+							aav.visit(null, elem);
+						}
+						aav.visitEnd();
+					},
+					(S) -> av.visit(name, val)
+					);
+		}
+
+		Object object(IConstructor type, IValue val) {
+			return Switch.type(type, 
+					(z) -> Boolean.valueOf(((IBool) val).getValue()), 
+					(i) -> Integer.valueOf((int) ((IInteger) val).intValue()), 
+					(s) -> Short.valueOf((short) ((IInteger) val).intValue()), 
+					(b) -> Byte.valueOf((byte) ((IInteger) val).intValue()),
+					(c) -> Character.valueOf((char) ((IInteger) val).intValue()),
+					(f) -> Float.valueOf((float) ((IReal) val).floatValue()),
+					(d) -> Double.valueOf((double) ((IReal) val).doubleValue()),
+					(j) -> Long.valueOf((long) ((IInteger) val).longValue()),
+					(v) -> null,
+					(C) -> ((IString) val).getValue(), // to support enums 
+					(a) -> array(type, val),
+					(s)  -> ((IString) val).getValue()
+					);
+		}
+
+		private Object array(IConstructor type, IValue val) {
+			if (!(val instanceof IList)) {
+				throw new IllegalArgumentException("array annotations must be provided as lists");
+			}
+			
+			IList list = (IList) val;
+			Object[] arr = new Object[list.length()];
+			int i = 0;
+			for (IValue elem : (IList) val) {
+				arr[i++] = object(AST.$getArg(type), elem);
+			}
+			
+			return arr;
 		}
 
 		private void generateDefaultConstructor(ClassNode cn) {
@@ -2844,6 +2919,18 @@ public class ClassCompiler {
 			return ((IInteger) exp.get("key")).intValue();
 		}
 		
+		public static IValue $getVal(IConstructor anno) {
+			return anno.get("val");
+		}
+
+		public static boolean $getAtRuntime(IConstructor elem) {
+			if (elem.asWithKeywordParameters().hasParameter("runtime")) {
+				return ((IBool) elem.asWithKeywordParameters().getParameter("runtime")).getValue();
+			}
+			
+			return true;
+		}
+
 		public static IValue $getConstant(IConstructor exp) {
 			return exp.get("constant");
 		}
@@ -2975,7 +3062,7 @@ public class ClassCompiler {
 		public static String $getName(IConstructor exp) {
 			return ((IString) exp.get("name")).getValue();
 		}
-
+		
 		public static IConstructor $getType(IConstructor exp) {
 			return (IConstructor) exp.get("type");
 		}
@@ -3038,6 +3125,10 @@ public class ClassCompiler {
 
 		public static IList $getMethodsParameter(IWithKeywordParameters<? extends IConstructor> kws) {
 			return (IList) kws.getParameter("methods");
+		}
+		
+		public static IList $getAnnotations(IWithKeywordParameters<? extends IConstructor> kws) {
+			return (IList) kws.getParameter("annotations");
 		}
 
 		public static IList $getFieldsParameter(IWithKeywordParameters<? extends IConstructor> kws) {

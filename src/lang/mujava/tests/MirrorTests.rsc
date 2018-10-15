@@ -109,3 +109,5 @@ test bool arrayLengthStringFilled(int l)
 test bool arrayLengthDefault()
   = array(integer(), 100).length() == 100;
   
+test bool annoMirror() 
+  = classMirror("java.lang.Deprecated").getAnnotation(reference("java.lang.annotation.Retention")) != null();  

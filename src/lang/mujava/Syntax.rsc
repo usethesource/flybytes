@@ -49,7 +49,7 @@ data Class
       list[Type] interfaces = [],
       list[Field] fields = [], 
       list[Method] methods = [],
-      //list[Annotation] annotations = [],
+      list[Annotation] annotations = [],
       //list[Class] children = [],
       loc source = |unknown:///|
     )
@@ -97,14 +97,24 @@ data Type
   | float()
   | double()
   | long()
-  | reference(str name)
+  | reference(str name) /* TODO: rename to "object" like it is called in the ASM framework
+// | method() /* TODO: add method handles */
   | array(Type arg)
   | \void()
   | string()
   ;
 
-data Annotation; // TODO
-
+data Annotation
+  // values _must_ be str, int, real, list[int], list[str], list[real], or nested further: list[list[int]]
+  = \anno(Type \type, str name, value val, RetentionPolicy retention=runtime(), list[Annotation] annotations = [])
+  ;
+  
+data RetentionPolicy
+  = class()   // store in the class file, but drop at class loading time
+  | runtime() // store in the class file, and keep for reflective access
+  | source()  // forget immediately
+  ;
+ 
 @doc{optional init expressions will be used at run-time if `null` is passed as actual parameter}
 data Formal = var(Type \type, str name, Exp init = defValue(\type)); 
 

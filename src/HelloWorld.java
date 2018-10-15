@@ -10,7 +10,9 @@ public class HelloWorld {
 	@Deprecated
 	int f = 0;
 	
-	private static int g(@Deprecated int x ) {
+	private static int g(int x ) {
+		@Deprecated
+		int K = 0;
 		for (int i = 0; i < 10; i++) {
 			synchronized(new Object()) {
 				if (i % 2 == 0) {

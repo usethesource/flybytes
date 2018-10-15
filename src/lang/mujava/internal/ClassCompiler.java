@@ -21,6 +21,7 @@ import org.rascalmpl.objectweb.asm.ClassVisitor;
 import org.rascalmpl.objectweb.asm.ClassWriter;
 import org.rascalmpl.objectweb.asm.Label;
 import org.rascalmpl.objectweb.asm.Opcodes;
+import org.rascalmpl.objectweb.asm.TypeReference;
 import org.rascalmpl.objectweb.asm.tree.ClassNode;
 import org.rascalmpl.objectweb.asm.tree.FieldNode;
 import org.rascalmpl.objectweb.asm.tree.MethodNode;
@@ -47,7 +48,6 @@ import io.usethesource.vallang.IWithKeywordParameters;
 import io.usethesource.vallang.type.Type;
 import io.usethesource.vallang.type.TypeFactory;
 import io.usethesource.vallang.type.TypeStore;
-import lang.mujava.internal.ClassCompiler.Signature;
 
 /**
  * Translates muJava ASTs (see lang::mujava::Syntax.rsc) directly down to JVM bytecode,
@@ -255,6 +255,7 @@ public class ClassCompiler {
 		private ArrayList<IConstructor> variableTypes;
 		private ArrayList<String> variableNames;
 		private ArrayList<IConstructor> variableDefaults;
+		private ArrayList<IList> variableAnnotations;
 		private boolean hasDefaultConstructor = false;
 		private boolean hasStaticInitializer;
 		private boolean isInterface;
@@ -507,6 +508,7 @@ public class ClassCompiler {
 			variableTypes = new ArrayList<>();
 			variableNames = new ArrayList<>();
 			variableDefaults = new ArrayList<>();
+			variableAnnotations = new ArrayList<>();
 
 			methodStartLabel = new LeveledLabel(0);
 			methodEndLabel = new LeveledLabel(0);
@@ -580,7 +582,7 @@ public class ClassCompiler {
 				variableDefaults = new ArrayList<>();
 
 				if (!isStatic) {
-					declareVariable(classType, "this", null, false);
+					declareVariable(classType, "this", null, false, null);
 				}
 
 				methodStartLabel = new LeveledLabel(0);
@@ -609,6 +611,13 @@ public class ClassCompiler {
 					String varType = Signature.type(variableTypes.get(i));
 					
 					method.visitLocalVariable(varName, varType, null, methodStartLabel, methodEndLabel, i);
+					
+					IList annotations = variableAnnotations.get(i);
+					if (annotations != null) {
+						final int index = i;
+						annotations((s,v) -> 
+						   method.visitLocalVariableAnnotation(TypeReference.LOCAL_VARIABLE, null, new Label[] {methodStartLabel}, new Label[] {methodEndLabel}, new int[] {index}, s, v), annotations);
+					}
 				}
 				
 				if (debug) {
@@ -627,12 +636,13 @@ public class ClassCompiler {
 			classNode.methods.add(method);
 		}
 		
-		private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize) {
+		private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize, IList annotations) {
 			int pos = variableNames.size();
 			
 			variableTypes.add(type);
 			variableNames.add(name);
 			variableDefaults.add(def);
+			variableAnnotations.add(annotations);
 			
 			String typeName = type.getConstructorType().getName();
 			if (typeName.equals("double") || typeName.equals("long")) {
@@ -688,7 +698,7 @@ public class ClassCompiler {
 				final int index = i;
 				IConstructor var = (IConstructor) elem;
 				IConstructor varType = AST.$getType(var);
-				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize);
+				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize, null);
 			
 				if (var.asWithKeywordParameters().hasParameter("annotations")) {
 					annotation((s,v) -> method.visitParameterAnnotation(index, s, v), (IList) var.asWithKeywordParameters().getParameter("annotations"));
@@ -1097,7 +1107,7 @@ public class ClassCompiler {
 				
 				if (isLast && isFinally) {
 					finallyVarName = "finally:" + UUID.randomUUID();
-					declareVariable(Types.throwableType(), finallyVarName, null, false);
+					declareVariable(Types.throwableType(), finallyVarName, null, false, null);
 					finallyCode = () -> statements(AST.$getBlock(catcher), breakLabel, continueLabel, joinLabel);
 					pushFinally(finallyCode);
 				}
@@ -1107,7 +1117,7 @@ public class ClassCompiler {
 				else {
 					IConstructor exceptionType = AST.$getType(catcher);
 					String varName = AST.$getName(catcher);
-					declareVariable(exceptionType, varName, null, false);
+					declareVariable(exceptionType, varName, null, false, null);
 				}
 			}
 			
@@ -1183,7 +1193,7 @@ public class ClassCompiler {
 			// compute the lock object
 			IConstructor type = expr(lock);
 			// declare lock object var for later usage in the sinks of the control flow
-			declareVariable(type, lockVarName, null, false);
+			declareVariable(type, lockVarName, null, false, null);
 			// keep the lock object ready for MONITORENTER:
 			dup(); 
 			// store lock object var for later use
@@ -1327,11 +1337,18 @@ public class ClassCompiler {
 
 		private void declStat(IConstructor stat, LeveledLabel joinLabel) {
 			IConstructor def = null;
-			if (stat.asWithKeywordParameters().hasParameter("init")) {
-				def = (IConstructor) stat.asWithKeywordParameters().getParameter("init");
+			IList annotations = null;
+			IWithKeywordParameters<? extends IConstructor> kws = stat.asWithKeywordParameters();
+			
+			if (kws.hasParameter("init")) {
+				def = (IConstructor) kws.getParameter("init");
 			}
 			
-			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true);
+			if (kws.hasParameter("annotations")) {
+				annotations = (IList) kws.getParameter("annotations");
+			}
+			
+			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true, annotations);
 		}
 
 		private void forStat(String label, IList init, IConstructor cond, IList next, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {

@@ -100,10 +100,10 @@ data Type
   | string()
   ;
 
-data Annotation
+data Annotation(RetentionPolicy retention=runtime())
   // values _must_ be str, int, real, list[int], list[str], list[real]
-  = \anno(str annoClass, Type \type, value val, RetentionPolicy retention=runtime(), str name = "value", list[Annotation] annotations = [])
-  | \anno(str annoClass, RetentionPolicy retention=runtime())
+  = \anno(str annoClass, Type \type, value val, str name = "value")
+  | \tag(str annoClass) /* tag annotation */
   ;
   
 data RetentionPolicy

@@ -8,7 +8,7 @@ Class annoClass() =
   methods=[
     staticMethod(\public(),boolean(),"testMethod", [], [ \return(\true())])[
       annotations=[
-        \anno("java.lang.Deprecated"),
+        \tag("java.lang.Deprecated"),
         \anno("java.lang.Annotation", array(integer()), [0,1,2], name="version")
       ]
     ]

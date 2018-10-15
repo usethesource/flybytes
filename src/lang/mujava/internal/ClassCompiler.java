@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -344,6 +345,14 @@ public class ClassCompiler {
 		}
 
 		private void annotations(ClassNode cn, IList annotations) {
+			annotations((d, v) -> cn.visitAnnotation(d, v), annotations);
+		}
+		
+		private void annotations(MethodNode mn, IList annotations) {
+			annotations((d, v) -> mn.visitAnnotation(d, v), annotations);
+		}
+		
+		private void annotations(BiFunction<String,Boolean,AnnotationVisitor> cn, IList annotations) {
 			for (IValue elem : annotations) {
 				String retention = AST.$getRetention((IConstructor) elem);
 				boolean visible = true;
@@ -354,8 +363,15 @@ public class ClassCompiler {
 				case "runtime": visible = true;
 				}
 				
-				String descriptor = Signature.type(AST.$getType((IConstructor) elem));
-				annotation(cn.visitAnnotation(descriptor, visible), (IConstructor) elem);
+				IConstructor anno = (IConstructor) elem;
+				String sig = "L" + AST.$getAnnoClass(anno) + ";";
+				AnnotationVisitor an = cn.apply(sig, visible);
+				
+				if (anno.arity() > 1) {
+					annotation(an, (IConstructor) elem);
+				}
+				
+				an.visitEnd();
 			}
 		}
 
@@ -365,29 +381,26 @@ public class ClassCompiler {
 			Object val = object(type, AST.$getVal(anno));
 			String descriptor = Signature.type(type);
 			
-			AnnotationVisitor av = node.visitAnnotation(name, descriptor);
-			
 			Switch.type0(type, 
-					(z) -> av.visit(name, val),
-					(i) -> av.visit(name, val),
-					(s) -> av.visit(name, val),
-					(b) -> av.visit(name, val),
-					(c) -> av.visit(name, val),
-					(f) -> av.visit(name, val),
-					(d) -> av.visit(name, val),
-					(l) -> av.visit(name, val),
-					(v) -> av.visit(name, val),
-					(C) -> av.visitEnum(name, descriptor, (String) val),
+					(z) -> node.visit(name, val),
+					(i) -> node.visit(name, val),
+					(s) -> node.visit(name, val),
+					(b) -> node.visit(name, val),
+					(c) -> node.visit(name, val),
+					(f) -> node.visit(name, val),
+					(d) -> node.visit(name, val),
+					(l) -> node.visit(name, val),
+					(v) -> node.visit(name, val),
+					(C) -> node.visitEnum(name, descriptor, (String) val),
 					(a) -> {
-						AnnotationVisitor aav = av.visitArray(null);
+						AnnotationVisitor aav = node.visitArray(null);
 						for (Object elem : (Object[]) val) {
-							aav.visit(null, elem);
+							aav.visit(name, elem);
 						}
 						aav.visitEnd();
 					},
-					(S) -> av.visit(name, val)
+					(S) -> node.visit(name, val)
 					);
-			node.visitEnd();
 		}
 
 		Object object(IConstructor type, IValue val) {
@@ -593,6 +606,10 @@ public class ClassCompiler {
 				else {
 					method.visitMaxs(0, 0);
 				}
+			}
+			
+			if (kws.hasParameter("annotations")) {
+				annotations(method, (IList) kws.getParameter("annotations"));
 			}
 			
 			method.visitEnd(); // also needed for abstract methods
@@ -2910,7 +2927,7 @@ public class ClassCompiler {
 			}
 		}
 
-		private static Class<?> forName(String name) {
+		public static Class<?> forName(String name) {
 			try {
 				return Class.forName(name);
 			} catch (ClassNotFoundException e) {
@@ -3070,6 +3087,10 @@ public class ClassCompiler {
 
 		public static String $getName(IConstructor exp) {
 			return ((IString) exp.get("name")).getValue();
+		}
+		
+		public static String $getAnnoClass(IConstructor exp) {
+			return ((IString) exp.get("annoClass")).getValue();
 		}
 		
 		public static IConstructor $getType(IConstructor exp) {

@@ -42,22 +42,18 @@ generation.
 @author{Jurgen J. Vinju}
 module lang::mujava::Syntax
 
-data Class
+data Class(list[Annotation] annotations = [], loc source = |unknown:///|)
   = class(Type \type /* reference(str name) */, 
       set[Modifier] modifiers = {\public()},
-      Type super = object(),
-      list[Type] interfaces = [],
-      list[Field] fields = [], 
-      list[Method] methods = [],
-      list[Annotation] annotations = [],
+      Type super              = object(),
+      list[Type]   interfaces = [],
+      list[Field]  fields     = [], 
+      list[Method] methods    = []
       //list[Class] children = [],
-      loc source = |unknown:///|
     )
   | interface(Type \type /* reference(str name) */,
-      list[Field] fields = [],
-      list[Method] methods = [],
-      //list[Annotation] annotations = [],
-      loc source = |unknown:///|
+      list[Field]  fields  = [],
+      list[Method] methods = []
     )  
    ;
     
@@ -74,7 +70,7 @@ data Modifier
 data Field
   = field(Type \type, str name, Exp init = defValue(\type), set[Modifier] modifiers = {\private()});
          
-data Method
+data Method(list[Annotation] annotations = [])
   = method(Signature desc, list[Formal] formals, list[Stat] block, set[Modifier] modifiers = {\public()})
   | method(Signature desc, set[Modifier] modifiers={\abstract(), \public()})
   | static(list[Stat] block)
@@ -106,7 +102,8 @@ data Type
 
 data Annotation
   // values _must_ be str, int, real, list[int], list[str], list[real], or nested further: list[list[int]]
-  = \anno(Type \type, str name, value val, RetentionPolicy retention=runtime(), list[Annotation] annotations = [])
+  = \anno(str annoClass, Type \type, str name, value val, RetentionPolicy retention=runtime(), list[Annotation] annotations = [])
+  | \anno(str annoClass, RetentionPolicy retention=runtime())
   ;
   
 data RetentionPolicy

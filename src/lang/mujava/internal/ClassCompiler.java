@@ -580,6 +580,7 @@ public class ClassCompiler {
 				variableTypes = new ArrayList<>();
 				variableNames =  new ArrayList<>();
 				variableDefaults = new ArrayList<>();
+				variableAnnotations = new ArrayList<>();
 
 				if (!isStatic) {
 					declareVariable(classType, "this", null, false, null);
@@ -642,7 +643,7 @@ public class ClassCompiler {
 			variableTypes.add(type);
 			variableNames.add(name);
 			variableDefaults.add(def);
-			variableAnnotations.add(annotations);
+			variableAnnotations.add(null);
 			
 			String typeName = type.getConstructorType().getName();
 			if (typeName.equals("double") || typeName.equals("long")) {
@@ -650,6 +651,7 @@ public class ClassCompiler {
 				variableTypes.add(null);
 				variableNames.add(null);
 				variableDefaults.add(null); 
+				variableAnnotations.add(null);
 			}
 			
 			if (alwaysInitialize) {

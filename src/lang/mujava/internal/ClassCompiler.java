@@ -47,6 +47,7 @@ import io.usethesource.vallang.IWithKeywordParameters;
 import io.usethesource.vallang.type.Type;
 import io.usethesource.vallang.type.TypeFactory;
 import io.usethesource.vallang.type.TypeStore;
+import lang.mujava.internal.ClassCompiler.Signature;
 
 /**
  * Translates muJava ASTs (see lang::mujava::Syntax.rsc) directly down to JVM bytecode,
@@ -376,7 +377,7 @@ public class ClassCompiler {
 		}
 
 		private void annotation(AnnotationVisitor node, IConstructor anno) {
-			String name = AST.$getName(anno);
+			String name = AST.$getAnnotationName(anno);
 			IConstructor type = AST.$getType(anno);
 			Object val = object(type, AST.$getVal(anno));
 			String descriptor = Signature.type(type);
@@ -393,9 +394,9 @@ public class ClassCompiler {
 					(v) -> node.visit(name, val),
 					(C) -> node.visitEnum(name, descriptor, (String) val),
 					(a) -> {
-						AnnotationVisitor aav = node.visitArray(null);
-						for (Object elem : (Object[]) val) {
-							aav.visit(name, elem);
+						AnnotationVisitor aav = node.visitArray(name);
+						for (int i = 0; i < Array.getLength(val); i++) {
+							aav.visit(name, Array.get(val, i));
 						}
 						aav.visitEnd();
 					},
@@ -421,18 +422,24 @@ public class ClassCompiler {
 		}
 
 		private Object array(IConstructor type, IValue val) {
-			if (!(val instanceof IList)) {
-				throw new IllegalArgumentException("array annotations must be provided as lists");
+			try {
+				if (!(val instanceof IList)) {
+					throw new IllegalArgumentException("array annotations must be provided as lists");
+				}
+
+				IList list = (IList) val;
+				Object arr = Array.newInstance(Signature.binaryClass(AST.$getArg(type)), list.length());
+
+				int i = 0;
+				for (IValue elem : (IList) val) {
+					Array.set(arr, i++, object(AST.$getArg(type), elem));
+				}
+
+				return arr;
 			}
-			
-			IList list = (IList) val;
-			Object[] arr = new Object[list.length()];
-			int i = 0;
-			for (IValue elem : (IList) val) {
-				arr[i++] = object(AST.$getArg(type), elem);
+			catch (ClassNotFoundException e) {
+				throw new IllegalArgumentException("could not construct annotation array of " + type + " due to " + e.getMessage(), e);
 			}
-			
-			return arr;
 		}
 
 		private void generateDefaultConstructor(ClassNode cn) {
@@ -3087,6 +3094,16 @@ public class ClassCompiler {
 
 		public static String $getName(IConstructor exp) {
 			return ((IString) exp.get("name")).getValue();
+		}
+		
+		public static String $getAnnotationName(IConstructor exp) {
+			IWithKeywordParameters<? extends IConstructor> kws = exp.asWithKeywordParameters();
+			
+			if (kws.hasParameter("name")) {
+				return ((IString) kws.getParameter("name")).getValue();
+			}
+			
+			return "value";
 		}
 		
 		public static String $getAnnoClass(IConstructor exp) {

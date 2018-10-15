@@ -101,8 +101,8 @@ data Type
   ;
 
 data Annotation
-  // values _must_ be str, int, real, list[int], list[str], list[real], or nested further: list[list[int]]
-  = \anno(str annoClass, Type \type, str name, value val, RetentionPolicy retention=runtime(), list[Annotation] annotations = [])
+  // values _must_ be str, int, real, list[int], list[str], list[real]
+  = \anno(str annoClass, Type \type, value val, RetentionPolicy retention=runtime(), str name = "value", list[Annotation] annotations = [])
   | \anno(str annoClass, RetentionPolicy retention=runtime())
   ;
   

@@ -67,8 +67,8 @@ data Modifier
    | \synchronized()
    ;
 
-data Field
-  = field(Type \type, str name, Exp init = defValue(\type), set[Modifier] modifiers = {\private()});
+data Field(list[Annotation] annotations = [], set[Modifier] modifiers = {\private()})
+  = field(Type \type, str name, Exp init = defValue(\type));
          
 data Method(list[Annotation] annotations = [])
   = method(Signature desc, list[Formal] formals, list[Stat] block, set[Modifier] modifiers = {\public()})
@@ -113,7 +113,8 @@ data RetentionPolicy
   ;
  
 @doc{optional init expressions will be used at run-time if `null` is passed as actual parameter}
-data Formal = var(Type \type, str name, Exp init = defValue(\type)); 
+data Formal
+  = var(Type \type, str name, Exp init = defValue(\type)); 
 
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Stat(loc src = |unknown:///|)

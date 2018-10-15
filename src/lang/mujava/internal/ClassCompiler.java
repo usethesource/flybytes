@@ -2800,7 +2800,13 @@ public class ClassCompiler {
 						(s) -> null);
 			}
 
-			classNode.fields.add(new FieldNode(access, name, signature, null, value));
+			FieldNode fieldNode = new FieldNode(access, name, signature, null, value);
+			
+			if (kws.hasParameter("annotations")) {
+				annotations((a, b) -> fieldNode.visitAnnotation(a, b), (IList) kws.getParameter("annotations"));
+			}
+			
+			classNode.fields.add(fieldNode);
 		}
 
 		private int access(ISet modifiers) {

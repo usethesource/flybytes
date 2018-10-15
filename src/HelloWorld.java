@@ -7,8 +7,10 @@ public class HelloWorld {
 //		System.err.println(g(14)); 
 	}
 
+	@Deprecated
+	int f = 0;
 	
-	private static int g(int x) {
+	private static int g(@Deprecated int x ) {
 		for (int i = 0; i < 10; i++) {
 			synchronized(new Object()) {
 				if (i % 2 == 0) {

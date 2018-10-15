@@ -345,7 +345,15 @@ public class ClassCompiler {
 
 		private void annotations(ClassNode cn, IList annotations) {
 			for (IValue elem : annotations) {
-				boolean visible = AST.$getAtRuntime((IConstructor) elem);
+				String retention = AST.$getRetention((IConstructor) elem);
+				boolean visible = true;
+				
+				switch (retention) {
+				case "source" : continue; // do not compile the annotation
+				case "class" : visible = false;
+				case "runtime": visible = true;
+				}
+				
 				String descriptor = Signature.type(AST.$getType((IConstructor) elem));
 				annotation(cn.visitAnnotation(descriptor, visible), (IConstructor) elem);
 			}
@@ -379,6 +387,7 @@ public class ClassCompiler {
 					},
 					(S) -> av.visit(name, val)
 					);
+			node.visitEnd();
 		}
 
 		Object object(IConstructor type, IValue val) {
@@ -2923,12 +2932,12 @@ public class ClassCompiler {
 			return anno.get("val");
 		}
 
-		public static boolean $getAtRuntime(IConstructor elem) {
-			if (elem.asWithKeywordParameters().hasParameter("runtime")) {
-				return ((IBool) elem.asWithKeywordParameters().getParameter("runtime")).getValue();
+		public static String $getRetention(IConstructor elem) {
+			if (elem.asWithKeywordParameters().hasParameter("retention")) {
+				return ((IString) elem.asWithKeywordParameters().getParameter("runtime")).getValue();
 			}
 			
-			return true;
+			return "class";
 		}
 
 		public static IValue $getConstant(IConstructor exp) {

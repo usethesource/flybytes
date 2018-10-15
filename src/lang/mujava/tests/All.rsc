@@ -15,3 +15,4 @@ extend lang::mujava::tests::GotoTests;
 extend lang::mujava::tests::OtherExpressionTests;
 extend lang::mujava::tests::CatchTests;
 extend lang::mujava::tests::MonitorTests;
+extend lang::mujava::tests::AnnotationTests;

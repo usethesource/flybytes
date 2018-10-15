@@ -355,25 +355,29 @@ public class ClassCompiler {
 		
 		private void annotations(BiFunction<String,Boolean,AnnotationVisitor> cn, IList annotations) {
 			for (IValue elem : annotations) {
-				String retention = AST.$getRetention((IConstructor) elem);
-				boolean visible = true;
-				
-				switch (retention) {
-				case "source" : continue; // do not compile the annotation
-				case "class" : visible = false;
-				case "runtime": visible = true;
-				}
-				
-				IConstructor anno = (IConstructor) elem;
-				String sig = "L" + AST.$getAnnoClass(anno) + ";";
-				AnnotationVisitor an = cn.apply(sig, visible);
-				
-				if (anno.arity() > 1) {
-					annotation(an, (IConstructor) elem);
-				}
-				
-				an.visitEnd();
+				annotation(cn, elem);
 			}
+		}
+
+		private void annotation(BiFunction<String, Boolean, AnnotationVisitor> cn, IValue elem) {
+			String retention = AST.$getRetention((IConstructor) elem);
+			boolean visible = true;
+			
+			switch (retention) {
+			case "source" : return;
+			case "class" : visible = false;
+			case "runtime": visible = true;
+			}
+			
+			IConstructor anno = (IConstructor) elem;
+			String sig = "L" + AST.$getAnnoClass(anno) + ";";
+			AnnotationVisitor an = cn.apply(sig, visible);
+			
+			if (anno.arity() > 1) {
+				annotation(an, (IConstructor) elem);
+			}
+			
+			an.visitEnd();
 		}
 
 		private void annotation(AnnotationVisitor node, IConstructor anno) {
@@ -678,10 +682,18 @@ public class ClassCompiler {
 		}
 
 		private void formalVariables(IList formals, boolean initialize) {
+			int i = 0;
+			
 			for (IValue elem : formals) {
+				final int index = i;
 				IConstructor var = (IConstructor) elem;
 				IConstructor varType = AST.$getType(var);
 				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize);
+			
+				if (var.asWithKeywordParameters().hasParameter("annotations")) {
+					annotation((s,v) -> method.visitParameterAnnotation(index, s, v), (IList) var.asWithKeywordParameters().getParameter("annotations"));
+				}
+				i++;
 			}
 		}
 

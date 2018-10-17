@@ -231,16 +231,22 @@ data Exp(loc src = |unknown:///|)
 A bootstrap handle is a name of a static method (as defined by its host class,
 its name and its type signature), and a list of constant str arguments (for convenience).
 } 
-data Bootstrap = bootstrap(Type class, str name, Signature desc, list[str] args);
+data Bootstrap = bootstrap(Type class, str name, Signature desc, list[value /*int or str*/] args);
  
-Signature bootstrapDesc(str name, int extra) 
+Signature bootstrapDescWithStrings(str name, int extra) 
+  = bootstrapDesc(name, [string() | i <- [0..extra], i < 251]);
+  
+Signature bootstrapDescWithInts(str name, int extra) 
+  = bootstrapDesc(name, [integer() | i <- [0..extra], i < 251]);  
+    
+Signature bootstrapDesc(str name, Type extra.../* integer() or string() */) 
   = methodDesc(reference("java.lang.invoke.CallSite"), name, [
       reference("java.lang.invoke.MethodHandlers.Lookup"),
       string() /* name of the method */,
       reference("java.lang.invoke.MethodType"),
-      // up to 251 additional constant string arguments:
-      *[string() | i <- [0..extra], i < 251]  
-    ]);
+      // up to 251 additional constant string or integer arguments:
+      *extra  
+    ]);    
  
 Exp defVal(boolean()) = const(boolean(), false);
 Exp defVal(integer()) = const(integer(), 0);

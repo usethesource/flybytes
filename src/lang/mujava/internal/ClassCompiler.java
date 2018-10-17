@@ -2604,7 +2604,15 @@ public class ClassCompiler {
 			
 			int i = 0;
 			for (IValue elem : args) {
-				results[i++] = ((IString) elem).getValue();
+				if (elem instanceof IString) {
+					results[i++] = ((IString) elem).getValue();
+				}
+				else if (elem instanceof IInteger){
+					results[i++] = ((IInteger) elem).intValue();
+				}
+				else {
+					throw new IllegalArgumentException("bootstrap method arguments can only be either constant strings or constant integers");
+				}
 			}
 		
 			return results;

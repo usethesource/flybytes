@@ -194,6 +194,9 @@ data Exp(loc src = |unknown:///|)
   | /* Invoke a super constructor, typically only used in constructor method bodies */
     invokeSuper(Signature desc, list[Exp] args)
     
+  | /* Generate a call site using a static "bootstrap" method, cache it and invoke it */
+    invokeDynamic(Bootstrap handle, Signature desc, list[Exp] args)
+      
   | newInstance(Type class, Signature desc, list[Exp] args)
   | getField(Type class, Exp receiver, Type \type, str name)
   | getStatic(Type class, Type \type, str name)
@@ -223,6 +226,21 @@ data Exp(loc src = |unknown:///|)
   | neg(Exp arg)
   | inc(str name, int inc)
   ;
+ 
+@doc{
+A bootstrap handle is a name of a static method (as defined by its host class,
+its name and its type signature), and a list of constant str arguments (for convenience).
+} 
+data Bootstrap = bootstrap(Type class, str name, Signature desc, list[str] args);
+ 
+Signature bootstrapDesc(str name, int extra) 
+  = methodDesc(reference("java.lang.invoke.CallSite"), name, [
+      reference("java.lang.invoke.MethodHandlers.Lookup"),
+      string() /* name of the method */,
+      reference("java.lang.invoke.MethodType"),
+      // up to 251 additional constant string arguments:
+      *[string() | _ <- [0..extra], extra < 251]  
+    ]);
  
 Exp defVal(boolean()) = const(boolean(), false);
 Exp defVal(integer()) = const(integer(), 0);

@@ -19,6 +19,7 @@ import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.objectweb.asm.AnnotationVisitor;
 import org.rascalmpl.objectweb.asm.ClassVisitor;
 import org.rascalmpl.objectweb.asm.ClassWriter;
+import org.rascalmpl.objectweb.asm.Handle;
 import org.rascalmpl.objectweb.asm.Label;
 import org.rascalmpl.objectweb.asm.Opcodes;
 import org.rascalmpl.objectweb.asm.TypeReference;
@@ -1577,6 +1578,8 @@ public class ClassCompiler {
 				return invokeSuperStat(classNode.superName, AST.$getDesc(exp), AST.$getArgs(exp));
 			case "invokeStatic" : 
 				return invokeStaticExp(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getArgs(exp));
+			case "invokeDynamic" : 
+				return invokeDynamicExp(AST.$getHandle(exp), AST.$getDesc(exp), AST.$getArgs(exp));
 			case "getField":
 				return getfieldExp(AST.$getReceiver(exp), AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));
 			case "instanceof":
@@ -2581,6 +2584,40 @@ public class ClassCompiler {
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, AST.$getName(sig), Signature.method(sig), false);
 			return AST.$getReturn(sig);
 		}
+		
+		private IConstructor invokeDynamicExp(IConstructor handler, IConstructor sig, IList args) {
+			String name = AST.$getName(sig);
+			Handle bootstrapper = bootstrapHandler(handler);
+			Object[] bArgs = bootstrapArgs(handler);
+			
+			// push arguments to the method on the stack
+			expressions(args);
+			
+			// invoke the dynamic handle (and registeres it as side-effect using the bootstrap method)
+			method.visitInvokeDynamicInsn(name, Signature.method(sig), bootstrapper, bArgs);
+			return AST.$getReturn(sig);
+		}
+
+		private Object[] bootstrapArgs(IConstructor handler) {
+			IList args = AST.$getArgs(handler);
+			Object[] results = new Object[args.length()];
+			
+			int i = 0;
+			for (IValue elem : args) {
+				results[i++] = ((IString) elem).getValue();
+			}
+		
+			return results;
+		}
+
+		private Handle bootstrapHandler(IConstructor handler) {
+			return new Handle(Opcodes.H_INVOKESTATIC,
+					AST.$getClassFromType(AST.$getClass(handler), classNode.name),
+					AST.$getName(handler),
+					Signature.method(AST.$getDesc(handler)),
+					false
+					);
+		}
 
 		private IConstructor invokeVirtualExp(String cls, IConstructor sig, IConstructor receiver, IList args) {
 			expr(receiver);
@@ -2989,6 +3026,10 @@ public class ClassCompiler {
 			return ((IInteger) exp.get("key")).intValue();
 		}
 		
+		public static IConstructor $getHandle(IConstructor exp) {
+			return (IConstructor) exp.get("handle");
+		}
+
 		public static IValue $getVal(IConstructor anno) {
 			return anno.get("val");
 		}

@@ -239,7 +239,7 @@ Signature bootstrapDesc(str name, int extra)
       string() /* name of the method */,
       reference("java.lang.invoke.MethodType"),
       // up to 251 additional constant string arguments:
-      *[string() | _ <- [0..extra], extra < 251]  
+      *[string() | i <- [0..extra], i < 251]  
     ]);
  
 Exp defVal(boolean()) = const(boolean(), false);

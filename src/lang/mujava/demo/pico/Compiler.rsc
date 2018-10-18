@@ -8,17 +8,14 @@ import lang::mujava::api::System; // for stdout
 import lang::mujava::api::Object; // for toString
 import lang::mujava::api::String; // for concat
 
+import lang::mujava::macros::ControlFlow; // for_array
+
 import String;
 import ParseTree;
 
 void testFactorial() {
-  Program tree = parse(#start[Program], |std:///demo/lang/Pico/programs/Fac.pico|).top;
+  Program tree = parse(#start[Program], |project://mujava/src/lang/mujava/demo/pico/fac.pico|).top;
   compileProgram(tree, "Factorial", |project://mujava/generated|);
-}
-
-Class getFactorial() {
-   Program tree = parse(#start[Program], |std:///demo/lang/Pico/programs/Fac.pico|).top;
-   return compileProgram(tree, "Factorial");
 }
 
 void compileProgram(Program p, str name, loc folder) {
@@ -29,8 +26,9 @@ void compileProgram(Program p, str name, loc folder) {
 Class compileProgram(Program p, str name)
   = class(reference(name),
       methods=[
-        main("args", [
+        main("$$args", [
           *decls(p.decls),
+          *commandline(p.decls),
           *stats(p.body),
           *output(p.decls),
           \return()
@@ -41,23 +39,35 @@ Class compileProgram(Program p, str name)
 list[Stat] decls(Declarations p)
   = [decl(\type(t), "<i>") | (IdType) `<Id i> : <Type t>` <- p.decls];
  
+list[Stat] commandline(Declarations p) 
+  = [for_array("$$args", "i", [
+        \if (equals(sconst("<i>"), aload(load("$$args"), load("i"))), [
+          store("<i>", convert(t, aload(load("$$args"), add(load("i"), iconst(1)))))
+        ])
+      ])
+    | (IdType) `<Id i> : <Type t>` <- p.decls];
+   
+Exp convert((Type) `natural`, Exp e) = invokeStatic(reference("java.lang.Integer"), methodDesc(integer(), "parseInt", [string(), integer()]), [e, iconst(10)]);
+Exp convert((Type) `string`, Exp e)  = e;
+ 
 Type \type((Type) `natural`) = integer();
-Type \type((Type) `string`) = string();
+Type \type((Type) `string`)  = string();
   
-list[Stat] stats({Statement  ";"}* stats) 
-  = [stat(s) | s <- stats];
+list[Stat] stats({Statement  ";"}* stats) = [stat(s) | s <- stats];
   
 Stat stat((Statement) `<Id var> := <Expression val>`)
    = store("<var>", expr(val)); 
    
-Stat stat((Statement) `if <Expression cond> then 
+Stat stat((Statement) 
+                 `if <Expression cond> then 
                  '  <{Statement ";"}* thenPart> 
                  'else 
                  '  <{Statement ";"}* elsePart> 
                  'fi`)
    = \if(expr(cond), stats(thenPart), stats(elsePart));
    
-Stat stat((Statement) `while <Expression cond> do 
+Stat stat((Statement) 
+                 `while <Expression cond> do 
                  '  <{Statement ";"}* body> 
                  'od`)
    = \while(expr(cond), stats(body));

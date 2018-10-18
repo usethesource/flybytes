@@ -1,5 +1,6 @@
 module lang::mujava::macros::ControlFlow
 
+import lang::mujava::Syntax;
 import lang::mujava::api::JavaLang;
 
 Stat for_array(str arrayVar, str indexVar, list[Stat] body)

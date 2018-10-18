@@ -57,13 +57,8 @@ Exp expr((Exp) `let <{Binding ","}* bindings> in <Exp e> end`) {
   return sblock(decls, expr(rename(e)));
 }
 
-Exp  expr((Exp) `if <Exp cond> then <Exp thenPart> else <Exp elsePart> end`) {
-  v = "$cond_<uuidi()>";
-  return sblock([
-    decl(boolean(), v),
-    \if (expr(cond), [store(v, expr(thenPart))], [store(v, expr(elsePart))])
-  ], load(v));
-}
+Exp  expr((Exp) `if <Exp c> then <Exp thenPart> else <Exp elsePart> end`)
+  = cond(expr(c), expr(thenPart), expr(elsePart));
 
 Exp expr((Exp) `(<Exp e>)`) = expr(e);
 

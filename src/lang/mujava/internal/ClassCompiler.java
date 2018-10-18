@@ -3154,14 +3154,14 @@ public class ClassCompiler {
 
 		public static String $getClassFromType(IConstructor type, String currentClass) {
 			return Switch.type(type, 
-					(z) -> "java.lang.Boolean", 
-					(i) -> "java.lang.Integer", 
-					(s) -> "java.lang.Short", 
-					(b) -> "java.lang.Byte",
-					(c) -> "java.lang.Character", 
-					(f) -> "java.lang.Float", 
-					(d) -> "java.lang.Double", 
-					(j) -> "java.lang.Long", 
+					(z) -> "java/lang/Boolean", 
+					(i) -> "java/lang/Integer", 
+					(s) -> "java/lang/Short", 
+					(b) -> "java/lang/Byte",
+					(c) -> "java/lang/Character", 
+					(f) -> "java/lang/Float", 
+					(d) -> "java/lang/Double", 
+					(j) -> "java/lang/Long", 
 					(v) -> { throw new IllegalArgumentException("can not instantiate void type"); },
 					(c) -> {
 						String name = AST.$getName(type).replace('.','/');
@@ -3171,7 +3171,7 @@ public class ClassCompiler {
 						return name;
 					},
 					(a) -> { throw new IllegalArgumentException("can not instantiate array types, use newArray instead of newInstance"); }, 
-					(s) -> "java.lang.String");
+					(s) -> "java/lang/String");
 		}
 
 		public static String $getConstructorName(IValue parameter) {

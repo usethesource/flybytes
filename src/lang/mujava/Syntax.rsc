@@ -225,6 +225,7 @@ data Exp(loc src = |unknown:///|)
   | mul(Exp lhs, Exp rhs)
   | neg(Exp arg)
   | inc(str name, int inc)
+  | cond(Exp condition, Exp thenExp, Exp elseExp)
   ;
  
 @doc{

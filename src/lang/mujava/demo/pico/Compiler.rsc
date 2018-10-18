@@ -7,6 +7,7 @@ import lang::mujava::Compiler;
 import lang::mujava::api::System; // for stdout
 import lang::mujava::api::Object; // for toString
 import lang::mujava::api::String; // for concat
+import lang::mujava::api::JavaLang; // for parseInt
 
 import lang::mujava::macros::ControlFlow; // for_array
 
@@ -27,8 +28,8 @@ Class compileProgram(Program p, str name)
   = class(reference(name),
       methods=[
         main("$$args", [
-          *decls(p.decls),
-          *commandline(p.decls),
+          *decls(p.decls), 
+          *commandline(p.decls), 
           *stats(p.body),
           *output(p.decls),
           \return()
@@ -39,17 +40,7 @@ Class compileProgram(Program p, str name)
 list[Stat] decls(Declarations p)
   = [decl(\type(t), "<i>") | (IdType) `<Id i> : <Type t>` <- p.decls];
  
-list[Stat] commandline(Declarations p) 
-  = [for_array("$$args", "i", [
-        \if (equals(sconst("<i>"), aload(load("$$args"), load("i"))), [
-          store("<i>", convert(t, aload(load("$$args"), add(load("i"), iconst(1)))))
-        ])
-      ])
-    | (IdType) `<Id i> : <Type t>` <- p.decls];
-   
-Exp convert((Type) `natural`, Exp e) = invokeStatic(reference("java.lang.Integer"), methodDesc(integer(), "parseInt", [string(), integer()]), [e, iconst(10)]);
-Exp convert((Type) `string`, Exp e)  = e;
- 
+
 Type \type((Type) `natural`) = integer();
 Type \type((Type) `string`)  = string();
   
@@ -91,3 +82,16 @@ Exp toString(Id i, (Type) `natural`)
 Exp toString(Id i, (Type) `string`)
   = load("<i>");
       
+list[Stat] commandline(Declarations p) 
+  = [for_array("$$args", "i", [
+       // if (args[i].equals(varName))
+        \if (equals(sconst("<i>"), aload(load("$$args"), load("i"))), [
+          // varName = fromString(args[i+1])
+          store("<i>", fromString(t, aload(load("$$args"), add(load("i"), iconst(1)))))
+        ])
+      ])
+    | (IdType) `<Id i> : <Type t>` <- p.decls];
+   
+Exp fromString((Type) `natural`, Exp e) = Integer_parseInt(e, 10);
+Exp fromString((Type) `string`, Exp e)  = e;
+ 

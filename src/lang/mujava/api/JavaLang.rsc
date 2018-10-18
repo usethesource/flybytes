@@ -54,3 +54,5 @@ int  epsilon(character()) = 1;
 int  epsilon(integer())   = 1;
 int  epsilon(long())      = 1;
 int  epsilon(byte())      = 1;
+
+Exp Integer_parseInt(Exp e, int radix) = invokeStatic(Integer(), methodDesc(integer(), "parseInt", [string(), integer()]), [e, iconst(radix)]);

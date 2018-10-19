@@ -1,6 +1,7 @@
 module lang::mujava::demo::pico::Compiler
 
-import lang::pico::\syntax::Main;
+import lang::mujava::demo::pico::Syntax;
+
 import lang::mujava::Syntax;
 import lang::mujava::Compiler;
 

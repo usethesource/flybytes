@@ -1,6 +1,6 @@
 module lang::mujava::demo::func::Compiler
 
-import demo::lang::Func::Func;
+import lang::mujava::demo::func::Syntax;
 
 import lang::mujava::Syntax;
 import lang::mujava::Compiler;
@@ -38,50 +38,42 @@ list[Method] functions(Func* funcs) = [func(f) | f <- funcs];
 
 Method func((Func) `<Ident name>(<{Ident ","}* params>) = <Exp e>`)
   = staticMethod(\public(), integer(), "<name>", formals(params), [
-      \return(expr(e))
+      \return(expr(e, ()))
     ]);
 
 list[Formal] formals({Ident ","}* params) = [var(integer(), "<i>") | Ident i <- params];
 
-Exp expr((Exp) `let <{Binding ","}* bindings> in <Exp e> end`) {
-  renamed = ("<i>" : "$var_<uuidi()>" | (Binding) `<Ident i> = <Exp init>` <- bindings);
+Exp expr((Exp) `let <{Binding ","}* bindings> in <Exp e> end`, map[str,str] renamings) {
+  decls = for((Binding) `<Ident i> = <Exp val>` <- bindings) {
+    // it's a let*
+    renamings += ("<i>" : "$var_<uuidi()>");
+    append decl(integer(), renamed["<i>"], init=expr(val, renamings));
+  }
   
-  Exp rename(Exp f) = visit (f) {
-    case Ident i => [Ident] renamed["<i>"] when "<i>" in renamed 
-  };
-  
-  decls = [decl(integer(), renamed["<i>"], init=expr(rename(inExp))) 
-          | (Binding) `<Ident i> = <Exp inExp>` <- bindings
-          ];
-          
-  return sblock(decls, expr(rename(e)));
+  return sblock(decls, expr(e, renamings));
 }
 
-Exp  expr((Exp) `if <Exp c> then <Exp thenPart> else <Exp elsePart> end`)
-  = cond(expr(c), expr(thenPart), expr(elsePart));
+Exp  expr((Exp) `if <Exp c> then <Exp thenPart> else <Exp elsePart> end`, map[str,str] names)
+  = cond(expr(c, names), expr(thenPart, names), expr(elsePart, names));
 
-Exp expr((Exp) `(<Exp e>)`) = expr(e);
+Exp expr((Exp) `(<Exp e>)`, map[str,str] names) = expr(e, names);
 
-Exp expr((Exp) `<Ident i>`) = load("<i>");
+Exp expr((Exp) `<Ident i>`, map[str,str] names) = load(names["<i>"]?"<i>");
 
-Exp expr((Exp) `<Natural n>`) = iconst(toInt("<n>"));
+Exp expr((Exp) `<Natural n>`, map[str,str] _) = iconst(toInt("<n>"));
 
-Exp expr((Exp) `<Ident i>(<{Exp ","}* args>)`)
-  = invokeStatic(methodDesc(integer(), "<i>", [integer() | _ <- args]), [expr(a) | a <- args]);
+Exp expr((Exp) `<Ident i>(<{Exp ","}* args>)`, map[str,str] names)
+  = invokeStatic(methodDesc(integer(), names["<i>"]?"<i>", [integer() | _ <- args]), [expr(a, names) | a <- args]);
 
-// TODO
-//           | address: "&" Ident
-//           > deref: "*" Exp 
+Exp expr((Exp) `<Exp l> * <Exp r>`, map[str,str] names) = mul(expr(l, names), expr(r, names));
+Exp expr((Exp) `<Exp l> / <Exp r>`, map[str,str] names) = div(expr(l, names), expr(r, names));
+Exp expr((Exp) `<Exp l> + <Exp r>`, map[str,str] names) = add(expr(l, names), expr(r, names));
+Exp expr((Exp) `<Exp l> - <Exp r>`, map[str,str] names) = sub(expr(l, names), expr(r, names));
 
-Exp expr((Exp) `<Exp l> * <Exp r>`) = mul(expr(l), expr(r));
-Exp expr((Exp) `<Exp l> / <Exp r>`) = div(expr(l), expr(r));
-Exp expr((Exp) `<Exp l> + <Exp r>`) = add(expr(l), expr(r));
-Exp expr((Exp) `<Exp l> - <Exp r>`) = sub(expr(l), expr(r));
+Exp expr((Exp) `<Exp l> \> <Exp r>`, map[str,str] names) = gt(expr(l, names), expr(r, names));
+Exp expr((Exp) `<Exp l> \< <Exp r>`, map[str,str] names) = lt(expr(l, names), expr(r, names));
+Exp expr((Exp) `<Exp l> \>= <Exp r>`, map[str,str] names) = ge(expr(l, names), expr(r, names));
+Exp expr((Exp) `<Exp l> \<= <Exp r>`, map[str,str] names) = le(expr(l, names), expr(r, names));
 
-Exp expr((Exp) `<Exp l> \> <Exp r>`) = gt(expr(l), expr(r));
-Exp expr((Exp) `<Exp l> \< <Exp r>`) = lt(expr(l), expr(r));
-Exp expr((Exp) `<Exp l> \>= <Exp r>`) = ge(expr(l), expr(r));
-Exp expr((Exp) `<Exp l> \<= <Exp r>`) = le(expr(l), expr(r));
-
-Exp expr((Exp) `<Ident i> := <Exp r>`) = sblock([store("<i>", <expr(r)>)],load("<i>"));
-Exp expr((Exp) `<Exp l> ; <Exp r>`) = sblock([\do(expr(l))], expr(r));
+Exp expr((Exp) `<Ident i> := <Exp r>`, map[str,str] names) = sblock([store("<i>", <expr(r, names)>)],load("<i>"));
+Exp expr((Exp) `<Exp l> ; <Exp r>`, map[str,str] names) = sblock([\do(expr(l, names))], expr(r, names));

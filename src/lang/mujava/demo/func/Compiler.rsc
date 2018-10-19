@@ -15,8 +15,11 @@ import ParseTree;
 import util::UUID;
 
 void testFunFactorial() {
-  Prog tree = parse(#start[Prog], |project://mujava/src/lang/mujava/demo/func/fac.func|).top;
+  tree = parse(#start[Prog], |project://mujava/src/lang/mujava/demo/func/fac.func|).top;
   compileProg(tree, "FuncFactorial", |project://mujava/generated|);
+  
+  tree = parse(#start[Prog], |project://mujava/src/lang/mujava/demo/func/factlet.func|).top;
+  compileProg(tree, "FuncLetFactorial", |project://mujava/generated|);
 }
 
 void compileProg(Prog p, str name, loc folder) {
@@ -43,14 +46,14 @@ Method func((Func) `<Ident name>(<{Ident ","}* params>) = <Exp e>`)
 
 list[Formal] formals({Ident ","}* params) = [var(integer(), "<i>") | Ident i <- params];
 
-Exp expr((Exp) `let <{Binding ","}* bindings> in <Exp e> end`, map[str,str] renamings) {
+Exp expr((Exp) `let <{Binding ","}* bindings> in <Exp e> end`, map[str,str] names) {
   decls = for((Binding) `<Ident i> = <Exp val>` <- bindings) {
     // it's a let*
-    renamings += ("<i>" : "$var_<uuidi()>");
-    append decl(integer(), renamed["<i>"], init=expr(val, renamings));
+    names += ("<i>" : "$var_<uuidi()>");
+    append decl(integer(), names["<i>"], init=expr(val, names));
   }
   
-  return sblock(decls, expr(e, renamings));
+  return sblock(decls, expr(e, names));
 }
 
 Exp  expr((Exp) `if <Exp c> then <Exp thenPart> else <Exp elsePart> end`, map[str,str] names)

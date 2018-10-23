@@ -81,5 +81,5 @@ Exp expr((Exp) `<Exp l> \< <Exp r>`, map[str,str] names) = lt(expr(l, names), ex
 Exp expr((Exp) `<Exp l> \>= <Exp r>`, map[str,str] names) = ge(expr(l, names), expr(r, names));
 Exp expr((Exp) `<Exp l> \<= <Exp r>`, map[str,str] names) = le(expr(l, names), expr(r, names));
 
-Exp expr((Exp) `<Ident i> := <Exp r>`, map[str,str] names) = sblock([store("<i>", <expr(r, names)>)],load("<i>"));
+Exp expr((Exp) `<Ident i> := <Exp r>`, map[str,str] names) = sblock([store("<i>", expr(r, names))],load("<i>"));
 Exp expr((Exp) `<Exp l> ; <Exp r>`, map[str,str] names) = sblock([\do(expr(l, names))], expr(r, names));

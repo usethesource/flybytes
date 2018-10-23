@@ -24,7 +24,22 @@ Flybytes is an intermediate language towards JVM bytecode generation for Rascal-
 * Flybytes does not cover a priori type checking of the input Flybytes AST. So, a proper application of the Flybytes compiler assumes:
    * Your DSL has its own type checker and the compiler is not called if the input code still has serious type errors or name resolution errors (but you could also generate error nodes for partial compilation support)
    * Your compiler to Flybytes ASTs does not introduce new type errors with respect to the JVM's type system.
-* Flybytes does not cover much name resolution, so for imports, foreign names and such you have to provide fully qualified names while generating Flybytes ASTs
+* Flybytes does not cover much name resolution, and thus also no overloading:
+   * so no `import` statement
+   * field names are always fully qualified
+   * method names are always fully qualified and carry full descriptions of their parameter types
+* Flybytes does not do short-circuit evaluation of the boolean operators `or` and `and`, so you have to use `cond` expressions to guarantee short-circuit evaluation where necessary yourself.
+* Flybytes has (almost) the same type system as the JVM:
+   * object types with fully qualified names (no generics) 
+   * array types (which are restricted and final object types)
+   * the root object type is `object("java.lang.Object")`
+   * Flybytes has some kind of type system:
+      * method resolution, like the JVM has, that method signatures are used as method names, and methods and fields are sought through an inheritance relation at run-time.
+      * but otherwise Flybytes has no sub-typing or any static typing rules, that feature is left to your own language design
+   * primitive types (integer, short, byte, long, character)
+   * additionally Flybytes has a boolean type
+   * additionally Flybytes has the string() types which is equivalent to `object("java.lang.String")`
+   * additionally Flybytes offers a safe syntax for constructing and calling "bootstrap" methods for `invokedynamic`
 
 ### Features:
 

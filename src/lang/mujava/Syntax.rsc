@@ -230,8 +230,6 @@ data Exp(loc src = |unknown:///|)
   | cond(Exp condition, Exp thenExp, Exp elseExp)
   ;
  
-
-
 Exp defVal(boolean()) = const(boolean(), false);
 Exp defVal(integer()) = const(integer(), 0);
 Exp defVal(long()) = const(long(), 0);
@@ -381,13 +379,20 @@ data CallSiteInfo
   | floatInfo(float f)
   | doubleInfo(double d)
   | methodTypeInfo(Signature desc)
-  | virtualHandle(Type class, str name, Signature desc)
-  | specialHandle(Type class, str name, Signature desc, Type caller)
-  | getterHandle(Type class, str name, Type \type)
-  | setterHandle(Type class, str name, Type \type)
-  | staticGetterHandle(Type class, str name, Type \type)
-  | staticSetterHandle(Type class, str name, Type \type)
-  | constructorHandle(Type class, Type desc)
+  | // see MethodHandles.lookup().findVirtual for more information
+    virtualHandle(Type class, str name, Signature desc)
+  | // see MethodHandles.lookup().findSpecial for more information
+    specialHandle(Type class, str name, Signature desc, Type caller)
+  | // see MethodHandles.lookup().findGetter for more information
+    getterHandle(Type class, str name, Type \type)
+  | // see MethodHandles.lookup().findSetter for more information
+    setterHandle(Type class, str name, Type \type)
+  | // see MethodHandles.lookup().findStaticGetter for more information
+    staticGetterHandle(Type class, str name, Type \type)
+  | // see MethodHandles.lookup().findStaticSetter for more information
+    staticSetterHandle(Type class, str name, Type \type)
+  | // see MethodHandles.lookup().findConstructor for more information
+    constructorHandle(Type class, Type desc)
   ;
   
 Type callsiteInfoType(stringInfo(_))             = string();

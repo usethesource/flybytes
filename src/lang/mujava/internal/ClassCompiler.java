@@ -801,10 +801,10 @@ public class ClassCompiler {
 				aastoreStat(AST.$getArray(stat), AST.$getIndex(stat), AST.$getArg(stat));
 				break;
 			case "putField":
-				putFieldStat(AST.$getClassFromType(AST.$getClass(stat), classNode.name), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
+				putFieldStat(AST.$getRefClassFromType(AST.$getClass(stat), classNode.name), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
 				break;
 			case "putStatic":
-				putStaticStat(AST.$getClassFromType(AST.$getClass(stat), classNode.name), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
+				putStaticStat(AST.$getRefClassFromType(AST.$getClass(stat), classNode.name), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
 				break;
 			case "return" : 
 				returnStat(stat);
@@ -1149,7 +1149,7 @@ public class ClassCompiler {
 					method.visitLabel(handlers[i]);
 					String varName = AST.$getName(catcher);
 					IConstructor exceptionType = AST.$getType(catcher);
-					String clsName = AST.$getClassFromType(exceptionType, classNode.name);
+					String clsName = AST.$getRefClassFromType(exceptionType, classNode.name);
 					method.visitVarInsn(Opcodes.ASTORE, positionOf(varName));
 					statements(AST.$getBlock(catcher), continueLabel, breakLabel, joinLabel);
 					method.visitTryCatchBlock(tryStart, tryEnd, handlers[i], clsName);
@@ -1560,23 +1560,23 @@ public class ClassCompiler {
 			case "aload" :
 				return aaloadExp(AST.$getArray(exp), AST.$getIndex(exp));
 			case "getStatic":
-				return getstaticExp(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));
+				return getstaticExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));
 			case "invokeVirtual" : 
-				return invokeVirtualExp(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
+				return invokeVirtualExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 			case "invokeInterface" : 
-				return invokeInterfaceExp(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
+				return invokeInterfaceExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 			case "invokeSpecial" : 
-				return invokeSpecialExp(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
+				return invokeSpecialExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
 			case "invokeSuper" : 
 				return invokeSuperStat(classNode.superName, AST.$getDesc(exp), AST.$getArgs(exp));
 			case "invokeStatic" : 
-				return invokeStaticExp(AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getArgs(exp));
+				return invokeStaticExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getArgs(exp));
 			case "invokeDynamic" : 
 				return invokeDynamicExp(AST.$getHandle(exp), AST.$getDesc(exp), AST.$getArgs(exp));
 			case "getField":
-				return getfieldExp(AST.$getReceiver(exp), AST.$getClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));
+				return getfieldExp(AST.$getReceiver(exp), AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));
 			case "instanceof":
-				return instanceofExp(AST.$getArg(exp), AST.$getClassFromType(exp, classNode.name));
+				return instanceofExp(AST.$getArg(exp), AST.$getRefClassFromType(exp, classNode.name));
 			case "sblock":
 				return sblockExp(AST.$getStatements(exp), AST.$getArg(exp));
 			case "null":
@@ -2562,7 +2562,7 @@ public class ClassCompiler {
 		private IConstructor newInstanceExp(IConstructor exp) {
 			expressions(AST.$getArgs(exp));
 			IConstructor type = AST.$getClass(exp);
-			String cls = AST.$getClassFromType(type, classNode.name);
+			String cls = AST.$getRefClassFromType(type, classNode.name);
 			String desc = Signature.constructor(AST.$getDesc(exp));
 			method.visitTypeInsn(Opcodes.NEW, cls);
 			dup();
@@ -2688,7 +2688,7 @@ public class ClassCompiler {
 
 		private Handle bootstrapHandler(IConstructor handler) {
 			return new Handle(Opcodes.H_INVOKESTATIC,
-					AST.$getClassFromType(AST.$getClass(handler), classNode.name),
+					AST.$getRefClassFromType(AST.$getClass(handler), classNode.name),
 					AST.$getName(handler),
 					Signature.method(AST.$getDesc(handler)),
 					false
@@ -3244,28 +3244,6 @@ public class ClassCompiler {
 			return ((IString) parameter.get("class")).getValue();
 		}
 
-		public static String $getClassFromType(IConstructor type, String currentClass) {
-			return Switch.type(type, 
-					(z) -> "java/lang/Boolean", 
-					(i) -> "java/lang/Integer", 
-					(s) -> "java/lang/Short", 
-					(b) -> "java/lang/Byte",
-					(c) -> "java/lang/Character", 
-					(f) -> "java/lang/Float", 
-					(d) -> "java/lang/Double", 
-					(j) -> "java/lang/Long", 
-					(v) -> { throw new IllegalArgumentException("can not instantiate void type"); },
-					(c) -> {
-						String name = AST.$getName(type).replace('.','/');
-						if (name.equals("<current>")) {
-							name = currentClass;
-						}
-						return name;
-					},
-					(a) -> { throw new IllegalArgumentException("can not instantiate array types, use newArray instead of newInstance"); }, 
-					(s) -> "java/lang/String");
-		}
-		
 		public static String $getRefClassFromType(IConstructor type, String currentClass) {
 			return Switch.type(type, 
 					(z) -> { throw new IllegalArgumentException("expected object type"); }, 

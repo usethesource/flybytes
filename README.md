@@ -35,9 +35,11 @@ Flybytes is an intermediate language towards JVM bytecode generation for Rascal-
    1. formal parameter names
    1. structured control flow: if, while, do-while, try-catch-finally, for, break, continue, return, switch
    1. monitor blocks
-   1. full expression language (but no short-circuiting for the booleans!)
+   1. full expression language (fully hides stack operations of JVM bytecode)
    1. class, method, and variable annotations 
    1. method invocation specialized towards specific JVM instructions (for efficiency's sake)
+* Offers symbolic types and method descriptors (as opposed to mangled strings in JVM bytecode)
+* Can generate JVM bytecode which would be type-incorrect for Java, but type-correct for the JVM.
 * Additional dynamic language support via `invokedynamic` and construction and invocation of bootstrap methods
 * Incrementally growing library of macros for typical program element snippets, such as loops over arrays and loops over iterables, etc.
 
@@ -54,3 +56,11 @@ Flybytes is an intermediate language towards JVM bytecode generation for Rascal-
 * add support for error nodes (to support partial compilation and running partially compiled classes)
 * refactor compiler exceptions to Rascal exceptions (to help debugging Flybytes AST generators)
 * add support for nested classes (helps in generating code for lambda expressions)
+
+### Citations
+
+The design of Flybtyes was informed by the JVM VM spec, the ASM library code and documentation and the Jitescript API:
+
+* <https://docs.oracle.com/javase/specs/jvms/se8/jvms8.pdf>
+* <https://asm.ow2.io/>
+* <https://github.com/qmx/jitescript>

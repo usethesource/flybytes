@@ -11,7 +11,7 @@ Class primVarTestClass(Type t, value v) {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(reference("PrimVarTestClass_<getName(t)>"),
+  return class(object("PrimVarTestClass_<getName(t)>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
@@ -61,7 +61,7 @@ Class objVarTestClass(Type t, Exp v) {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(reference("ObjVarTestClass_<getName(t)>"),
+  return class(object("ObjVarTestClass_<getName(t)>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [

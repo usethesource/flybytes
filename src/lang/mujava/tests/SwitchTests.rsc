@@ -5,7 +5,7 @@ import lang::mujava::Compiler;
 import Node;
 
 Class switchClass(SwitchOption option) 
-  = class(reference("SwitchClass_<getName(option)>"),
+  = class(object("SwitchClass_<getName(option)>"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [var(integer(), "par")],
         [ 
@@ -41,7 +41,7 @@ test bool simpleSwitch3auto() = testSwitchClass(switchClass(auto()), 18, 0);
 
 
 Class switchDefaultClass(SwitchOption option) 
-  = class(reference("SwitchDefaultClass_<getName(option)>"),
+  = class(object("SwitchDefaultClass_<getName(option)>"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [var(integer(), "par")],
         [ 
@@ -75,7 +75,7 @@ test bool simpleDefaultSwitch2Auto() = testSwitchClass(switchDefaultClass(auto()
 test bool simpleDefaultSwitch3Auto() = testSwitchClass(switchDefaultClass(auto()), 0, -1);
 
 Class switchCompactClass(SwitchOption option) 
-  = class(reference("SwitchCompactClass_<getName(option)>"),
+  = class(object("SwitchCompactClass_<getName(option)>"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [var(integer(), "par")],
         [ 

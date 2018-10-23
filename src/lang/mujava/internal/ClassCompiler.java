@@ -666,7 +666,7 @@ public class ClassCompiler {
 				}
 			}
 			else {
-				if (def != null && (typeName.equals("reference") || typeName.equals("array"))) {
+				if (def != null && (typeName.equals("object") || typeName.equals("array"))) {
 					// if somebody passed 'null' as actual parameter and we have something to initialize with here,
 					// then we store that into the variable now. mujava has default parameters!
 					loadExp(name);
@@ -1943,7 +1943,7 @@ public class ClassCompiler {
 			String cons = type.getConstructorType().getName();
 
 			// weird inconsistency in CHECKCAST instruction?
-			if (cons == "reference") {
+			if (cons == "object") {
 				method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type));
 			}
 			else if (cons == "array") {
@@ -2261,7 +2261,7 @@ public class ClassCompiler {
 					}, 
 					(v) -> failedCoercion("string", to), 
 					(a) -> failedCoercion("string", to),
-					(c) -> failedCoercion("reference", to),
+					(c) -> failedCoercion("object", to),
 					(S) -> { /* identity */ }
 					);
 		}
@@ -2285,7 +2285,7 @@ public class ClassCompiler {
 					(d) -> failedCoercion("double", to),
 					(l) -> failedCoercion("long", to),
 					(v) -> failedCoercion("void", to),
-					(c) -> failedCoercion("reference", to),
+					(c) -> failedCoercion("object", to),
 					(a) -> coerceArrayToArray(from, to, arg),
 					(S) -> failedCoercion("string", to) // TODO byteArray?
 					);
@@ -2306,7 +2306,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.L2D); },
 					(l) -> { /* do nothing */ },
 					(v) -> { pop(); nullExp(); },
-					(c) -> failedCoercion("reference", to),
+					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						expr(arg);
@@ -2389,7 +2389,7 @@ public class ClassCompiler {
 							/* do nothing */
 						}
 						else {
-							failedCoercion("reference", to);
+							failedCoercion("object", to);
 						}
 					},
 					(a) -> failedCoercion("array", to),
@@ -2411,7 +2411,7 @@ public class ClassCompiler {
 					(d) -> { /* do nothing */ },
 					(l) -> { method.visitInsn(Opcodes.D2L); } ,
 					(v) -> { pop(); nullExp(); },
-					(c) -> failedCoercion("reference", to),
+					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						expr(arg);
@@ -2431,7 +2431,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.F2D); },
 					(l) -> { method.visitInsn(Opcodes.F2L); },
 					(v) -> { pop(); nullExp(); },
-					(c) -> failedCoercion("reference", to),
+					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						expr(arg);
@@ -2451,7 +2451,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.I2D); },
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); nullExp(); },
-					(c) -> failedCoercion("reference", to),
+					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						expr(arg);
@@ -2471,7 +2471,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.I2D); },
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); nullExp(); },
-					(c) -> failedCoercion("reference", to),
+					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						expr(arg);
@@ -2491,7 +2491,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.I2D); },
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); nullExp(); },
-					(c) -> failedCoercion("reference", to),
+					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						expr(arg);
@@ -2511,7 +2511,7 @@ public class ClassCompiler {
 					(d) -> { method.visitInsn(Opcodes.I2D); },
 					(l) -> { method.visitInsn(Opcodes.I2L); },
 					(v) -> { pop(); nullExp(); },
-					(c) -> failedCoercion("reference", to),
+					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
 						expr(arg);
@@ -3437,7 +3437,7 @@ public class ClassCompiler {
 			case "void" :
 				voids.accept(type);
 				break;
-			case "reference" :
+			case "object" :
 				classes.accept(type);
 				break;
 			case "array" :
@@ -3475,7 +3475,7 @@ public class ClassCompiler {
 				return longs.apply(type);
 			case "void" :
 				return voids.apply(type);
-			case "reference" :
+			case "object" :
 				return classes.apply(type);
 			case "array" :
 				return arrays.apply(type);
@@ -3519,7 +3519,7 @@ public class ClassCompiler {
 			case "void" :
 				voids.accept(type, arg);
 				break;
-			case "reference" :
+			case "object" :
 				classes.accept(type, arg);
 				break;
 			case "array" :
@@ -3545,7 +3545,7 @@ public class ClassCompiler {
 		private static final IConstructor INTEGER_CONS = vf.constructor(INTEGER);
 		private static final Type VOID = tf.constructor(store, TYPE, "void");
 		private static final IConstructor VOID_CONS = vf.constructor(VOID);
-		private static final Type REF = tf.constructor(store, TYPE, "reference", tf.stringType(), "name");
+		private static final Type REF = tf.constructor(store, TYPE, "object", tf.stringType(), "name");
 
 		static IConstructor booleanType() {
 			return BOOL_CONS;

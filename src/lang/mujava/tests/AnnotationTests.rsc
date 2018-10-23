@@ -4,7 +4,7 @@ import lang::mujava::Syntax;
 import lang::mujava::Compiler;
 
 Class annoClass() =
-  class(reference("AnnoClass")
+  class(object("AnnoClass")
   methods=[
     staticMethod(\public(),boolean(),"testMethod", [], [ \return(\true())])[
       annotations=[
@@ -15,7 +15,7 @@ Class annoClass() =
   ],
   annotations=[
     \anno("java.lang.Annotation", integer(), 0, name="version"),
-    \anno("javax.annotation.processing.SupportedSourceVersion", reference("javax.lang.model.SourceVersion"), "RELEASE_0")
+    \anno("javax.annotation.processing.SupportedSourceVersion", object("javax.lang.model.SourceVersion"), "RELEASE_0")
   ]
   );
 

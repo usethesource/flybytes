@@ -4,7 +4,7 @@ import lang::mujava::Syntax;
 import lang::mujava::Compiler;
 
 Class defParamClass() {
-  return class(reference("DefParam"),
+  return class(object("DefParam"),
       methods=[
         staticMethod(\public(), string(), "testMethod", [var(string(), "i", init=sconst("hello!"))],[
            \return(load("i"))

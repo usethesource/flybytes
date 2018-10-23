@@ -5,7 +5,7 @@ import lang::mujava::Compiler;
 
 
 Class GotoClass1() 
-  = class(reference("GotoClass"),
+  = class(object("GotoClass"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [ 

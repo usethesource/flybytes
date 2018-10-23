@@ -45,7 +45,7 @@ module lang::mujava::Syntax
 import List;
 
 data Class(list[Annotation] annotations = [], loc source = |unknown:///|)
-  = class(Type \type /* reference(str name) */, 
+  = class(Type \type /* object(str name) */, 
       set[Modifier] modifiers = {\public()},
       Type super              = object(),
       list[Type]   interfaces = [],
@@ -53,7 +53,7 @@ data Class(list[Annotation] annotations = [], loc source = |unknown:///|)
       list[Method] methods    = []
       //list[Class] children = [],
     )
-  | interface(Type \type /* reference(str name) */,
+  | interface(Type \type /* object(str name) */,
       list[Field]  fields  = [],
       list[Method] methods = []
     )  
@@ -95,8 +95,7 @@ data Type
   | float()
   | double()
   | long()
-  | reference(str name) /* TODO: rename to "object" like it is called in the ASM framework
-// | method() /* TODO: add method handles */
+  | object(str name)  
   | array(Type arg)
   | \void()
   | string()
@@ -238,14 +237,14 @@ Exp defVal(character()) = const(character(), 0);
 Exp defVal(short()) = const(short(), 0);
 Exp defVal(float()) = const(float(), 0.0);
 Exp defVal(double()) = const(double(), 0.0);
-Exp defVal(reference(str _)) = null();
+Exp defVal(object(str _)) = null();
 Exp defVal(array(Type _)) = null();
 Exp defVal(string()) = null();
  
  // Below popular some convenience macros for
  // generating methods and constructors:
  
-Type object() = reference("java.lang.Object");
+Type object() = object("java.lang.Object");
 
 Stat invokeSuper(list[Type] formals, list[Exp] args)
   = do(invokeSuper(constructorDesc(formals), args));
@@ -292,7 +291,7 @@ Exp new(Type class)
 Exp this() = load("this");
 
 // the "<current>" class refers to the class currently being generated
-private Type CURRENT = reference("\<current\>");
+private Type CURRENT = object("\<current\>");
 
 // Load a field from the currently defined class
 Exp getField(Type \type, str name) = getField(CURRENT, this(), \type, name);
@@ -341,31 +340,31 @@ the type of the static bootstrap method.
 } 
 data BootstrapCall = bootstrap(Type class, str name, Signature desc, list[CallSiteInfo] args);
  
-BootstrapCall bootstrap(Type class, str name, list[BootstrapInfo] args)
+BootstrapCall bootstrap(Type class, str name, list[CallSiteInfo] args)
   = bootstrap(class, name, 
-      methodDesc(reference("java.lang.invoke.CallSite"),
+      methodDesc(object("java.lang.invoke.CallSite"),
                  name,
                  [
-                    reference("java.lang.invoke.MethodHandlers.Lookup"),
+                    object("java.lang.invoke.MethodHandlers.Lookup"),
                     string(),
                     MethodType()
                     *[callsiteInfoType(a) | a <- args]
                  ]),
        args);
 
-BootstrapCall bootstrap(Type class, str name, list[BootstrapInfo] args)
-  = bootstrap(reference("\<CURRENT\>"), name, args);
+BootstrapCall bootstrap(Type class, str name, list[CallSiteInfo] args)
+  = bootstrap(object("\<CURRENT\>"), name, args);
   
 @doc{
 Convenience function to use existing BootstrapCall information to generate a fitting bootstrap 
 method to call.
 }  
-Method bootstrapMethod(BootstrapCall b, list[Statement] body)
+Method bootstrapMethod(BootstrapCall b, list[Stat] body)
   = method(b.desc, 
       [
-         var(reference("java.lang.invoke.MethodHandlers.Lookup"), "callerClass"),
+         var(object("java.lang.invoke.MethodHandlers.Lookup"), "callerClass"),
          var(string(), "dynMethodName"),
-         var(reference("java.lang.invoke.MethodType"), "dynMethodType"),
+         var(object("java.lang.invoke.MethodType"), "dynMethodType"),
          *[var(callsiteInfoType(args[i]), "info_<i>") | i <- index(args), csi <- args]
       ], 
       block, {\public(), \static()});
@@ -392,20 +391,20 @@ data CallSiteInfo
   | // see MethodHandles.lookup().findStaticSetter for more information
     staticSetterHandle(Type class, str name, Type \type)
   | // see MethodHandles.lookup().findConstructor for more information
-    constructorHandle(Type class, Type desc)
+    constructorHandle(Type class, Signature desc)
   ;
   
 Type callsiteInfoType(stringInfo(_))             = string();
-Type callsiteInfoType(classInfo(_))              = reference("java.lang.Class");
+Type callsiteInfoType(classInfo(_))              = object("java.lang.Class");
 Type callsiteInfoType(integerInfo(_))            = integer();
 Type callsiteInfoType(longInfo(_))               = long();
 Type callsiteInfoType(floatInfo(_))              = float();
 Type callsiteInfoType(doubleInfo(_))             = double();
-Type callsiteInfoType(virtualHandle(_,_,_))      = reference("java.lang.invoke.MethodHandle");
-Type callsiteInfoType(specialHandle(_,_,_,_))    = reference("java.lang.invoke.MethodHandle");
-Type callsiteInfoType(getterHandle(_,_,_))       = reference("java.lang.invoke.MethodHandle");
-Type callsiteInfoType(setterHandle(_,_,_))       = reference("java.lang.invoke.MethodHandle");
-Type callsiteInfoType(staticGetterHandle(_,_,_)) = reference("java.lang.invoke.MethodHandle");
-Type callsiteInfoType(staticSetterHandle(_,_,_)) = reference("java.lang.invoke.MethodHandle");
-Type callsiteInfoType(constructorHandle(_,_))    = reference("java.lang.invoke.MethodHandle");
-Type callsiteInfoType(methodTypeInfo())          = reference("java.lang.invoke.MethodType");   
+Type callsiteInfoType(virtualHandle(_,_,_))      = object("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(specialHandle(_,_,_,_))    = object("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(getterHandle(_,_,_))       = object("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(setterHandle(_,_,_))       = object("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(staticGetterHandle(_,_,_)) = object("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(staticSetterHandle(_,_,_)) = object("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(constructorHandle(_,_))    = object("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(methodTypeInfo())          = object("java.lang.invoke.MethodType");   

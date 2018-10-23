@@ -8,7 +8,7 @@ Class primArrayTestClass(Type t, int len) {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(reference("PrimArrayTestClass_<getName(t)>_<len>"),
+  return class(object("PrimArrayTestClass_<getName(t)>_<len>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
@@ -39,7 +39,7 @@ Exp defVal(long()) = jconst(0);
 Exp defVal(byte()) = bconst(0);
 Exp defVal(character()) = cconst(0);
 Exp defVal(short()) = sconst(0);
-Exp defVal(reference(str _)) = null();
+Exp defVal(object(str _)) = null();
 Exp defVal(array(Type _)) = null();
 Exp defVal(string()) = null();
 Exp defVal(boolean()) = \false();
@@ -64,7 +64,7 @@ Class valArrayTestClass(Type t, int len, Exp val) {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(reference("ValArrayTestClass_<getName(t)>_<len>"),
+  return class(object("ValArrayTestClass_<getName(t)>_<len>"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [

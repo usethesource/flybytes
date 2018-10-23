@@ -8,7 +8,7 @@ import Node;
 // If not, than the bytecode verifier should throw a IllegalMonitorStateException.
 
 Class monitorBreakClass() 
-  = class(reference("MonitorBreak"),
+  = class(object("MonitorBreak"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [var(integer(), "par")],
         [ 
@@ -25,7 +25,7 @@ Class monitorBreakClass()
     );
     
 Class monitorReturnClass() 
-  = class(reference("MonitorReturn"),
+  = class(object("MonitorReturn"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [var(integer(), "par")],
         [ 
@@ -42,7 +42,7 @@ Class monitorReturnClass()
     );
     
 Class monitorThrowClass() 
-  = class(reference("MonitorThrow"),
+  = class(object("MonitorThrow"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [var(integer(), "par")],
         [ 
@@ -50,13 +50,13 @@ Class monitorThrowClass()
             \for([decl(integer(), "i", init=iconst(0))], lt(load("i"), iconst(10)), [incr("i",1)], [
                monitor(new(object()), [
                  \if(eq(rem(load("i"),iconst(2)),iconst(0)), [
-                   \throw(new(reference("java.lang.IllegalArgumentException")))
+                   \throw(new(object("java.lang.IllegalArgumentException")))
                  ])
                ])
             ]),
             \return(iconst(-1))
           ],[
-            \catch(reference("java.lang.IllegalArgumentException"), "e", [
+            \catch(object("java.lang.IllegalArgumentException"), "e", [
               \return(load("par"))
             ])
           ])          

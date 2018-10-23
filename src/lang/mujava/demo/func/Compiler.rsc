@@ -30,7 +30,7 @@ void compileProg(Prog p, str name, loc folder) {
 }
 
 Class compileProg((Prog) `<Func* funcs>`, str name) 
-  = class(reference(name),
+  = class(object(name),
       methods=[
         *functions(funcs),
         main("args",[

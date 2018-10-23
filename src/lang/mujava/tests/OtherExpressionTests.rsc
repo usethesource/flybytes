@@ -4,7 +4,7 @@ import lang::mujava::Syntax;
 import lang::mujava::Compiler;
 
 Class incExpClass() {
-  return class(reference("IncTest"),
+  return class(object("IncTest"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [], [
            decl(integer(), "i", init=iconst(1)),
@@ -19,7 +19,7 @@ test bool testInc() = loadClass(incExpClass())
   .invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#bool);
   
 Class incStatClass() {
-  return class(reference("IncTest"),
+  return class(object("IncTest"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [], [
            decl(integer(), "i", init=iconst(1)),

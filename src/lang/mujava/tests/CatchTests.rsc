@@ -5,7 +5,7 @@ import lang::mujava::Compiler;
 import lang::mujava::Mirror;
 
 Class catchClass() {
-  return class(reference("CatchTest"),
+  return class(object("CatchTest"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [], [
            \try([
@@ -13,7 +13,7 @@ Class catchClass() {
              \return(\false())
            ],
            [ // Type \type, str name, list[Stat] block
-             \catch(reference("java.lang.ArithmeticException"), "e", [
+             \catch(object("java.lang.ArithmeticException"), "e", [
                \return(\true())
              ])
            ]
@@ -28,22 +28,22 @@ test bool testCatch() = loadClass(catchClass(), file=just(|project://mujava/gene
   .invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#bool);
   
 Class multipleCatchClass() {
-  return class(reference("MultipleCatchTest"),
+  return class(object("MultipleCatchTest"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [var(boolean(), "switch")], [
            \try([
              \if (load("switch"), [
                \do(div(iconst(1), iconst(0)))
              ],[
-               \throw(new(reference("java.lang.IllegalArgumentException")))
+               \throw(new(object("java.lang.IllegalArgumentException")))
              ]),
              \return(const(boolean(), false))
            ],
            [ // Type \type, str name, list[Stat] block
-             \catch(reference("java.lang.ArithmeticException"), "e", [
+             \catch(object("java.lang.ArithmeticException"), "e", [
                \return(iconst(1))
              ]),
-             \catch(reference("java.lang.IllegalArgumentException"), "f", [
+             \catch(object("java.lang.IllegalArgumentException"), "f", [
                \return(iconst(2))
              ])
            ]
@@ -61,7 +61,7 @@ test bool multipleTestCatch() {
 }
 
 Class finallyClass() {
-  return class(reference("FinallyTest"),
+  return class(object("FinallyTest"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [], [
            \try([
@@ -69,7 +69,7 @@ Class finallyClass() {
              \return(iconst(1))
            ],
            [ 
-             \catch(reference("java.lang.ArithmeticException"), "e", [
+             \catch(object("java.lang.ArithmeticException"), "e", [
                \return(iconst(2)
              ]),
              \finally([
@@ -90,7 +90,7 @@ test bool finallyTest() {
 }
 
 Class finallyContinueClass() {
-  return class(reference("FinallyContinueTest"),
+  return class(object("FinallyContinueTest"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [], [
            decl(integer(), "j", init=iconst(0)),
@@ -122,7 +122,7 @@ test bool finallyContinueTest() {
 }
 
 Class finallyBreakClass() {
-  return class(reference("FinallyBreakTest"),
+  return class(object("FinallyBreakTest"),
       methods=[
         staticMethod(\public(), integer(), "testMethod", [], [
            decl(integer(), "j", init=iconst(0)),

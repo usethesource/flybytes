@@ -12,5 +12,5 @@ Stat stderr(Exp arg)
 
 // not-public because it depends on the magic constants "err" and "out" to work         
 private Exp println(str stream, Exp arg)
-   = invokeVirtual(reference("java.io.PrintStream"), getStatic(reference("java.lang.System"), reference("java.io.PrintStream"), stream), 
+   = invokeVirtual(object("java.io.PrintStream"), getStatic(object("java.lang.System"), object("java.io.PrintStream"), stream), 
          methodDesc(\void(), "println", [object()]), [arg]);         

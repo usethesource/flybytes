@@ -4,16 +4,16 @@ import lang::mujava::Syntax;
 import lang::mujava::Mirror;
 
 Type String() = string();
-Type Boolean() = reference("java.lang.Boolean");
-Type Integer() = reference("java.lang.Integer");
-Type Character() = reference("java.lang.Character");
-Type Double() = reference("java.lang.Double");
-Type Long() = reference("java.lang.Long");
-Type Short() = reference("java.lang.Short");
-Type Float() = reference("java.lang.Float");
+Type Boolean() = object("java.lang.Boolean");
+Type Integer() = object("java.lang.Integer");
+Type Character() = object("java.lang.Character");
+Type Double() = object("java.lang.Double");
+Type Long() = object("java.lang.Long");
+Type Short() = object("java.lang.Short");
+Type Float() = object("java.lang.Float");
 
-Type Iterator() = reference("java.lang.Iterator");
-Type Iterable() = reference("java.lang.Iterable");
+Type Iterator() = object("java.lang.Iterator");
+Type Iterable() = object("java.lang.Iterable");
 Signature Iterable_iterator() = methodDesc(Iterator(), "iterator", []);
 Signature Iterator_next() = methodDesc(object(), "next", []);
 Signature Iterator_hasNext() = methodDesc(boolean(), "hasNext", []);

@@ -26,7 +26,7 @@ void compileProgram(Program p, str name, loc folder) {
 
 @doc{compile Pico program to a class object}
 Class compileProgram(Program p, str name)
-  = class(reference(name),
+  = class(object(name),
       methods=[
         main("$$args", [
           *decls(p.decls), 
@@ -78,7 +78,7 @@ list[Stat] output(Declarations p)
     ;
     
 Exp toString(Id i, (Type) `natural`) 
-  = invokeStatic(reference("java.lang.Integer"), methodDesc(string(), "toString", [integer()]), [load("<i>")]);    
+  = invokeStatic(object("java.lang.Integer"), methodDesc(string(), "toString", [integer()]), [load("<i>")]);    
     
 Exp toString(Id i, (Type) `string`)
   = load("<i>");

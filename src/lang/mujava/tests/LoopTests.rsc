@@ -8,7 +8,7 @@ Class forLoopClass() {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(reference("ForLoopTestClass"),
+  return class(object("ForLoopTestClass"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
@@ -49,7 +49,7 @@ bool testForClass(Class c) {
 test bool testNormalFor() = testForClass(forLoopClass());
 
 Class NestedFor() {
-  return class(reference("NestedForClass"),
+  return class(object("NestedForClass"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
@@ -100,7 +100,7 @@ Class forLoopBreakClass() {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(reference("ForLoopBreakClass"),
+  return class(object("ForLoopBreakClass"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
@@ -136,7 +136,7 @@ Class forLoopContinueClass() {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(reference("ForLoopContinueClass"),
+  return class(object("ForLoopContinueClass"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
@@ -172,7 +172,7 @@ Class forLoopContinueClass() {
 test bool testForContinue() = testForClass(forLoopContinueClass());
 
 Class forLoopBreakNestedClass() {
-  return class(reference("ForLoopBreakNestedClass"),
+  return class(object("ForLoopBreakNestedClass"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
@@ -234,7 +234,7 @@ Class whileClass() {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(reference("WhileClass"),
+  return class(object("WhileClass"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [
@@ -256,7 +256,7 @@ Class doWhileClass() {
   rf = \return(\false());
   rt = \return(\true());
   
-  return class(reference("DoWhileClass"),
+  return class(object("DoWhileClass"),
       methods=[
         staticMethod(\public(), boolean(), "testMethod", [],
         [

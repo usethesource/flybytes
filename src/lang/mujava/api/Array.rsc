@@ -11,4 +11,4 @@ Exp index(str array, Exp index)
    = aaload(load(array), index); 
    
 Exp toString(Type elemType, Exp array)
-   = invokeStatic(reference("java.util.Arrays"), methodDesc(string(), "toString", [array(elemType)]), [array]);
+   = invokeStatic(object("java.util.Arrays"), methodDesc(string(), "toString", [array(elemType)]), [array]);

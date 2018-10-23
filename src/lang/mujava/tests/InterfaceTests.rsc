@@ -4,21 +4,21 @@ import lang::mujava::Syntax;
 import lang::mujava::Compiler;
 
 Class interfA() 
-  = interface(reference("Interface_A"),
+  = interface(object("Interface_A"),
       methods=[
         method(methodDesc(\integer(), "methodA", []))
       ]
     );
     
 Class interfB() 
-  = interface(reference("Interface_B"),
+  = interface(object("Interface_B"),
       methods=[
         method(methodDesc(\integer(), "methodB", []))
       ]
     );    
     
 Class implInvokeInterface() 
-  = class(reference("Impl_A"),
+  = class(object("Impl_A"),
       methods=[
         method(\public(), \boolean(), "testMethod", [], [
           \return(and(eq(invokeInterface(this(), methodDesc(\integer(), "methodA",[]), []), iconst(1)),
@@ -39,8 +39,8 @@ Class implInvokeInterface()
    );
    
 Class implInvokeVirtual() 
-  = class(reference("Impl_A"),
-      interfaces=[reference("Interface_A"), reference("Interface_B")],
+  = class(object("Impl_A"),
+      interfaces=[object("Interface_A"), object("Interface_B")],
       methods=[
         method(\public(), \boolean(), "testMethod", [], [
           \return(and(eq(invokeVirtual(this(), methodDesc(\integer(), "methodA",[]), []), iconst(1)),
@@ -85,7 +85,7 @@ test bool implementAbstractMethodInvokeInterface() {
 }  
 
 Class interfDefault() 
-  = interface(reference("Interface_Default"),
+  = interface(object("Interface_Default"),
       methods=[
         method(\public(), \integer(), "defaultMethod", [], [
           \return(iconst(-17))
@@ -94,8 +94,8 @@ Class interfDefault()
     );
 
 Class implInvokeDefault() 
-  = class(reference("Impl_B"),
-     interfaces=[reference("Interface_Default")],
+  = class(object("Impl_B"),
+     interfaces=[object("Interface_Default")],
       methods=[
         method(\public(), \boolean(), "testMethod", [], [
           \return(eq(invokeInterface(this(), methodDesc(\integer(), "defaultMethod",[]), []), iconst(-17))

@@ -5,7 +5,7 @@ Flybytes is an intermediate language towards JVM bytecode generation for Rascal-
 ### Context:
 
 * you are implementing a textual or graphical DSL or a programming language using Rascal
-* you want to target the JVM because of its general availability and the JIT compiler
+* you want to target the JVM because of its general availability and the JIT compiler, or to easily interact with other JVM languages
 * you do not have time to get into the hairy details of JVM bytecode generation, and do not have time for debugging on the JVM bytecode level
 * you do want to profit from the Just In Time (JIT) compiler, so you need idiomatic JVM bytecode that the JIT compiler understands
 * you understand the Java programming language pretty well

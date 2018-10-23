@@ -3,6 +3,8 @@ package lang.mujava.internal;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -82,13 +84,13 @@ public class ClassCompiler {
 
 	public IMap loadClasses(IList classes, IConstructor prefix, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode, IEvaluatorContext ctx) {
 		ClassMapLoader l = new ClassMapLoader(getClass().getClassLoader());
-		
+
 		ISourceLocation classFolder = null;
-		
+
 		if (prefix.getConstructorType().getName().equals("just")) {
 			classFolder = (ISourceLocation) prefix.get("val");
 		}
-		
+
 		for (IValue elem : classes) {
 			IConstructor cls = (IConstructor) elem;
 			String name = AST.$getName(AST.$getType(cls));
@@ -98,14 +100,14 @@ public class ClassCompiler {
 			if (debugMode.getValue()) {
 				cv = new CheckClassAdapter(new TraceClassVisitor(cw, out));
 			}
-			
+
 			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 			byte[] bytes = cw.toByteArray();
-			
+
 			l.putBytes(name, cw.toByteArray());
-			
-		    if (classFolder != null) {
-		    	ISourceLocation classFile = URIUtil.getChildLocation(classFolder, name.replace('.','/') + ".class");
+
+			if (classFolder != null) {
+				ISourceLocation classFile = URIUtil.getChildLocation(classFolder, name.replace('.','/') + ".class");
 				try (OutputStream out = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 					out.write(bytes);
 				}
@@ -114,7 +116,7 @@ public class ClassCompiler {
 				}
 			}
 		}
-		
+
 		try {
 			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
 			IMapWriter w = vf.mapWriter();
@@ -128,7 +130,7 @@ public class ClassCompiler {
 			throw new RuntimeException(e);
 		}
 	}
-	
+
 	public IValue loadClass(IConstructor cls, IConstructor output, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode, IEvaluatorContext ctx) {
 		this.out = ctx.getStdOut();
 
@@ -136,7 +138,7 @@ public class ClassCompiler {
 			String className = AST.$getName(AST.$getType(cls));
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 			ClassVisitor cv = cw;
-			
+
 			if (debugMode.getValue()) {
 				cv = new TraceClassVisitor(new CheckClassAdapter(cw), out);
 			}
@@ -194,7 +196,7 @@ public class ClassCompiler {
 		l.putBytes(className, cw.toByteArray());
 		return l.getClass(className);
 	}
-	
+
 	/**
 	 * Load classes from a simple map (from class names to their bytearray bytecode representations)
 	 */
@@ -207,7 +209,7 @@ public class ClassCompiler {
 			this.bytecodes = new HashMap<>();
 			this.cache = new HashMap<>();
 		}
-		
+
 		public void putBytes(String name, byte[] bytes) {
 			bytecodes.put(name, bytes);
 		}
@@ -216,22 +218,22 @@ public class ClassCompiler {
 		protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
 			return getClass(name);
 		}
-		
+
 		@Override
 		public Class<?> loadClass(String name) throws ClassNotFoundException {
 			return getClass(name);
 		}
-		
+
 		public Class<?> getClass(String name) throws ClassNotFoundException {
 			if (cache.containsKey(name)) {
 				return cache.get(name);
 			}
-			
+
 			byte[] bytes = bytecodes.get(name);
 			if (bytes == null) {
 				return getParent().loadClass(name);
 			}
-			
+
 			Class<?> result = super.defineClass(name, bytes, 0, bytes.length);
 			cache.put(name,  result);
 			return result;
@@ -242,7 +244,7 @@ public class ClassCompiler {
 			return bytecodes.keySet().iterator();
 		}
 	}
-	
+
 	/**
 	 * The Compile class encapsulates a single run of the muJava -> JVM bytecode compiler
 	 * for a single Class definition.
@@ -339,22 +341,22 @@ public class ClassCompiler {
 			if (!hasStaticInitializer && !staticFieldInitializers.isEmpty()) {
 				staticInitializer(classNode, null);
 			}
-			
+
 			if (kws.hasParameter("annotations")) {
 				annotations(classNode, AST.$getAnnotations(kws));
 			}
-			
+
 			classNode.accept(cw);
 		}
 
 		private void annotations(ClassNode cn, IList annotations) {
 			annotations((d, v) -> cn.visitAnnotation(d, v), annotations);
 		}
-		
+
 		private void annotations(MethodNode mn, IList annotations) {
 			annotations((d, v) -> mn.visitAnnotation(d, v), annotations);
 		}
-		
+
 		private void annotations(BiFunction<String,Boolean,AnnotationVisitor> cn, IList annotations) {
 			for (IValue elem : annotations) {
 				annotation(cn, elem);
@@ -364,21 +366,21 @@ public class ClassCompiler {
 		private void annotation(BiFunction<String, Boolean, AnnotationVisitor> cn, IValue elem) {
 			String retention = AST.$getRetention((IConstructor) elem);
 			boolean visible = true;
-			
+
 			switch (retention) {
 			case "source" : return;
 			case "class" : visible = false;
 			case "runtime": visible = true;
 			}
-			
+
 			IConstructor anno = (IConstructor) elem;
 			String sig = "L" + AST.$getAnnoClass(anno) + ";";
 			AnnotationVisitor an = cn.apply(sig, visible);
-			
+
 			if (anno.arity() > 1) {
 				annotation(an, (IConstructor) elem);
 			}
-			
+
 			an.visitEnd();
 		}
 
@@ -387,7 +389,7 @@ public class ClassCompiler {
 			IConstructor type = AST.$getType(anno);
 			Object val = object(type, AST.$getVal(anno));
 			String descriptor = Signature.type(type);
-			
+
 			Switch.type0(type, 
 					(z) -> node.visit(name, val),
 					(i) -> node.visit(name, val),
@@ -542,10 +544,10 @@ public class ClassCompiler {
 			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
 
 			boolean isAbstract = cons.getConstructorType().getArity() == 1; // only a signature
-			
+
 			int modifiers = Opcodes.ACC_PUBLIC;
 			modifiers += isAbstract ? Opcodes.ACC_ABSTRACT : 0;
-			
+
 			if (kws.hasParameter("modifiers")) {
 				modifiers = modifiers(AST.$getModifiersParameter(kws));
 			}
@@ -555,19 +557,19 @@ public class ClassCompiler {
 			String name = isConstructor ? "<init>" : AST.$getName(sig);
 
 			method = new MethodNode(modifiers, name, isConstructor ? Signature.constructor(sig) : Signature.method(sig), null, null);
-			
+
 			// every method body has a fresh set of jump labels
 			labels = new HashMap<>(); 
-			
+
 			if (!isAbstract) {
 				if (isInterface && classNode.version < Opcodes.V1_8) {
 					throw new IllegalArgumentException("default methods requires at least JVM version v1_8()");
 				}
-				
+
 				if ((modifiers & Opcodes.ACC_ABSTRACT) != 0) {
 					throw new IllegalArgumentException("method with body should not be abstract");
 				}
-				
+
 				IList sigFormals = AST.$getFormals(sig);
 				hasDefaultConstructor |= (isConstructor && sigFormals.isEmpty());
 				IList varFormals = AST.$getFormals(cons);
@@ -592,7 +594,7 @@ public class ClassCompiler {
 
 				method.visitCode(); 
 				method.visitLabel(methodStartLabel);
-				
+
 				formalVariables(varFormals, false /* no initialization */);
 
 				if (isConstructor && !fieldInitializers.isEmpty()) {
@@ -602,26 +604,26 @@ public class ClassCompiler {
 				statements(AST.$getBlock(cons), methodStartLabel, methodEndLabel, methodEndLabel);
 
 				method.visitLabel(methodEndLabel);
-				
+
 				for (int i = 0; i < variableNames.size(); i++) {
 					String varName = variableNames.get(i);
-					
+
 					if (varName == null) {
 						continue; // empty slot
 					}
-					
+
 					String varType = Signature.type(variableTypes.get(i));
-					
+
 					method.visitLocalVariable(varName, varType, null, methodStartLabel, methodEndLabel, i);
-					
+
 					IList annotations = variableAnnotations.get(i);
 					if (annotations != null) {
 						final int index = i;
 						annotations((s,v) -> 
-						   method.visitLocalVariableAnnotation(TypeReference.LOCAL_VARIABLE, null, new Label[] {methodStartLabel}, new Label[] {methodEndLabel}, new int[] {index}, s, v), annotations);
+						method.visitLocalVariableAnnotation(TypeReference.LOCAL_VARIABLE, null, new Label[] {methodStartLabel}, new Label[] {methodEndLabel}, new int[] {index}, s, v), annotations);
 					}
 				}
-				
+
 				if (debug) {
 					method.visitMaxs(Short.MAX_VALUE, Short.MAX_VALUE);
 				}
@@ -629,23 +631,23 @@ public class ClassCompiler {
 					method.visitMaxs(0, 0);
 				}
 			}
-			
+
 			if (kws.hasParameter("annotations")) {
 				annotations(method, (IList) kws.getParameter("annotations"));
 			}
-			
+
 			method.visitEnd(); // also needed for abstract methods
 			classNode.methods.add(method);
 		}
-		
+
 		private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize, IList annotations) {
 			int pos = variableNames.size();
-			
+
 			variableTypes.add(type);
 			variableNames.add(name);
 			variableDefaults.add(def);
 			variableAnnotations.add(null);
-			
+
 			String typeName = type.getConstructorType().getName();
 			if (typeName.equals("double") || typeName.equals("long")) {
 				// doubles and longs take up 2 stack positions
@@ -654,7 +656,7 @@ public class ClassCompiler {
 				variableDefaults.add(null); 
 				variableAnnotations.add(null);
 			}
-			
+
 			if (alwaysInitialize) {
 				if (def == null) {
 					computeDefaultValueForVariable(type, pos);
@@ -671,7 +673,7 @@ public class ClassCompiler {
 					invertedConditionalFlow(0, Opcodes.IFNONNULL, () -> storeStat(name, def), null, null);
 				}
 			}
-			
+
 			return;
 		}
 
@@ -696,13 +698,13 @@ public class ClassCompiler {
 
 		private void formalVariables(IList formals, boolean initialize) {
 			int i = 0;
-			
+
 			for (IValue elem : formals) {
 				final int index = i;
 				IConstructor var = (IConstructor) elem;
 				IConstructor varType = AST.$getType(var);
 				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize, null);
-			
+
 				if (var.asWithKeywordParameters().hasParameter("annotations")) {
 					annotation((s,v) -> method.visitParameterAnnotation(index, s, v), (IList) var.asWithKeywordParameters().getParameter("annotations"));
 				}
@@ -816,7 +818,7 @@ public class ClassCompiler {
 				continueStat(stat, continueLabel);
 				// dropping the joinLabel, there is nothing to do after break!
 				break;
-			
+
 			case "if":
 				if (stat.getConstructorType().getArity() == 3) {
 					ifThenElseStat(AST.$getCondition(stat), AST.$getThenBlock(stat), AST.$getElseBlock(stat), continueLabel, breakLabel, joinLabel);
@@ -880,11 +882,11 @@ public class ClassCompiler {
 			int max = Integer.MAX_VALUE;
 			int min = Integer.MIN_VALUE;
 			long labelCount = 0;
-			
+
 			for (int i = 0; i < cases.length(); i++) {
 				IConstructor c = (IConstructor) cases.get(i);
 				boolean isDefault = AST.$is("default", c);
-				
+
 				if (!isDefault) {
 					int key = AST.$getKey(c);
 					min = Math.min(key, min);
@@ -892,17 +894,17 @@ public class ClassCompiler {
 					labelCount++;
 				}
 			}
-			
+
 			// we're exactly mimicking Java compiler, see 
 			// http://hg.openjdk.java.net/jdk8/jdk8/langtools/file/30db5e0aaf83/src/share/classes/com/sun/tools/javac/jvm/Gen.java#l1153
-			
+
 			long tableSpaceCost = 4 + (long) (max - min + 1); 
 			long tableTimeCost  = 3; 
 			long lookupSpaceCost = 3 + 2 * (long) labelCount;
 			long lookupTimeCost = labelCount;
 			long tableCost = tableSpaceCost + 3 * tableTimeCost;
 			long lookupCost = lookupSpaceCost + 3 * lookupTimeCost;
-			
+
 			if (labelCount > 0 && tableCost <= lookupCost) {
 				tableSwitch(arg, cases, continueLabel, joinLabel);
 			}
@@ -910,10 +912,10 @@ public class ClassCompiler {
 				lookupSwitch(arg, cases, continueLabel, joinLabel);
 			}
 		}
-		
+
 		private static class CaseLabel extends Label {
 			final int key;
-			
+
 			public CaseLabel(int key) {
 				this.key = key;
 			}
@@ -938,14 +940,14 @@ public class ClassCompiler {
 			ArrayList<CaseLabel> labels = new ArrayList<>();
 			Label defaultLabel = new Label();
 			boolean hasDef = false;
-			
+
 			for (int i = 0; i < cases.length(); i++) {
 				IConstructor c = (IConstructor) cases.get(i);
-				
+
 				if (AST.$is("default", c)) {
 					defaultLabel = new Label();
 					hasDef = true;
-					
+
 					if (i != cases.length() - 1) {
 						throw new IllegalArgumentException("default handler should be the last of the cases");
 					}
@@ -954,22 +956,22 @@ public class ClassCompiler {
 					labels.add(new CaseLabel(AST.$getKey(c)));
 				}
 			}
-				
-			
+
+
 			// first put the key value on the stack
 			expr(arg);
-					
+
 			@SuppressWarnings("unchecked")
 			ArrayList<CaseLabel> sorted = (ArrayList<CaseLabel>) labels.clone();
 			sorted.sort((a,b) -> Integer.compare(a.key, b.key));
-			
+
 			// here come the handlers, in sorted order
 			int[] keyArray = sorted.stream().mapToInt(l->l.key).toArray();
 			Label[] labelArray = sorted.toArray(new Label[0]);
-			
+
 			// NOTE: this only works correctly if the jump labels have already been visited			
 			method.visitLookupSwitchInsn(defaultLabel, keyArray, labelArray);
-						
+
 			// the case code must be printed in the original order for fall-through semantics
 			for (int i = 0; i < cases.length(); i++) {
 				IConstructor c = (IConstructor) cases.get(i);
@@ -986,11 +988,11 @@ public class ClassCompiler {
 				statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase);
 				method.visitLabel(endCase);
 			}
-			
+
 			if (!hasDef) {
 				method.visitLabel(defaultLabel);
 			}
-			
+
 		}
 
 
@@ -1018,7 +1020,7 @@ public class ClassCompiler {
 				IConstructor c = (IConstructor) cases.get(i);
 				boolean isLast = i == cases.length() - 1;
 				boolean isDefault = AST.$is("default", c);
-				
+
 				if (!isDefault) {
 					int key = AST.$getKey(c);
 					min = Math.min(key, min);
@@ -1026,20 +1028,20 @@ public class ClassCompiler {
 				}
 				else {
 					hasDefault = true;
-					
+
 					if (!isLast) {
 						throw new IllegalArgumentException("default handler should be the last of the cases");
 					}
 				}
 			}
-				
+
 			LeveledLabel defaultLabel = hasDefault ? newLabel(tryFinallyNestingLevel) : joinLabel;
 			Label[] labels = new LeveledLabel[max - min + 1];
-			
+
 			for (int i = 0; i < labels.length; i++) {
 				labels[i] = defaultLabel; // they all jump to default
 			}
-			
+
 			// unless there is case to jump to:
 			for (int j = 0; j < cases.length(); j++) {
 				IConstructor c = (IConstructor) cases.get(j);
@@ -1051,13 +1053,13 @@ public class ClassCompiler {
 					labels[AST.$getKey(c) - min] = newLabel(tryFinallyNestingLevel);
 				}
 			}
-			
+
 			// first put the key value on the stack
 			expr(arg);
-						
+
 			// then we generate the switch tabel
 			method.visitTableSwitchInsn(min, max, defaultLabel, labels);
-			
+
 			// here come the handlers
 			for (int i = 0; i < cases.length(); i++) {
 				IConstructor c = (IConstructor) cases.get(i);
@@ -1093,21 +1095,21 @@ public class ClassCompiler {
 				// JVM can not deal with empty catch ranges anyway
 				return;
 			}
-			
+
 			Label tryStart = newLabel(tryFinallyNestingLevel);
 			Label tryEnd = newLabel(tryFinallyNestingLevel);
 			Label[] handlers = new LeveledLabel[catches.length()];
-			
+
 			String finallyVarName = null;
 			Builder<IConstructor> finallyCode = null;
-			
+
 			// produce handler registration for every catch block
 			for (int i = 0; i < catches.length(); i++) {
 				IConstructor catcher = (IConstructor) catches.get(i);
 				boolean isFinally = AST.$is("finally", catcher);
 				boolean isLast = i == catches.length() - 1;
 				handlers[i] = newLabel(tryFinallyNestingLevel);
-				
+
 				if (isLast && isFinally) {
 					finallyVarName = "finally:" + UUID.randomUUID();
 					declareVariable(Types.throwableType(), finallyVarName, null, false, null);
@@ -1123,21 +1125,21 @@ public class ClassCompiler {
 					declareVariable(exceptionType, varName, null, false, null);
 				}
 			}
-			
+
 			// the try block itself
 			method.visitLabel(tryStart);
 			statements(block, continueLabel, breakLabel, joinLabel);
 			method.visitLabel(tryEnd);
-			
+
 			// jump over the catch blocks
 			method.visitJumpInsn(Opcodes.GOTO, joinLabel);
-			
+
 			// generate blocks for each handler
 			for (int i = 0; i < catches.length(); i++) {
 				IConstructor catcher = (IConstructor) catches.get(i);
 				boolean isFinally = AST.$is("finally", catcher);
 				boolean isLast = i == catches.length() - 1;
-				
+
 				if (isLast && isFinally) {
 					method.visitLabel(handlers[i]);
 					finallyCode.build();
@@ -1151,7 +1153,7 @@ public class ClassCompiler {
 					method.visitVarInsn(Opcodes.ASTORE, positionOf(varName));
 					statements(AST.$getBlock(catcher), continueLabel, breakLabel, joinLabel);
 					method.visitTryCatchBlock(tryStart, tryEnd, handlers[i], clsName);
-					
+
 					if (!isLast) { // jump over the other handlers
 						method.visitJumpInsn(Opcodes.GOTO, joinLabel);
 					}
@@ -1177,12 +1179,12 @@ public class ClassCompiler {
 			if (block.isEmpty()) {
 				return;
 			}
-			
+
 			LeveledLabel startExceptionBlock = newLabel(tryFinallyNestingLevel);
 			LeveledLabel endExceptionBlock = newLabel(tryFinallyNestingLevel);
 			LeveledLabel handlerStart = newLabel(tryFinallyNestingLevel);
 			LeveledLabel handlerEnd = newLabel(tryFinallyNestingLevel);
-			
+
 			method.visitTryCatchBlock(startExceptionBlock, endExceptionBlock, handlerStart, null);
 			method.visitTryCatchBlock(handlerStart, handlerEnd, handlerStart, null);
 
@@ -1192,7 +1194,7 @@ public class ClassCompiler {
 				method.visitInsn(Opcodes.MONITOREXIT);	
 				return null;
 			};
-			
+
 			// compute the lock object
 			IConstructor type = expr(lock);
 			// declare lock object var for later usage in the sinks of the control flow
@@ -1219,7 +1221,7 @@ public class ClassCompiler {
 
 			// end of monitor, jump over the catch block to continue with the rest
 			method.visitJumpInsn(Opcodes.GOTO, joinLabel); 
-			
+
 			// an exception happened, exit the monitor, and rethrow the exception
 			method.visitLabel(handlerStart);
 			method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
@@ -1235,14 +1237,14 @@ public class ClassCompiler {
 
 		private void whileStat(String label, IConstructor cond, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			LeveledLabel testConditional = newLabel(tryFinallyNestingLevel);
-			
+
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
 				labels.put("continue:" + label, testConditional);
 			}
 
 			method.visitLabel(testConditional);
-			
+
 			// deal efficiently with negated conditionals
 			int cmpCode = Opcodes.IFEQ;
 			if (cond.getConstructorType().getName().equals("neg")) {
@@ -1255,22 +1257,22 @@ public class ClassCompiler {
 					() -> statements(body, testConditional, joinLabel, testConditional), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
 					testConditional);
-			
+
 			jumpTo(testConditional); // this might be superfluous
 		}
-		
+
 		private void doWhileStat(String label, IConstructor cond, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			LeveledLabel nextIteration = newLabel(tryFinallyNestingLevel);
-			
+
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
 				labels.put("continue:" + label, nextIteration);
 			}
 
 			method.visitLabel(nextIteration);
-			
+
 			statements(body, nextIteration, joinLabel, nextIteration);
-			
+
 			// deal efficiently with negated conditionals
 			int cmpCode = Opcodes.IFEQ;
 			if (cond.getConstructorType().getName().equals("neg")) {
@@ -1290,47 +1292,47 @@ public class ClassCompiler {
 			if (join == null) {
 				throw new IllegalArgumentException("no loop to break from (or inside an expression or monitor block");
 			}
-			
+
 			LeveledLabel target = join;
-			
+
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
 				target = getLabel(tryFinallyNestingLevel.size(), "break:" + loopLabel);
 			}
-			
+
 			emitFinally(target.getFinallyNestingLevel());
 			method.visitJumpInsn(Opcodes.GOTO, target);
 		}
-		
+
 		private void continueStat(IConstructor stat, LeveledLabel join) {
 			if (join == null) {
 				throw new IllegalArgumentException("no loop to continue with (or inside an expression or monitor block");
 			}
-			
+
 			LeveledLabel target = join;
-			
+
 			if (stat.asWithKeywordParameters().hasParameter("label")) {
 				String loopLabel = ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue();
 				target = getLabel(tryFinallyNestingLevel.size(), "continue:" + loopLabel);
 			}
-			
+
 			emitFinally(target.getFinallyNestingLevel());
 			method.visitJumpInsn(Opcodes.GOTO, target);
 		}
 
 		private LeveledLabel getLabel(int level, String label) {
 			LeveledLabel l = labels.get(label);
-			
+
 			if (l == null) {
 				throw new IllegalArgumentException("unknown label: " + label);
 			}
-			
+
 			return l;
 		}
 
 		private void blockStat(String label, IList body, LeveledLabel joinLabel) {
 			LeveledLabel again = newLabel(tryFinallyNestingLevel);
-			
+
 			labels.put("break:" + label, joinLabel);
 			labels.put("continue:" + label, again);
 
@@ -1342,31 +1344,31 @@ public class ClassCompiler {
 			IConstructor def = null;
 			IList annotations = null;
 			IWithKeywordParameters<? extends IConstructor> kws = stat.asWithKeywordParameters();
-			
+
 			if (kws.hasParameter("init")) {
 				def = (IConstructor) kws.getParameter("init");
 			}
-			
+
 			if (kws.hasParameter("annotations")) {
 				annotations = (IList) kws.getParameter("annotations");
 			}
-			
+
 			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true, annotations);
 		}
 
 		private void forStat(String label, IList init, IConstructor cond, IList next, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			LeveledLabel testConditional = newLabel(tryFinallyNestingLevel);
 			LeveledLabel nextIterationLabel = newLabel(tryFinallyNestingLevel);
-			
+
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
 				labels.put("continue:" + label, nextIterationLabel);
 			}
 
 			statements(init, continueLabel /*outerloop*/, breakLabel /*outerloop*/, testConditional /*start of inner loop*/);
-			
+
 			method.visitLabel(testConditional);
-			
+
 			// deal efficiently with negated conditionals
 			int cmpCode = Opcodes.IFEQ;
 			if (cond.getConstructorType().getName().equals("neg")) {
@@ -1379,7 +1381,7 @@ public class ClassCompiler {
 					() -> statements(body, nextIterationLabel, joinLabel, nextIterationLabel), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
 					nextIterationLabel);
-			
+
 			method.visitLabel(nextIterationLabel);
 			LeveledLabel endNext = newLabel(tryFinallyNestingLevel);
 			statements(next, continueLabel /*outerloop */, breakLabel /*outerloop*/, endNext);
@@ -1401,7 +1403,7 @@ public class ClassCompiler {
 			Builder<IConstructor> elseBuilder = elseBlock != null ? () -> statements(elseBlock, continueLabel, breakLabel, joinLabel) : DONE;
 			ifThenElse(cond, thenBuilder, elseBuilder, continueLabel, breakLabel, joinLabel);
 		}
-			
+
 		private IConstructor ifThenElse(IConstructor cond, Builder<IConstructor> thenBuilder, Builder<IConstructor> elseBuilder, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
 			// here we special case for !=, ==, <=, >=, < and >, because
 			// there are special jump instructions for these operators on the JVM and we don't want to push
@@ -1462,7 +1464,7 @@ public class ClassCompiler {
 					(a) -> { /* array */ method.visitVarInsn(Opcodes.ASTORE, pos); },
 					(S) -> { /* string */ method.visitVarInsn(Opcodes.ASTORE, pos); }
 					);
-			
+
 			return null;
 		}
 
@@ -1472,12 +1474,12 @@ public class ClassCompiler {
 			}
 			else {
 				IConstructor type = expr(AST.$getArg(stat));
-				
+
 				// return, or break or continue from the finally block,
 				// must not execute current finally again (infinite loop),
 				// so pop that and push it back when done.
 				emitFinally(0);
-				
+
 				Switch.type0(type,
 						(z) -> { method.visitInsn(Opcodes.IRETURN); },
 						(i) -> { method.visitInsn(Opcodes.IRETURN); },
@@ -1504,7 +1506,7 @@ public class ClassCompiler {
 				for (int i = tryFinallyNestingLevel.size() - 1; i >= 0 && i >= toLevel; i--) {
 					tryFinallyNestingLevel.get(i).build();
 				}
-				
+
 				emittingFinally = false;
 			}
 		}
@@ -1602,14 +1604,14 @@ public class ClassCompiler {
 				leExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
 				return Types.booleanType();
 			case "gt":
-				 gtExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
-				 return Types.booleanType();
+				gtExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
+				return Types.booleanType();
 			case "ge":
-				 geExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
-				 return Types.booleanType();
+				geExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
+				return Types.booleanType();
 			case "lt":
-				 ltExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
-				 return Types.booleanType();
+				ltExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
+				return Types.booleanType();
 			case "add":
 				return addExp(AST.$getLhs(exp), AST.$getRhs(exp));
 			case "div":
@@ -2135,24 +2137,24 @@ public class ClassCompiler {
 			Label jump = newLabel(tryFinallyNestingLevel);
 			Label next = joinLabel == null ? newLabel(tryFinallyNestingLevel) : joinLabel;
 			IConstructor res1 = null, res2 = null;
-			
+
 			if (compare != 0) {
 				method.visitInsn(compare);
 			}
-			
+
 			method.visitJumpInsn(opcode, elsePart != null ? jump : next);
 			res1 = thenPart.build();
-			
+
 			if (elsePart != null) {
 				jumpTo(next);
 				method.visitLabel(jump);
 				res2 = elsePart.build();
 			}
-			
+
 			if (joinLabel == null) {
 				method.visitLabel(next);
 			}
-			
+
 			return merge(res1, res2);
 		}
 
@@ -2600,15 +2602,15 @@ public class ClassCompiler {
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, AST.$getName(sig), Signature.method(sig), false);
 			return AST.$getReturn(sig);
 		}
-		
+
 		private IConstructor invokeDynamicExp(IConstructor handler, IConstructor sig, IList args) {
 			String name = AST.$getName(sig);
 			Handle bootstrapper = bootstrapHandler(handler);
 			Object[] bArgs = bootstrapArgs(handler);
-			
+
 			// push arguments to the method on the stack
 			expressions(args);
-			
+
 			// invoke the dynamic handle (and registeres it as side-effect using the bootstrap method)
 			method.visitInvokeDynamicInsn(name, Signature.method(sig), bootstrapper, bArgs);
 			return AST.$getReturn(sig);
@@ -2617,20 +2619,70 @@ public class ClassCompiler {
 		private Object[] bootstrapArgs(IConstructor handler) {
 			IList args = AST.$getArgs(handler);
 			Object[] results = new Object[args.length()];
-			
-			int i = 0;
-			for (IValue elem : args) {
-				if (elem instanceof IString) {
-					results[i++] = ((IString) elem).getValue();
+			Class<?> clzTmp;
+
+			try {
+				int i = 0;
+				for (IValue elem : args) {
+					IConstructor cons = (IConstructor) elem;
+
+					switch(cons.getConstructorType().getName()) {
+					case "stringInfo":
+						results[i++] = ((IString) cons.get("s")).getValue();
+						break;
+					case "classInfo":
+						results[i++] = Signature.forName(((IString) cons.get("name")).getValue());
+						break;
+					case "integerInfo":
+						results[i++] = ((IInteger) cons.get("i")).intValue();
+						break;
+					case "longInfo":
+						results[i++] = ((IInteger) cons.get("l")).longValue();
+						break;
+					case "floatInfo":
+						results[i++] = ((IReal) cons.get("f")).floatValue();
+						break;
+					case "doubleInfo":
+						results[i++] = ((IReal) cons.get("d")).doubleValue();
+						break;
+					case "virtualHandle": 
+						clzTmp = Class.forName(AST.$getRefClassFromType(AST.$getClass(cons), classNode.name));
+						results[i++] = MethodHandles.lookup().findVirtual(clzTmp, AST.$getName(cons), Signature.methodType(AST.$getDesc(cons)));
+						break;
+					case "specialHandle": 
+						clzTmp = Class.forName(AST.$getRefClassFromType(AST.$getClass(cons), classNode.name));
+						Class<?> specialTmp = Class.forName(AST.$getRefClassFromType(AST.$getSpecial(cons), classNode.name));
+						results[i++] = MethodHandles.lookup().findSpecial(clzTmp, AST.$getName(cons), Signature.methodType(AST.$getDesc(cons)), specialTmp);
+						break;
+					case "getterHandle": 
+						clzTmp = Class.forName(AST.$getRefClassFromType(AST.$getClass(cons), classNode.name));
+						results[i++] = MethodHandles.lookup().findGetter(clzTmp, AST.$getName(cons), Signature.binaryClass(AST.$getType(cons)));
+						break;
+					case "setterHandle": 
+						clzTmp = Class.forName(AST.$getRefClassFromType(AST.$getClass(cons), classNode.name));
+						results[i++] = MethodHandles.lookup().findSetter(clzTmp, AST.$getName(cons), Signature.binaryClass(AST.$getType(cons)));
+						break;
+					case "staticGetterHandle": 
+						clzTmp = Class.forName(AST.$getRefClassFromType(AST.$getClass(cons), classNode.name));
+						results[i++] = MethodHandles.lookup().findStaticGetter(clzTmp, AST.$getName(cons), Signature.binaryClass(AST.$getType(cons)));
+						break;
+					case "staticSetterHandle": 
+						clzTmp = Class.forName(AST.$getRefClassFromType(AST.$getClass(cons), classNode.name));
+						results[i++] = MethodHandles.lookup().findStaticSetter(clzTmp, AST.$getName(cons), Signature.binaryClass(AST.$getType(cons)));
+						break;
+					case "constructorHandle": 	
+						clzTmp = Class.forName(AST.$getRefClassFromType(AST.$getClass(cons), classNode.name));
+						results[i++] = MethodHandles.lookup().findConstructor(clzTmp, Signature.constructorType(AST.$getDesc(cons)));
+						break;
+					case "methodTypeInfo":
+						results[i++] = Signature.methodType(AST.$getDesc(cons));
+						break;
+					}
 				}
-				else if (elem instanceof IInteger){
-					results[i++] = ((IInteger) elem).intValue();
-				}
-				else {
-					throw new IllegalArgumentException("bootstrap method arguments can only be either constant strings or constant integers");
-				}
-			}
-		
+			} catch (NoSuchMethodException | IllegalAccessException | ClassNotFoundException | NoSuchFieldException e) {
+				throw new IllegalArgumentException("Could not construct the right type for building argument for bootstrap method", e);
+			} 
+
 			return results;
 		}
 
@@ -2893,11 +2945,11 @@ public class ClassCompiler {
 			}
 
 			FieldNode fieldNode = new FieldNode(access, name, signature, null, value);
-			
+
 			if (kws.hasParameter("annotations")) {
 				annotations((a, b) -> fieldNode.visitAnnotation(a, b), (IList) kws.getParameter("annotations"));
 			}
-			
+
 			classNode.fields.add(fieldNode);
 		}
 
@@ -2957,7 +3009,7 @@ public class ClassCompiler {
 		public static final String objectType = "L" + objectName + ";";
 		public static final String stringType = "L" + stringName + ";";
 
-		private static String constructor(IConstructor sig) {
+		public static String constructor(IConstructor sig) {
 			StringBuilder val = new StringBuilder();
 			val.append("(");
 			for (IValue formal : AST.$getFormals(sig)) {
@@ -2967,7 +3019,7 @@ public class ClassCompiler {
 			return val.toString();
 		}
 
-		private static String method(IConstructor sig) {
+		public static String method(IConstructor sig) {
 			StringBuilder val = new StringBuilder();
 			val.append("(");
 			for (IValue formal : AST.$getFormals(sig)) {
@@ -2976,6 +3028,14 @@ public class ClassCompiler {
 			val.append(")");
 			val.append(type(AST.$getReturn(sig)));
 			return val.toString();
+		}
+
+		public static MethodType methodType(IConstructor sig) {
+			return MethodType.fromMethodDescriptorString(method(sig), Signature.class.getClassLoader() /* TODO */);
+		}
+
+		public static MethodType constructorType(IConstructor sig) {
+			return MethodType.fromMethodDescriptorString(constructor(sig), Signature.class.getClassLoader() /* TODO */);
 		}
 
 		public static String type(IConstructor t) {
@@ -3049,11 +3109,15 @@ public class ClassCompiler {
 		public static int $getKey(IConstructor exp) {
 			return ((IInteger) exp.get("key")).intValue();
 		}
-		
+
+		public static IConstructor $getSpecial(IConstructor cons) {
+			return (IConstructor) cons.get("special");
+		}
+
 		public static IConstructor $getThenExp(IConstructor exp) {
 			return (IConstructor) exp.get("thenExp");
 		}
-		
+
 		public static IConstructor $getElseExp(IConstructor exp) {
 			return (IConstructor) exp.get("elseExp");
 		}
@@ -3070,7 +3134,7 @@ public class ClassCompiler {
 			if (elem.asWithKeywordParameters().hasParameter("retention")) {
 				return ((IString) elem.asWithKeywordParameters().getParameter("runtime")).getValue();
 			}
-			
+
 			return "class";
 		}
 
@@ -3089,7 +3153,7 @@ public class ClassCompiler {
 		public static IList $getFinally(IConstructor stat) {
 			return (IList) stat.get("finally");
 		}
-		
+
 		public static String $getLabel(IConstructor stat) {
 			return ((IString) stat.get("label")).getValue();
 		}
@@ -3176,6 +3240,10 @@ public class ClassCompiler {
 			return (IConstructor) parameter.get("class");
 		}
 
+		public static String $getClassStr(IConstructor parameter) {
+			return ((IString) parameter.get("class")).getValue();
+		}
+
 		public static String $getClassFromType(IConstructor type, String currentClass) {
 			return Switch.type(type, 
 					(z) -> "java/lang/Boolean", 
@@ -3197,6 +3265,28 @@ public class ClassCompiler {
 					(a) -> { throw new IllegalArgumentException("can not instantiate array types, use newArray instead of newInstance"); }, 
 					(s) -> "java/lang/String");
 		}
+		
+		public static String $getRefClassFromType(IConstructor type, String currentClass) {
+			return Switch.type(type, 
+					(z) -> { throw new IllegalArgumentException("expected object type"); }, 
+					(i) -> { throw new IllegalArgumentException("expected object type"); }, 
+					(s) -> { throw new IllegalArgumentException("expected object type"); }, 
+					(b) -> { throw new IllegalArgumentException("expected object type"); },
+					(c) -> { throw new IllegalArgumentException("expected object type"); }, 
+					(f) -> { throw new IllegalArgumentException("expected object type"); }, 
+					(d) -> { throw new IllegalArgumentException("expected object type"); }, 
+					(j) -> { throw new IllegalArgumentException("expected object type"); }, 
+					(v) -> { throw new IllegalArgumentException("expected object type"); },
+					(c) -> {
+						String name = AST.$getName(type).replace('.','/');
+						if (name.equals("<current>")) {
+							name = currentClass;
+						}
+						return name;
+					},
+					(a) -> { throw new IllegalArgumentException("can not instantiate array types, use newArray instead of newInstance"); }, 
+					(s) -> "java/lang/String");
+		}
 
 		public static String $getConstructorName(IValue parameter) {
 			return ((IConstructor) parameter).getConstructorType().getName();
@@ -3205,21 +3295,21 @@ public class ClassCompiler {
 		public static String $getName(IConstructor exp) {
 			return ((IString) exp.get("name")).getValue();
 		}
-		
+
 		public static String $getAnnotationName(IConstructor exp) {
 			IWithKeywordParameters<? extends IConstructor> kws = exp.asWithKeywordParameters();
-			
+
 			if (kws.hasParameter("name")) {
 				return ((IString) kws.getParameter("name")).getValue();
 			}
-			
+
 			return "value";
 		}
-		
+
 		public static String $getAnnoClass(IConstructor exp) {
 			return ((IString) exp.get("annoClass")).getValue();
 		}
-		
+
 		public static IConstructor $getType(IConstructor exp) {
 			return (IConstructor) exp.get("type");
 		}
@@ -3283,7 +3373,7 @@ public class ClassCompiler {
 		public static IList $getMethodsParameter(IWithKeywordParameters<? extends IConstructor> kws) {
 			return (IList) kws.getParameter("methods");
 		}
-		
+
 		public static IList $getAnnotations(IWithKeywordParameters<? extends IConstructor> kws) {
 			return (IList) kws.getParameter("annotations");
 		}
@@ -3490,23 +3580,23 @@ public class ClassCompiler {
 		static IConstructor voidType() {
 			return VOID_CONS;
 		}
-		
+
 		static String throwableName() {
 			return "java/lang/Throwable";
 		}
-		
+
 		static IConstructor throwableType() {
 			return vf.constructor(REF, vf.string(throwableName()));
 		}
 	}
-	
+
 	private static class LeveledLabel extends Label {
 		private final int finallyNestingLevel;
-		
+
 		public LeveledLabel(int level) {
 			this.finallyNestingLevel = level;
 		}
-		
+
 		public int getFinallyNestingLevel() {
 			return finallyNestingLevel;
 		}

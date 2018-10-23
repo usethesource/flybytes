@@ -42,6 +42,8 @@ generation.
 @author{Jurgen J. Vinju}
 module lang::mujava::Syntax
 
+import List;
+
 data Class(list[Annotation] annotations = [], loc source = |unknown:///|)
   = class(Type \type /* reference(str name) */, 
       set[Modifier] modifiers = {\public()},
@@ -195,7 +197,7 @@ data Exp(loc src = |unknown:///|)
     invokeSuper(Signature desc, list[Exp] args)
     
   | /* Generate a call site using a static "bootstrap" method, cache it and invoke it */
-    invokeDynamic(Bootstrap handle, Signature desc, list[Exp] args)
+    invokeDynamic(BootstrapCall handle, Signature desc, list[Exp] args)
       
   | newInstance(Type class, Signature desc, list[Exp] args)
   | getField(Type class, Exp receiver, Type \type, str name)
@@ -228,27 +230,8 @@ data Exp(loc src = |unknown:///|)
   | cond(Exp condition, Exp thenExp, Exp elseExp)
   ;
  
-@doc{
-A bootstrap handle is a name of a static method (as defined by its host class,
-its name and its type signature), and a list of constant str arguments (for convenience).
-} 
-data Bootstrap = bootstrap(Type class, str name, Signature desc, list[value /*int or str*/] args);
- 
-Signature bootstrapDescWithStrings(str name, int extra) 
-  = bootstrapDesc(name, [string() | i <- [0..extra], i < 251]);
-  
-Signature bootstrapDescWithInts(str name, int extra) 
-  = bootstrapDesc(name, [integer() | i <- [0..extra], i < 251]);  
-    
-Signature bootstrapDesc(str name, Type extra.../* integer() or string() */) 
-  = methodDesc(reference("java.lang.invoke.CallSite"), name, [
-      reference("java.lang.invoke.MethodHandlers.Lookup"),
-      string() /* name of the method */,
-      reference("java.lang.invoke.MethodType"),
-      // up to 251 additional constant string or integer arguments:
-      *extra  
-    ]);    
- 
+
+
 Exp defVal(boolean()) = const(boolean(), false);
 Exp defVal(integer()) = const(integer(), 0);
 Exp defVal(long()) = const(long(), 0);
@@ -346,4 +329,78 @@ Exp sconst(str i) = const(string(), i);
 Exp dconst(real i) = const(double(), i);
 Exp fconst(real i) = const(float(), i);
 
-   
+// dynamic invoke needs a lot of extra detail, which is all below this line:
+
+@doc{
+A bootstrap handle is a name of a static method (as defined by its host class,
+its name and its type signature), and a list of constant str arguments (for convenience).
+
+It's advised to use the convenience function below:
+  * `bootstrap(Type class, str name, list[BootstrapInfo] args)`
+  
+That function makes sure to line up any additional information about the call site with
+the type of the static bootstrap method.
+} 
+data BootstrapCall = bootstrap(Type class, str name, Signature desc, list[CallSiteInfo] args);
+ 
+BootstrapCall bootstrap(Type class, str name, list[BootstrapInfo] args)
+  = bootstrap(class, name, 
+      methodDesc(reference("java.lang.invoke.CallSite"),
+                 name,
+                 [
+                    reference("java.lang.invoke.MethodHandlers.Lookup"),
+                    string(),
+                    MethodType()
+                    *[callsiteInfoType(a) | a <- args]
+                 ]),
+       args);
+
+BootstrapCall bootstrap(Type class, str name, list[BootstrapInfo] args)
+  = bootstrap(reference("\<CURRENT\>"), name, args);
+  
+@doc{
+Convenience function to use existing BootstrapCall information to generate a fitting bootstrap 
+method to call.
+}  
+Method bootstrapMethod(BootstrapCall b, list[Statement] body)
+  = method(b.desc, 
+      [
+         var(reference("java.lang.invoke.MethodHandlers.Lookup"), "callerClass"),
+         var(string(), "dynMethodName"),
+         var(reference("java.lang.invoke.MethodType"), "dynMethodType"),
+         *[var(callsiteInfoType(args[i]), "info_<i>") | i <- index(args), csi <- args]
+      ], 
+      block, {\public(), \static()});
+      
+     
+data CallSiteInfo
+  = stringInfo(str s)
+  | classInfo(str name)
+  | integerInfo(int i)
+  | longInfo(long l)
+  | floatInfo(float f)
+  | doubleInfo(double d)
+  | methodTypeInfo(Signature desc)
+  | virtualHandle(Type class, str name, Signature desc)
+  | specialHandle(Type class, str name, Signature desc, Type caller)
+  | getterHandle(Type class, str name, Type \type)
+  | setterHandle(Type class, str name, Type \type)
+  | staticGetterHandle(Type class, str name, Type \type)
+  | staticSetterHandle(Type class, str name, Type \type)
+  | constructorHandle(Type class, Type desc)
+  ;
+  
+Type callsiteInfoType(stringInfo(_))             = string();
+Type callsiteInfoType(classInfo(_))              = reference("java.lang.Class");
+Type callsiteInfoType(integerInfo(_))            = integer();
+Type callsiteInfoType(longInfo(_))               = long();
+Type callsiteInfoType(floatInfo(_))              = float();
+Type callsiteInfoType(doubleInfo(_))             = double();
+Type callsiteInfoType(virtualHandle(_,_,_))      = reference("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(specialHandle(_,_,_,_))    = reference("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(getterHandle(_,_,_))       = reference("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(setterHandle(_,_,_))       = reference("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(staticGetterHandle(_,_,_)) = reference("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(staticSetterHandle(_,_,_)) = reference("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(constructorHandle(_,_))    = reference("java.lang.invoke.MethodHandle");
+Type callsiteInfoType(methodTypeInfo())          = reference("java.lang.invoke.MethodType");   

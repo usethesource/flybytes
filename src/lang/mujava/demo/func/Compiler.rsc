@@ -14,12 +14,15 @@ import String;
 import ParseTree;
 import util::UUID;
 
-void testFunFactorial() {
+void testFunc() {
   tree = parse(#start[Prog], |project://mujava/src/lang/mujava/demo/func/fac.func|).top;
   compileProg(tree, "FuncFactorial", |project://mujava/generated|);
   
   tree = parse(#start[Prog], |project://mujava/src/lang/mujava/demo/func/factlet.func|).top;
   compileProg(tree, "FuncLetFactorial", |project://mujava/generated|);
+  
+  tree = parse(#start[Prog], |project://mujava/src/lang/mujava/demo/func/shadowing.func|).top;
+  compileProg(tree, "Shadowing", |project://mujava/generated|);
 }
 
 void compileProg(Prog p, str name, loc folder) {

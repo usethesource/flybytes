@@ -1,0 +1,13 @@
+test(n) = let
+	        x = n,
+	        y = n
+          in
+	        let y = 2 * x 
+	        in
+	           2 * y
+	        end
+	      end
+
+main() = test(2)
+	      
+	      

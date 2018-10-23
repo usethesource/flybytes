@@ -375,9 +375,9 @@ data CallSiteInfo
   = stringInfo(str s)
   | classInfo(str name)
   | integerInfo(int i)
-  | longInfo(long l)
-  | floatInfo(float f)
-  | doubleInfo(double d)
+  | longInfo(int l)
+  | floatInfo(int f)
+  | doubleInfo(int d)
   | methodTypeInfo(Signature desc)
   | // see MethodHandles.lookup().findVirtual for more information
     virtualHandle(Type class, str name, Signature desc)

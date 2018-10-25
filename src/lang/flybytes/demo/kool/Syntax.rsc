@@ -1,481 +1,182 @@
 module lang::flybytes::demo::kool::Syntax
 
-
-syntax Exp =
-  new: "new" Name \ NameKeywords "(" {Exp ","}* ")" 
-  | newNoParams: "new" Name \ NameKeywords 
+syntax Program = program: Class* Exp;
+  
+syntax Class 
+  = class: "class" Name "extends" Name "is" Decl* Method* "end" 
+  | primClassNoParent: "primclass" Name "is" Decl* Method* "end" 
+  | classNoParent: "class" Name "is" Decl* Method* "end" 
+  | primClass: "primclass" Name "extends" Name "is" Decl* Method* "end" 
   ;
 
-keyword NameKeywords =
-  "new" 
+syntax Method 
+  = methodWParamsDef: "method" Name "(" {AttributedName ","}+ ")" "is" Decl* Stmt "end" 
+  | methodDef: "method" Name "is" Decl* Stmt "end" 
   ;
 
-syntax Name =
-  LEX_Name 
+syntax Stmt 
+  = right seqComp: Stmt Stmt 
+  | \throw: "throw" Exp ";" 
+  | tryCatch: "try" Stmt "catch" Name Stmt "end" 
+  | whileLoop: "while" Exp "do" Stmt "od" 
+  | doLoop: "do" Stmt "while" Exp "od" 
+  | \break: "break" ";" 
+  | forLoop: "for" Name "\<-" Exp "to" Exp "do" Stmt "od" 
+  | \continue: "continue" ";" 
+  | ifThenElse: "if" Exp "then" Stmt "else" Stmt "fi" 
+  | ifThen: "if" Exp "then" Stmt "fi" 
+  | \assert: "assert" Exp ";" 
+  | returnNoVal: "return" ";" 
+  | \return: "return" Exp ";" 
+  | typeCaseElse: "typecase" Exp "of" Case+ ElseCase "end" 
+  | typeCase: "typecase" Exp "of" Case+ "end" 
+  | block: "begin" Decl* Stmt "end" 
+  | assign: Exp "\<-" Exp ";" 
+  | release: "release" Exp ";" 
+  | spawn: "spawn" Exp ";" 
+  | acquire: "acquire" Exp ";" 
+  | skip: "skip" ";" 
+  | labelStmt: Name ":" 
+  | stmtExp: Exp ";" 
   ;
 
-
-keyword NameKeywords =
-  "is" 
-  | "end" 
-  | "method" 
+syntax Attribute 
+  = attribNoParams: "@" Name 
+  | attribWParams: "@" Name "(" {Exp ","}+ ")" 
   ;
 
-syntax Name =
-  LEX_Name 
-  ;
-
-syntax Method =
-  methodWParamsDef: "method" Name \ NameKeywords "(" {AttributedName ","}+ ")" "is" Decl* Stmt "end" 
-  | methodDef: "method" Name \ NameKeywords "is" Decl* Stmt "end" 
-  ;
-
-
-syntax Exp =
-  vector: "(#" {Exp ","}+ "#)" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-
-syntax Exp =
-  self: "self" 
-  ;
-
-keyword NameKeywords =
-  "self" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-syntax Stmt =
-  right seqComp: Stmt Stmt 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-
-keyword NameKeywords =
-  "throw" 
-  | "end" 
-  | "try" 
-  | "catch" 
-  ;
-
-syntax Stmt =
-  \throw: "throw" Exp ";" 
-  | tryCatch: "try" Stmt "catch" Name \ NameKeywords Stmt "end" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-lexical String =
-  "\"" ![\n \a0D \" \\]* "\"" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-lexical Slash =
-  [/] 
-  ;
-
-layout LAYOUTLIST  =
-  LAYOUT* !>> [\t-\n \a0D \ ] 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-lexical LAYOUT =
-  "//" ![\n]* [\n] 
-  | BlockComment 
-  ;
-
-lexical BlockComment =
-  "/*" CommentPart* "*/" 
-  ;
-
-lexical Asterisk =
-  [*] 
-  ;
-
-lexical CommentPart =
-  Asterisk !>> [/] 
-  | ![* /] 
-  | BlockComment 
-  | Slash !>> [*] 
-  ;
-
-
-lexical Char =
-  "\'" [0-9 A-Z a-z] "\'" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-syntax Class =
-  class: "class" Name \ NameKeywords "extends" Name \ NameKeywords "is" Decl* Method* "end" 
-  | primClassNoParent: "primclass" Name \ NameKeywords "is" Decl* Method* "end" 
-  | classNoParent: "class" Name \ NameKeywords "is" Decl* Method* "end" 
-  | primClass: "primclass" Name \ NameKeywords "extends" Name \ NameKeywords "is" Decl* Method* "end" 
-  ;
-
-keyword NameKeywords =
-  "extends" 
-  | "end" 
-  | "is" 
-  | "class" 
-  | "primclass" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-syntax Exp =
-  superSame: "super" "(" {Exp ","}+ ")" 
+syntax Exp 
+  = new: "new" Name "(" {Exp ","}* ")" 
+  | newNoParams: "new" Name 
+  | vector: "(#" {Exp ","}+ "#)" 
+  | self: "self" 
+  | superSame: "super" "(" {Exp ","}+ ")" 
   | superUnarySame: "super" "(" ")" 
-  | super: "super" "." Name \ NameKeywords "(" {Exp ","}+ ")" 
-  | superUnary: "super" "." Name \ NameKeywords (  "("    ")"  )? 
-  ;
-
-keyword NameKeywords =
-  "super" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-keyword OperatorNameKeywords =
-  "@" 
-  ;
-
-syntax Attribute =
-  attribNoParams: "@" Name \ NameKeywords 
-  | attribWParams: "@" Name \ NameKeywords "(" {Exp ","}+ ")" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-keyword OperatorNameKeywords =
-  "/=" 
-  | "==" 
-  ;
-
-syntax Exp =
-  refNeq: Exp "/=" Exp 
+  | super: "super" "." Name "(" {Exp ","}+ ")" 
+  | superUnary: "super" "." Name (  "("    ")"  )? 
   | string: String 
   | \bool: Bool 
   | integer: Integer 
-  | refEq: Exp "==" Exp 
   | nil: "nil" 
   | bracket "(" Exp ")" 
-  | name: Name \ NameKeywords 
+  | name: Name 
   | char: Char 
   | float: Float 
+  | prim: "primInvoke" "(" {Exp ","}+ ")" 
+  | left send: Exp "." Name "(" {Exp ","}+ ")" 
+  | left unarySend: Exp "." Name (  "("    ")"  )? 
+  | left binOpSend: Exp OperatorName Exp 
+  | left 
+    ( left unarySend: Exp "." Name (  "("    ")"  )? 
+    | left send: Exp "." Name "(" {Exp ","}+ ")" 
+    )
+  > left binOpSend: Exp OperatorName Exp 
+  > non-assoc 
+    ( refEq: Exp "==" Exp
+    | non-assoc refNeq: Exp "/=" Exp
+    )
   ;
 
-keyword NameKeywords =
-  "nil" 
+lexical Float 
+  = [+ \-]? [0-9]+ "." 
+  | [+ \-]? "." [0-9]+ 
+  | [+ \-]? [0-9]+ "." [0-9]+ 
   ;
 
-syntax Name =
-  LEX_Name 
+lexical Integer = [+ \-]? [0-9]+ ; 
+
+syntax AttributedName = attribName: Attribute* Name;
+
+syntax Decl = decl: "var" {AttributedName ","}+ ";" ;
+
+syntax Case = \case: "case" Name "of" Stmt ;
+
+syntax ElseCase = elseCase: "else" Stmt ;
+
+lexical Bool 
+  = "true" 
+  | "false" 
   ;
 
-
-syntax Name =
-  LEX_Name 
+syntax Name 
+  = [0-9 A-Z a-z] !<< ([A-Z a-z] [0-9 A-Z a-z]*) !>> [0-9 A-Z a-z] \ NameKeywords
+  | OperatorName
   ;
 
-syntax Program =
-  program: Class* Exp 
-  ;
-
-keyword NameKeywords =
-  "continue" 
+keyword NameKeywords 
+  = "var" 
+  | "return" 
+  | "spawn" 
+  | "skip" 
+  | "primInvoke" 
+  | "if" 
+  | "fi" 
+  | "else" 
+  | "then" 
+  | "continue" 
   | "do" 
   | "for" 
   | "break" 
   | "od" 
   | "to" 
-  | "while" 
-  ;
-
-syntax Stmt =
-  whileLoop: "while" Exp "do" Stmt "od" 
-  | doLoop: "do" Stmt "while" Exp "od" 
-  | \break: "break" ";" 
-  | forLoop: "for" Name \ NameKeywords "\<-" Exp "to" Exp "do" Stmt "od" 
-  | \continue: "continue" ";" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-keyword NameKeywords =
-  "if" 
-  | "fi" 
+  | "while"
+  | "nil"
+  | "super"
+  | "extends" 
+  | "throw" 
+  | "self" 
+  | "new" 
+  | "is" 
+  | "end" 
+  | "method" 
+  | "begin" 
+  | "end" 
+  | "true" 
+  | "false"
+  | "case" 
+  | "end" 
   | "else" 
-  | "then" 
-  ;
-
-syntax Stmt =
-  ifThenElse: "if" Exp "then" Stmt "else" Stmt "fi" 
-  | ifThen: "if" Exp "then" Stmt "fi" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-syntax Exp =
-  prim: "primInvoke" "(" {Exp ","}+ ")" 
-  ;
-
-keyword NameKeywords =
-  "primInvoke" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-keyword NameKeywords =
-  "assert" 
-  ;
-
-syntax Stmt =
-  \assert: "assert" Exp ";" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-
-syntax Exp =
-  left send: Exp "." Name \ NameKeywords "(" {Exp ","}+ ")" 
-  | left unarySend: Exp "." Name \ NameKeywords (  "("    ")"  )? 
-  | left binOpSend: Exp OperatorName \ OperatorNameKeywords Exp 
-  ;
-
-syntax Exp =
-  left 
-    ( left unarySend: Exp "." Name \ NameKeywords (  "("    ")"  )? 
-    | left send: Exp "." Name \ NameKeywords "(" {Exp ","}+ ")" 
-    )
-  > left binOpSend: Exp OperatorName \ OperatorNameKeywords Exp 
-  ;
-
-keyword NameKeywords =
-  "return" 
-  ;
-
-syntax Stmt =
-  returnNoVal: "return" ";" 
-  | \return: "return" Exp ";" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-keyword NameKeywords =
-  "skip" 
-  ;
-
-syntax Stmt =
-  skip: "skip" ";" 
-  | labelStmt: Name \ NameKeywords ":" 
-  | stmtExp: Exp ";" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-
-lexical Float =
-  [+ \-]? [0-9]+ "." 
-  | [+ \-]? "." [0-9]+ 
-  | [+ \-]? [0-9]+ "." [0-9]+ 
-  ;
-
-lexical Integer =
-  [+ \-]? [0-9]+ 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-
-keyword NameKeywords =
-  "spawn" 
+  | "typecase"
+  | "end" 
+  | "try" 
+  | "catch" 
+  | "end" 
+  | "is" 
+  | "class" 
+  | "primclass"  
+  | "assert" 
   | "release" 
   | "acquire" 
   ;
-
-syntax Stmt =
-  release: "release" Exp ";" 
-  | spawn: "spawn" Exp ";" 
-  | acquire: "acquire" Exp ";" 
+  
+lexical OperatorName 
+  = [!#%*-+\-/\<-=\>^] !<< [!#%*-+\-/\<-=\>^]+ !>> [!#%*-+\-/\<-=\>^] \ OperatorNameKeywords
   ;
 
-syntax Name =
-  LEX_Name 
+keyword OperatorNameKeywords 
+  = "/=" 
+  | "==" 
+  | "@"
+  | "\<-" 
   ;
 
+lexical String = "\"" ![\n\a0D\"\\]* "\"";
+lexical Char = "\'" [0-9 A-Z a-z] "\'";
 
-syntax AttributedName =
-  attribName: Attribute* Name \ NameKeywords 
+layout WhitespaceComments  = (Whitespace | Comment)* !>> [\t-\n\a0D\ ] !>> "//" !>> "/*" ;
+
+lexical Whitespace = [\t-\n \a0D \ ];
+
+lexical Comment 
+  = @category="Comment" line: "//" ![\n]* [\n] 
+  | @category="Comment" BlockComment 
   ;
 
-keyword NameKeywords =
-  "var" 
-  ;
+lexical BlockComment =  "/*" CommentPart* "*/";
 
-syntax Name =
-  LEX_Name 
-  ;
-
-syntax Decl =
-  decl: "var" {AttributedName ","}+ ";" 
-  ;
-
-
-
-syntax Case =
-  \case: "case" Name \ NameKeywords "of" Stmt 
-  ;
-
-keyword NameKeywords =
-  "case" 
-  | "end" 
-  | "else" 
-  | "typecase" 
-  ;
-
-syntax ElseCase =
-  elseCase: "else" Stmt 
-  ;
-
-syntax Stmt =
-  typeCaseElse: "typecase" Exp "of" Case+ ElseCase "end" 
-  | typeCase: "typecase" Exp "of" Case+ "end" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-
-keyword NameKeywords =
-  "true" 
-  | "false" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-lexical Bool =
-  "true" 
-  | "false" 
-  ;
-
-
-layout LAYOUTLIST  =
-  LAYOUT* !>> [\t-\n \a0D \ ] 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-lexical LAYOUT =
-  [\t-\n \a0D \ ] 
-  ;
-
-
-syntax Name =
-  OperatorName \ OperatorNameKeywords 
-  | LEX_Name 
-  ;
-
-lexical LEX_Name =
-  [A-Z a-z] [0-9 A-Z a-z]* 
-  ;
-
-lexical OperatorName =
-  [! # % *-+ \- / \<-= \> ^]+ 
-  ;
-
-
-keyword NameKeywords =
-  "begin" 
-  | "end" 
-  ;
-
-syntax Stmt =
-  block: "begin" Decl* Stmt "end" 
-  ;
-
-syntax Name =
-  LEX_Name 
-  ;
-
-
-keyword OperatorNameKeywords =
-  "\<-" 
-  ;
-
-keyword NameKeywords =
-  "\<-" 
-  ;
-
-syntax Stmt =
-  assign: Exp "\<-" Exp ";" 
-  ;
-
-syntax Name =
-  LEX_Name 
+lexical CommentPart 
+  = "*" !>> [/] 
+  | ![*/]+ !>> ![*/] 
+  | BlockComment 
+  | "/" !>> [*] 
   ;

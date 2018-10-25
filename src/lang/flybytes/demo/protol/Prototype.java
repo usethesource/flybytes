@@ -22,17 +22,25 @@ public class Prototype {
 	  private static final Lookup lookup = MethodHandles.lookup();
 	  private static class ProtoCallSite extends MutableCallSite {
 		  final String methodName;
-
+		  Prototype object;
+		  
 		  ProtoCallSite(String methodName, MethodType type) {
 			  super(type);
 			  this.methodName = methodName;
+			  this.object = null;
+		  }
+		  
+		  public void setObject(Prototype object) {
+			this.object = object;
 		  }
 	  }
 	  
 	  private static final MethodHandle FINDER;
+	  private static final MethodHandle TESTER;
 	  static {
 		  try {
 			  FINDER = lookup.findStatic(Prototype.class, "finder", MethodType.methodType(Object.class, ProtoCallSite.class, Object[].class));
+			  TESTER = lookup.findStatic(Prototype.class, "cacheTester", MethodType.methodType(boolean.class, ProtoCallSite.class, Object[].class));
 		  } catch (ReflectiveOperationException e) {
 			  throw (AssertionError) new AssertionError().initCause(e);
 		  }
@@ -61,6 +69,9 @@ public class Prototype {
 		  return new Prototype();
 	  }
 	  
+	  /**
+	   * Bootstrap sets up _every_ method call via a dynamic finder method.
+	   */
 	  public static CallSite bootstrap(Lookup lookup, String name, MethodType type) {
 		  ProtoCallSite callSite = new ProtoCallSite(name, type);
 
@@ -72,6 +83,11 @@ public class Prototype {
 		  return callSite;
 	  }
 	  
+	  /**
+	   * Finder traverses the object prototyping hierarchy to locate the called method,
+	   * at run-time, or otherwise calls method_missing if it can't find anything.
+	   * The result is cached. 
+	   */
 	  public static Object finder(ProtoCallSite callSite, Object[] args) throws Throwable {
 		Prototype receiver = (Prototype) args[0];
 		Class<?> receiverClass = receiver.getClass();
@@ -83,7 +99,14 @@ public class Prototype {
 	    		// happy path: we just call a method in the receiver class
 	    		target = lookup.findVirtual(receiverClass, callSite.methodName, type.dropParameterTypes(0, 1));
 	    		target = target.asType(type);
+	    		
+	    		// cache the target
 	    		callSite.setTarget(target);
+	    		callSite.setObject(receiver);
+
+	    		// if the cache fails, try to find the method again:
+	    		target = MethodHandles.guardWithTest(TESTER, target, FINDER);
+	    		
 	    		return target.invokeWithArguments(args);
 	    	}
 	    	catch (NoSuchMethodException e) {
@@ -102,6 +125,7 @@ public class Prototype {
 	    	try {
 	    		target = lookup.findVirtual(receiverClass, "method_missing", type);
 	    		callSite.setTarget(target);
+	    		callSite.setObject(receiver);
 	    		return target.invoke(callSite, args);
 	    	}
 	    	catch (NoSuchMethodException e) {
@@ -114,5 +138,10 @@ public class Prototype {
 	    throw new NoSuchMethodException(callSite.methodName);
 	  }
 	  
-	 
+	  static boolean cacheTester(ProtoCallSite site, Object[] args) {
+		  // the first argument is the receiver of a method call, we test if its still the same
+		  // object as when we resolved the dynamic call, otherwise we should
+		  // re-bind the method namely to another object:
+		  return site.object == (Prototype) args[0];
+	  }
 }

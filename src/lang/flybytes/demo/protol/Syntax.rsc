@@ -5,7 +5,7 @@ module lang::flybytes::demo::protol::Syntax
 // and missing_field features. There are no classes on protol, just objects used as templates
 // for other objects.
 
-syntax Program = Command* commands;
+start syntax Program = Command* commands;
 
 syntax Command 
   = assign: Assignable assign "=" Expr val ";"
@@ -23,7 +23,8 @@ syntax Assignable
   ;
     
 syntax Expr
-  = send: Expr receiver "." Id name "(" {Expr ","}* args ")"
+  = "this"
+  | send: Expr receiver "." Id name "(" {Expr ","}* args ")"
   | array: "{" {Expr ","}* "}"
   | new: "new" Expr prototype?
   | \extend: "new" Expr prototype? "{" Definition+ definitions "}" 
@@ -46,7 +47,7 @@ syntax Definition
   | "missing_field" "(" Id arg ")" "{" Command* commands "}"
   ;  
   
-lexical Id = [A-Za-z][a-zA-Z0-9]+ \ "if" \ "new" \ "else" \ "while"  \ "return" \ "object";  
+lexical Id = [A-Za-z][a-zA-Z0-9]+ \ "if" \ "new" \ "else" \ "while"  \ "return" \ "this";  
 lexical Int = [0-9]+;
 lexical String = "\"" ![\"]* "\"";
 

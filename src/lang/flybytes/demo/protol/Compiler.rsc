@@ -48,7 +48,9 @@ Stat compile((Command) `<Exp e>;`) = \do(compile(e));
 Stat compile((Command) `return <Exp e>;`) = \return(compile(e));
 
 Stat compile((Command) `print <Exp e>;`) = stdout(compile(e));
-   
+ 
+Exp compile((Expr) `this`) = load("this");
+  
 Exp compile((Expr) `<Expr rec>.<Id name>(<{Expr ","}* args>)`)
   = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype | _ <- args]), compile(args));
    

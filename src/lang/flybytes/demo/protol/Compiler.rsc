@@ -24,7 +24,7 @@ list[Class] compile(Program p, str name) {
       ]
     );
  
-  allClasses = [removeNestedClasses(main), *extractClasses(main)];
+  allClasses = [removePrototypeClasses(main), *extractPrototypeClasses(main)];
 
   return declareVariables(allClasses);  
 }    
@@ -132,11 +132,11 @@ list[Class] declareVariables(list[Class] classes)
         decls := { decl(Prototype, name) | /store(str name, _) := stats}
   };
   
-Class removeNestedClasses(Class main) = visit(main) {
+Class removePrototypeClasses(Class main) = visit(main) {
   case prototype(_, _, _) => Prototype
 };
 
 // lifts local class declarations at newInstance locations to the top:
-list[Class] extractClasses(Class main) 
+list[Class] extractPrototypeClasses(Class main) 
   = [ class(reference(name), methods=methods, fields=fields) 
     | /prototype(str name, methods, fields) := main];

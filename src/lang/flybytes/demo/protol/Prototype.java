@@ -7,6 +7,7 @@ import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.MutableCallSite;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
 
 /**
  * Inspired mainly by the JSR-292 cookbook by @headius, this class provides the 
@@ -92,9 +93,9 @@ public class Prototype {
 		  this.prototype = (Prototype) prototype.clone();
 	  }
 	  
-	  public Prototype method_missing(ProtoCallSite name, Object[] args) {
-		  System.err.println("missed " + name.methodName + "!");
-		  return new Prototype();
+	  public Prototype missing(Str name, Arr args) {
+		  System.err.println("missed " + name + "!");
+		  return name;
 	  }
 	  
 	  /**
@@ -151,10 +152,11 @@ public class Prototype {
 	    
 	    while (receiver != null) {
 	    	try {
-	    		target = lookup.findVirtual(receiverClass, "method_missing", type);
+	    		target = lookup.findVirtual(receiverClass, "method", type);
 	    		callSite.setTarget(target);
 	    		callSite.setObject(receiver);
-	    		return target.invoke(callSite, args);
+	    		Prototype[] newArgs = Arrays.copyOf(args, args.length, Prototype[].class);
+	    		return target.invoke(new Str(callSite.methodName), new Arr(newArgs));
 	    	}
 	    	catch (NoSuchMethodException e) {
 	    		receiver = receiver.prototype;

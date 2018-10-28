@@ -43,11 +43,10 @@ syntax Expr
 syntax Definition
   = field:Id name "=" Expr val
   | method:Id name "(" {Id ","}* args ")" "{" Command* commands "}"
-  | "missing_method" "(" Id arg ")" "{" Command* commands "}"
-  | "missing_field" "(" Id arg ")" "{" Command* commands "}"
+  | "missing" "(" Id name "," Id args ")" "{" Command* commands "}"
   ;  
-  
-lexical Id = [A-Za-z][a-zA-Z0-9]+ \ "if" \ "new" \ "else" \ "while"  \ "return" \ "this";  
+   
+lexical Id = [A-Za-z][a-zA-Z0-9]+ \ "if" \ "new" \ "else" \ "while"  \ "return" \ "this" \ "missing";  
 lexical Int = [0-9]+;
 lexical String = "\"" ![\"]* "\"";
 

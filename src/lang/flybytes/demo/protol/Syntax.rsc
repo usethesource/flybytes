@@ -9,11 +9,11 @@ syntax Program = Command* commands;
 
 syntax Command 
   = assign: Assignable assign "=" Expr val ";"
-  | \if: "if" "(" Exp cond ")"  "{" Command* thenPart "}" "else" "{" Command* elsePart "}"
-  | \for: "while" "(" Exp cond ")" "{" Command* body "}" 
+  | \if: "if" "(" Expr cond ")"  "{" Command* thenPart "}" "else" "{" Command* elsePart "}"
+  | \for: "while" "(" Expr cond ")" "{" Command* body "}" 
   | exp: Exp e ";"
-  | \return: "return" Exp e ";" 
-  | print: "print" Exp e ";"
+  | \return: "return" Expr e ";" 
+  | print: "print" Expr e ";"
   ;
 
 syntax Assignable
@@ -27,16 +27,15 @@ syntax Expr
   | array: "{" {Expr ","}* "}"
   | new: "new" Expr prototype?
   | \extend: "new" Expr prototype? "{" Definition+ definitions "}" 
-
   | bracket "(" Expr ")"
   | ref: Id id
   | \int: Int
   | \str: String
   | field: Expr receiver "." Id name
   > array: Expr array "[" Expr index "]"
-  > mul: Expr "*" Expr
-  > left ( Expr "+" Expr | Expr "-" Expr )
-  > right( Expr "==" Expr | Expr "!=" Expr)
+  > left  (Expr "*" Expr | Expr "/" Expr)
+  > left  (Expr "+" Expr | Expr "-" Expr )
+  > right (Expr "==" Expr | Expr "!=" Expr)
   > right (Expr "\<=" Expr | Expr "\<" Expr | Expr "\>" Expr | Expr "\>=" Expr)
   ; 
 

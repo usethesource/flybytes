@@ -6,6 +6,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.MutableCallSite;
+import java.lang.reflect.InvocationTargetException;
 
 /**
  * Inspired mainly by the JSR-292 cookbook by @headius, this class provides the 
@@ -32,6 +33,33 @@ public class Prototype {
 		  
 		  public void setObject(Prototype object) {
 			this.object = object;
+		  }
+	  }
+	  
+	  /** basic wrapper for builtin ints; everything in Protol _is_ an object prototype */
+	  public static class Int extends Prototype {
+		  public int integer;
+		  
+		  public Int(int i) {
+			  this.integer = i;
+		  }
+	  }
+	  
+	  /** basic wrapper for builtin strings; everything in Protol _is_ an object prototype */
+	  public static class Str extends Prototype {
+		  public String string;
+		  
+		  public Str(String s) {
+			  this.string = s;
+		  }
+	  }
+	  
+	  /** basic wrapper for builtin arrays; everything in Protol _is_ an object prototype */
+	  public static class Arr extends Prototype {
+		  public Prototype[] array;
+		  
+		  public Arr(Prototype[] array) {
+			  this.array = array;
 		  }
 	  }
 	  

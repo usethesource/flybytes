@@ -75,7 +75,7 @@ Exp compile((Expr) `this`) = load("this");
 Exp compile((Expr) `<Expr rec>.<Id name>(<{Expr ","}* args>)`)
   = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype | _ <- args]), [compile(rec), *compile(args)]);
    
-Exp compile((Expr) `{<{Expr ","}* elems>}`)
+Exp compile((Expr) `[<{Expr ","}* elems>]`)
   = new(Arr, array(Prototype), [newArray(Prototype, compile(args))]); 
 
 Exp compile((Expr) `<Expr receiver>.<Id name>`)
@@ -169,7 +169,7 @@ Field field(str name, Expr val)
    
 list[Class] declareVariables(list[Class] classes) 
   = visit(classes) {
-      case method(desc, formals, block) => method(desc, formals, [*decls, *block])  
+      case method(desc, formals, block,modifiers=m) => method(desc, formals, [*decls, *block], modifiers=m)  
       when 
         // transform assignments to declarations and remove duplicates:
         decls := { decl(Prototype, name) | /store(str name, _) := block}

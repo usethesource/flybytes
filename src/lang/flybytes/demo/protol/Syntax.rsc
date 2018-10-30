@@ -25,7 +25,7 @@ syntax Assignable
 syntax Expr
   = "this"
   | send: Expr receiver "." Id name "(" {Expr ","}* args ")"
-  | array: "{" {Expr ","}* "}"
+  | array: "[" {Expr ","}* "]"
   | new: "new" Expr? prototype
   | \extend: "new" Expr? prototype "{" Definition+ definitions "}" 
   | bracket "(" Expr ")"

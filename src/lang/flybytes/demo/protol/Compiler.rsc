@@ -8,14 +8,24 @@ import lang::flybytes::api::System;
 import ParseTree;
 import String;
 import util::UUID;
-
+import IO;
 
 void testProtol() {
   tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/fact.protol|).top;
   compileProgram(tree, "ProtolFactorial", |project://flybytes/generated|);
 }
 
+int prototypes = 0;
+
+str protoClass() {
+  res = "Proto_<prototypes>";
+  prototypes += 1;
+  return res;
+}
+
 void compileProgram(Program p, str name, loc binFolder) {
+  prototypes = 0;
+  
   classes = compile(p, name);
   for (cl <- classes) {
     compileClass(cl, binFolder + "<cl.\type.name>.class", version=v1_8());
@@ -41,6 +51,7 @@ list[Class] compile(Program p, str name) {
       ]
     );
  
+  iprintln(declareVariables(removePrototypeClasses(progClass)));
   allClasses = [removePrototypeClasses(progClass), *extractPrototypeClasses(progClass)];
 
   return declareVariables(allClasses);  
@@ -66,7 +77,6 @@ Stat compile((Command) `while(<Expr cond>) { <Command* body> }`)
 
 Stat compile((Command) `<Expr e>;`) = \do(compile(e));
 
-
 Stat compile((Command) `return <Expr e>;`) = \return(compile(e));
 
 Stat compile((Command) `print <Expr e>;`) = stdout(compile(e));
@@ -74,7 +84,7 @@ Stat compile((Command) `print <Expr e>;`) = stdout(compile(e));
 Exp compile((Expr) `this`) = load("this");
   
 Exp compile((Expr) `<Expr rec>.<Id name>(<{Expr ","}* args>)`)
-  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype | _ <- args]), [compile(rec), *compile(args)]);
+  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype | _ <- args] + [Prototype]), [compile(rec), *compile(args) ]);
   
 list[Exp] compile({Expr ","}* args) = [compile(a) | a <- args];
    
@@ -89,10 +99,10 @@ Exp compile((Expr) `new`) = new(Prototype);
 Exp compile((Expr) `new <Expr p>`) = new(Prototype, [compile(p)]);
      
 Exp compile((Expr) `new { <Definition* defs> }`)
-  = new(prototype("Proto_<replaceAll("<uuidi()>", "-", "_")>", methods(defs), fields(defs)));
+  = new(prototype(protoClass(), methods(defs), fields(defs)));
 
 Exp compile((Expr) `new <Expr p> { <Definition* defs> }`) 
-  = new(prototype("Proto_<replaceAll("<uuidi()>", "-", "_")>", methods(defs), fields(defs)), [compile(p)]);
+  = new(prototype(protoClass(), methods(defs), fields(defs)), [compile(p)]);
       
 Exp compile((Expr) `(<Expr e>)`) = compile(e); 
 
@@ -170,25 +180,28 @@ Method method(str name, {Id ","}* args, Command* commands)
 Field field(str name, Expr val)
   = field(Prototype, name, init=compile(val));
    
-list[Class] declareVariables(list[Class] classes) 
+&T declareVariables(&T classes) 
   = visit(classes) {
-      case method(desc, formals, block,modifiers=m) => method(desc, formals, [*decls, *block], modifiers=m)  
+      case method(desc, formals, block, modifiers=m) => 
+           method(desc, formals, [*decls, *block], modifiers=m)  
       when 
         // transform assignments to declarations and remove duplicates:
         decls := { decl(Prototype, name) | /store(str name, _) := block}
   };
   
 Class removePrototypeClasses(Class main) = visit(main) {
-  case prototype(_, _, _) => Prototype
+  case prototype(n, _, _) => object(n)
 };
 
 // lifts local class declarations at newInstance locations to the top:
 list[Class] extractPrototypeClasses(Class main) 
-  = [ class(object(name), 
-         methods=[*methods, constructor(\public(), [var(Prototype, "proto")], [
-              invokeSuper([Prototype], [load("proto")])
+  = [ class(object(name),
+        super=Prototype, 
+         methods=[*ms, constructor(\public(), [var(Prototype, "proto")], [
+              invokeSuper([Prototype], [load("proto")]),
+              \return()
            ])
          ], 
-         fields=fields
+         fields=fs
       ) 
-    | /prototype(str name, methods, fields) := main];
+    | /prototype(str name, ms, fs) := main];

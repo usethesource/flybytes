@@ -89,10 +89,10 @@ Exp compile((Expr) `new`) = new(Prototype);
 Exp compile((Expr) `new <Expr p>`) = new(Prototype, [compile(p)]);
      
 Exp compile((Expr) `new { <Definition* defs> }`)
-  = new(prototype("<uuid()>", methods(defs), fields(defs)));
+  = new(prototype("Proto_<replaceAll("<uuidi()>", "-", "_")>", methods(defs), fields(defs)));
 
 Exp compile((Expr) `new <Expr p> { <Definition* defs> }`) 
-  = new(prototype("<uuid()>", methods(defs), fields(defs)), [compile(p)]);
+  = new(prototype("Proto_<replaceAll("<uuidi()>", "-", "_")>", methods(defs), fields(defs)), [compile(p)]);
       
 Exp compile((Expr) `(<Expr e>)`) = compile(e); 
 
@@ -149,7 +149,7 @@ list[Method] methods(Definition* defs)
     [ method("missing", missingArgs(name, args), commands)
     | (Definition) `missing(<Id name>, <Id args>) { <Command* commands> }` <- defs]
     +
-    [ getter(name), setter(name) | (Definition) `<Id name> = <Expr val>` <- defs]
+    [ getter("<name>"), setter("<name>") | (Definition) `<Id name> = <Expr val>` <- defs]
     ;
 
 Method getter(str name) 

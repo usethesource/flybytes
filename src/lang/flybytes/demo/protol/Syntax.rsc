@@ -41,12 +41,12 @@ syntax Expr
   ; 
 
 syntax Definition
-  = field:Id name "=" Expr val
-  | method:Id name "(" {Id ","}* args ")" "{" Command* commands "}"
-  | "missing" "(" Id name "," Id args ")" "{" Command* commands "}"
+  = field:   Id name \ "missing" "=" Expr val
+  | method:  Id name \ "missing" "(" {Id ","}* args ")" "{" Command* commands "}"
+  | missing: "missing" "(" Id name "," Id args ")" "{" Command* commands "}"
   ;  
    
-lexical Id     = ([A-Za-z][a-zA-Z0-9]+) \ "if" \ "new" \ "else" \ "while"  \ "return" \ "this" \ "missing";  
+lexical Id     = ([A-Za-z][a-zA-Z0-9]*) \ "if" \ "new" \ "else" \ "while"  \ "return" \ "this";  
 lexical Int    = [0-9]+;
 lexical String = "\"" ![\"]* "\"";
 

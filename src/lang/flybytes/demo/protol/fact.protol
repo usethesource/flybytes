@@ -1,6 +1,13 @@
 
 math = new {
-   
+   fact(n) {
+     if (n <= 1) {
+       return 1;
+     }
+     else {
+       return n * this.fact(n - 1);
+     }
+   }
 };
 
 print math.fact(6);

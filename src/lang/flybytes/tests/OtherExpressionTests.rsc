@@ -32,3 +32,20 @@ Class incStatClass() {
 
 test bool testIncStat() = loadClass(incStatClass())
   .invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#bool);  
+
+Class newExpClass()
+  = class(object("newExpTest"),
+      methods=[
+        staticMethod(\public(), boolean(), "testMethod", [], [
+           // i = new Integer(42)
+           decl(object("java.lang.Integer"), "i", init=new(object("java.lang.Integer"),[integer()], [iconst(42)])),
+           // j = new Integer(42)
+           decl(object("java.lang.Integer"), "j", init=new(object("java.lang.Integer"),[integer()], [iconst(42)])),
+           // return i.equals(j)
+           \return(invokeVirtual(object("java.lang.Object"), load("i"), methodDesc(boolean(), "equals", [object("java.lang.Object")]), [load("j")]))
+        ])
+      ]
+    );  
+    
+test bool testNew() = loadClass(newExpClass())
+   .invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#bool);   

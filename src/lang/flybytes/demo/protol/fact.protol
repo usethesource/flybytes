@@ -1,13 +1,4 @@
 
-fact = new {
-  factorial(n) {
-    if (n <= 1) {
-      return 1;
-    }
-    else {
-      return n * this.factorial(n - 1);
-    } 
-  }
-  
-  print fact.factorial(6);
-}
+fact = 1;
+fact = 2;
+fact = 3;

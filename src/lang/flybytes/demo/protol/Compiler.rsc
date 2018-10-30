@@ -2,8 +2,23 @@ module lang::flybytes::demo::protol::Compiler
 
 import lang::flybytes::Syntax;
 import lang::flybytes::Compiler;
+import lang::flybytes::demo::protol::Syntax;
 import lang::flybytes::api::Object;
+import ParseTree;
 import String;
+
+
+void testProtol() {
+  tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/fact.protol|).top;
+  compileProgram(tree, "FuncFactorial", |project://flybytes/generated|);
+}
+
+void compileProgram(Program p, str name, loc binFolder) {
+  classes = compile(p, name);
+  for (cl <- classes) {
+    compileClass(cl, binFolder + cl.\type.name, version=v1_8());
+  }
+}
 
 // the Protol compiler translates object allocation sites to specific JVM class definitions,
 // and uses invokeDynamic to call interfaces and set/get fields on objects of each 
@@ -18,18 +33,18 @@ Type Arr       = object("lang.flybytes.demo.protol.Prototype.Arr");
 data Type = prototype(str name, list[Method] methods, list[Field] fields);
 
 list[Class] compile(Program p, str name) { 
-  main = class(reference(name),
+  progClass = class(object(name),
       methods=[
-        main(\public(), compile(p.commands))
+        main("args", compile(p.commands))
       ]
     );
  
-  allClasses = [removePrototypeClasses(main), *extractPrototypeClasses(main)];
+  allClasses = [removePrototypeClasses(progClass), *extractPrototypeClasses(progClass)];
 
   return declareVariables(allClasses);  
 }    
 
-list[Stat] compile(Command *) = [compile(c) | c <- commands];
+list[Stat] compile(Command* commands) = [compile(c) | c <- commands];
 
 Stat compile((Command) `<Id id> = <Expr v>;`)
   = store("<id>", compile(v));
@@ -47,12 +62,12 @@ Stat compile((Command) `if(<Expr cond >) { <Command* thenPart> } else { <Command
 Stat compile((Command) `while(<Expr cond>) { <Command* body> }`)
   = \while(compile(cond), compile(body));   
 
-Stat compile((Command) `<Exp e>;`) = \do(compile(e));
+Stat compile((Command) `<Expr e>;`) = \do(compile(e));
 
 
-Stat compile((Command) `return <Exp e>;`) = \return(compile(e));
+Stat compile((Command) `return <Expr e>;`) = \return(compile(e));
 
-Stat compile((Command) `print <Exp e>;`) = stdout(compile(e));
+Stat compile((Command) `print <Expr e>;`) = stdout(compile(e));
  
 Exp compile((Expr) `this`) = load("this");
   
@@ -79,7 +94,7 @@ Exp compile((Expr) `(<Expr e>)`) = compile(e);
 
 Exp compile((Expr) `<Id i>`) = load("<i>");
 
-Exp compile((Expr) `<Int i>`) = new(Int, toInt("<i>"));
+Exp compile((Expr) `<Int i>`) = new(Int, [integer()], [iconst(toInt("<i>"))]);
  
 Exp compile((Expr) `<String s>`) = new(Str, sconst("<s>"[1..-1]));
 
@@ -87,38 +102,38 @@ Exp compile((Expr) `<Expr a>[<Expr index>]`)
   = aload(getField(Arr, compile(a), array(Prototype), "array"),
           compile(index));
      
-Exp compile((Exp) `<Expr l> * <Expr r>`) 
+Exp compile((Expr) `<Expr l> * <Expr r>`) 
   = new(Int, compile(l, r, mul));
   
-Exp compile((Exp) `<Expr l> / <Expr r>`) 
+Exp compile((Expr) `<Expr l> / <Expr r>`) 
   = new(Int, compile(l, r, div));  
 
-Exp compile((Exp) `<Expr l> + <Expr r>`) 
+Exp compile((Expr) `<Expr l> + <Expr r>`) 
   = new(Int, compile(l, r, add));  
 
-Exp compile((Exp) `<Expr l> - <Expr r>`) 
+Exp compile((Expr) `<Expr l> - <Expr r>`) 
   = new(Int, compile(l, r, sub));  
 
 Exp compile(Expr l, Expr r, Exp (Exp, Exp) op) 
   = op(getField(Int, compile(l), integer(), "integer"),
        getField(Int, compile(r), integer(), "integer"));
 
-Exp compile((Exp) `<Expr l> == <Expr r>`) 
+Exp compile((Expr) `<Expr l> == <Expr r>`) 
   = equals(compile(l), compile(r));
  
-Exp compile((Exp) `<Expr l> != <Expr r>`) 
+Exp compile((Expr) `<Expr l> != <Expr r>`) 
   = neg(equals(compile(l), compile(r)));
 
-Exp compile((Exp) `<Expr l> \<= <Expr r>`) 
+Exp compile((Expr) `<Expr l> \<= <Expr r>`) 
   = compile(l, r, le);
   
-Exp compile((Exp) `<Expr l> \< <Expr r>`) 
+Exp compile((Expr) `<Expr l> \< <Expr r>`) 
   = compile(l, r, lt);
  
-Exp compile((Exp) `<Expr l> \> <Expr r>`) 
+Exp compile((Expr) `<Expr l> \> <Expr r>`) 
   = compile(l, r, gt);     
 
-Exp compile((Exp) `<Expr l> \>= <Expr r>`) 
+Exp compile((Expr) `<Expr l> \>= <Expr r>`) 
   = compile(l, r, ge);    
 
 list[Method] methods(Definition+ defs) 
@@ -154,7 +169,7 @@ list[Class] declareVariables(list[Class] classes)
       case method(desc, formals, block) => method(desc, formals, [*decls, *block])  
       when 
         // transform assignments to declarations and remove duplicates:
-        decls := { decl(Prototype, name) | /store(str name, _) := stats}
+        decls := { decl(Prototype, name) | /store(str name, _) := block}
   };
   
 Class removePrototypeClasses(Class main) = visit(main) {

@@ -11,7 +11,7 @@ syntax Command
   = assign: Assignable assign "=" Expr val ";"
   | \if: "if" "(" Expr cond ")"  "{" Command* thenPart "}" "else" "{" Command* elsePart "}"
   | \for: "while" "(" Expr cond ")" "{" Command* body "}" 
-  | exp: Exp e ";"
+  | exp: Expr e ";"
   | \return: "return" Expr e ";" 
   | print: "print" Expr e ";"
   ;
@@ -26,8 +26,8 @@ syntax Expr
   = "this"
   | send: Expr receiver "." Id name "(" {Expr ","}* args ")"
   | array: "{" {Expr ","}* "}"
-  | new: "new" Expr prototype?
-  | \extend: "new" Expr prototype? "{" Definition+ definitions "}" 
+  | new: "new" Expr? prototype
+  | \extend: "new" Expr? prototype "{" Definition+ definitions "}" 
   | bracket "(" Expr ")"
   | ref: Id id
   | \int: Int
@@ -46,8 +46,8 @@ syntax Definition
   | "missing" "(" Id name "," Id args ")" "{" Command* commands "}"
   ;  
    
-lexical Id = [A-Za-z][a-zA-Z0-9]+ \ "if" \ "new" \ "else" \ "while"  \ "return" \ "this" \ "missing";  
-lexical Int = [0-9]+;
+lexical Id     = ([A-Za-z][a-zA-Z0-9]+) \ "if" \ "new" \ "else" \ "while"  \ "return" \ "this" \ "missing";  
+lexical Int    = [0-9]+;
 lexical String = "\"" ![\"]* "\"";
 
 layout WS = [\t\n\r\ ]*;

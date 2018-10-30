@@ -2560,12 +2560,12 @@ public class ClassCompiler {
 		}
 
 		private IConstructor newInstanceExp(IConstructor exp) {
-			expressions(AST.$getArgs(exp));
 			IConstructor type = AST.$getClass(exp);
 			String cls = AST.$getRefClassFromType(type, classNode.name);
 			String desc = Signature.constructor(AST.$getDesc(exp));
 			method.visitTypeInsn(Opcodes.NEW, cls);
 			dup();
+			expressions(AST.$getArgs(exp));
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", desc, false);
 			return type;
 		}

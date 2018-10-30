@@ -165,7 +165,7 @@ list[Field] fields(Definition* defs)
   = [ field("<name>", val) | (Definition) `<Id name> = <Expr val>` <- defs];
 
 Method method(str name, {Id ","}* args, Command* commands)
-  = method(\public(), Prototype, name, [var(Prototype, "<a>") | a <- args], compile(block));
+  = method(\public(), Prototype, name, [var(Prototype, "<a>") | a <- args], compile(commands));
 
 Field field(str name, Expr val)
   = field(Prototype, name, init=compile(val));
@@ -184,5 +184,11 @@ Class removePrototypeClasses(Class main) = visit(main) {
 
 // lifts local class declarations at newInstance locations to the top:
 list[Class] extractPrototypeClasses(Class main) 
-  = [ class(object(name), methods=methods, fields=fields) 
+  = [ class(object(name), 
+         methods=[*methods, constructor(\public(), [var(Prototype, "proto")], [
+              invokeSuper([Prototype], [load("proto")])
+           ])
+         ], 
+         fields=fields
+      ) 
     | /prototype(str name, methods, fields) := main];

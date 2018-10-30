@@ -4,19 +4,20 @@ import lang::flybytes::Syntax;
 import lang::flybytes::Compiler;
 import lang::flybytes::demo::protol::Syntax;
 import lang::flybytes::api::Object;
+import lang::flybytes::api::System;
 import ParseTree;
 import String;
 
 
 void testProtol() {
   tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/fact.protol|).top;
-  compileProgram(tree, "FuncFactorial", |project://flybytes/generated|);
+  compileProgram(tree, "ProtolFactorial", |project://flybytes/generated|);
 }
 
 void compileProgram(Program p, str name, loc binFolder) {
   classes = compile(p, name);
   for (cl <- classes) {
-    compileClass(cl, binFolder + cl.\type.name, version=v1_8());
+    compileClass(cl, binFolder + "<cl.\type.name>.class", version=v1_8());
   }
 }
 
@@ -94,25 +95,27 @@ Exp compile((Expr) `(<Expr e>)`) = compile(e);
 
 Exp compile((Expr) `<Id i>`) = load("<i>");
 
-Exp compile((Expr) `<Int i>`) = new(Int, [integer()], [iconst(toInt("<i>"))]);
+Exp compile((Expr) `<Int i>`) = newInt(iconst(toInt("<i>")));
  
 Exp compile((Expr) `<String s>`) = new(Str, sconst("<s>"[1..-1]));
 
 Exp compile((Expr) `<Expr a>[<Expr index>]`) 
   = aload(getField(Arr, compile(a), array(Prototype), "array"),
           compile(index));
+  
+Exp newInt(Exp e) = new(Int, [integer()], [e]);
      
 Exp compile((Expr) `<Expr l> * <Expr r>`) 
-  = new(Int, compile(l, r, mul));
+  = newInt(compile(l, r, mul));
   
 Exp compile((Expr) `<Expr l> / <Expr r>`) 
-  = new(Int, compile(l, r, div));  
+  = newInt(compile(l, r, div));  
 
 Exp compile((Expr) `<Expr l> + <Expr r>`) 
-  = new(Int, compile(l, r, add));  
+  = newInt(compile(l, r, add));  
 
 Exp compile((Expr) `<Expr l> - <Expr r>`) 
-  = new(Int, compile(l, r, sub));  
+  = newInt(compile(l, r, sub));  
 
 Exp compile(Expr l, Expr r, Exp (Exp, Exp) op) 
   = op(getField(Int, compile(l), integer(), "integer"),

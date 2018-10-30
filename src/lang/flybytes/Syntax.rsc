@@ -377,7 +377,7 @@ BootstrapCall bootstrap(Type class, str name, list[CallSiteInfo] args)
                  [
                     object("java.lang.invoke.MethodHandlers.Lookup"),
                     string(),
-                    MethodType()
+                    object("java.lang.invoke.MethodType"),
                     *[callsiteInfoType(a) | a <- args]
                  ]),
        args);

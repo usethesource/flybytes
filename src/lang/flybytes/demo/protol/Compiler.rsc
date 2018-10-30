@@ -84,7 +84,7 @@ Stat compile((Command) `print <Expr e>;`) = stdout(compile(e));
 Exp compile((Expr) `this`) = load("this");
   
 Exp compile((Expr) `<Expr rec>.<Id name>(<{Expr ","}* args>)`)
-  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype | _ <- args] + [Prototype]), [compile(rec), *compile(args) ]);
+  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype]/*receiver*/ + [Prototype | _ <- args] ), [compile(rec), *compile(args) ]);
   
 list[Exp] compile({Expr ","}* args) = [compile(a) | a <- args];
    
@@ -131,8 +131,8 @@ Exp compile((Expr) `<Expr l> - <Expr r>`)
   = newInt(compile(l, r, sub));  
 
 Exp compile(Expr l, Expr r, Exp (Exp, Exp) op) 
-  = op(getField(Int, compile(l), integer(), "integer"),
-       getField(Int, compile(r), integer(), "integer"));
+  = op(getField(Int, checkcast(compile(l), Int), integer(), "integer"),
+       getField(Int, checkcast(compile(r), Int), integer(), "integer"));
 
 Exp compile((Expr) `<Expr l> == <Expr r>`) 
   = equals(compile(l), compile(r));

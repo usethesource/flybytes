@@ -1942,6 +1942,7 @@ public class ClassCompiler {
 		private IConstructor checkCastExp(IConstructor arg, IConstructor type) {
 			String cons = type.getConstructorType().getName();
 
+			expr(arg);
 			// weird inconsistency in CHECKCAST instruction?
 			if (cons == "object") {
 				method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type));

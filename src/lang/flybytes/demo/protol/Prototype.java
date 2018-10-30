@@ -43,6 +43,11 @@ public class Prototype {
 		  public Int(int i) {
 			  this.integer = i;
 		  }
+		  
+		  @Override
+		  public String toString() {
+			  return Integer.toString(integer);
+		  }
 	  }
 	  
 	  /** basic wrapper for builtin strings; everything in Protol _is_ an object prototype */
@@ -52,6 +57,11 @@ public class Prototype {
 		  public Str(String s) {
 			  this.string = s;
 		  }
+		  
+		  @Override
+		  public String toString() {
+			  return string;
+		  }
 	  }
 	  
 	  /** basic wrapper for builtin arrays; everything in Protol _is_ an object prototype */
@@ -60,6 +70,20 @@ public class Prototype {
 		  
 		  public Arr(Prototype[] array) {
 			  this.array = array;
+		  }
+		  
+		  @Override
+		  public String toString() {
+			  StringBuilder b = new StringBuilder();
+			  b.append("[\n");
+			  for (Prototype p : array) {
+				  b.append("\t");
+				  b.append(p.toString());
+				  b.append(",\n");
+			  }
+			  b.delete(b.length() - 2, b.length()); // remove last comma and newline
+			  b.append("]\n");
+			  return b.toString();
 		  }
 	  }
 	  

@@ -27,7 +27,7 @@ syntax Expr
   | send: Expr receiver "." Id name "(" {Expr ","}* args ")"
   | array: "[" {Expr ","}* "]"
   | new: "new" Expr? prototype
-  | \extend: "new" Expr? prototype "{" Definition+ definitions "}" 
+  | \extend: "new" Expr? prototype "{" Definition* definitions "}" 
   | bracket "(" Expr ")"
   | ref: Id id
   | \int: Int
@@ -50,4 +50,4 @@ lexical Id     = ([A-Za-z][a-zA-Z0-9]+) \ "if" \ "new" \ "else" \ "while"  \ "re
 lexical Int    = [0-9]+;
 lexical String = "\"" ![\"]* "\"";
 
-layout WS = [\t\n\r\ ]*;
+layout WS = [\t\n\r\ ]* !>> [\t\n\r\ ];

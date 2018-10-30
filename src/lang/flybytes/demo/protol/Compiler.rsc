@@ -7,6 +7,7 @@ import lang::flybytes::api::Object;
 import lang::flybytes::api::System;
 import ParseTree;
 import String;
+import util::UUID;
 
 
 void testProtol() {
@@ -26,9 +27,9 @@ void compileProgram(Program p, str name, loc binFolder) {
 // possible object in memory.
 
 Type Prototype = object("lang.flybytes.demo.protol.Prototype");
-Type Int       = object("lang.flybytes.demo.protol.Prototype.Int");
-Type Str       = object("lang.flybytes.demo.protol.Prototype.Str");
-Type Arr       = object("lang.flybytes.demo.protol.Prototype.Arr");
+Type Int       = object("lang.flybytes.demo.protol.Prototype$Int");
+Type Str       = object("lang.flybytes.demo.protol.Prototype$Str");
+Type Arr       = object("lang.flybytes.demo.protol.Prototype$Arr");
 
 // an intermediate representation for prototype classes
 data Type = prototype(str name, list[Method] methods, list[Field] fields);
@@ -36,7 +37,7 @@ data Type = prototype(str name, list[Method] methods, list[Field] fields);
 list[Class] compile(Program p, str name) { 
   progClass = class(object(name),
       methods=[
-        main("args", compile(p.commands))
+        main("args", [*compile(p.commands), \return()])
       ]
     );
  
@@ -74,6 +75,8 @@ Exp compile((Expr) `this`) = load("this");
   
 Exp compile((Expr) `<Expr rec>.<Id name>(<{Expr ","}* args>)`)
   = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype | _ <- args]), [compile(rec), *compile(args)]);
+  
+list[Exp] compile({Expr ","}* args) = [compile(a) | a <- args];
    
 Exp compile((Expr) `[<{Expr ","}* elems>]`)
   = new(Arr, array(Prototype), [newArray(Prototype, compile(args))]); 
@@ -85,10 +88,10 @@ Exp compile((Expr) `new`) = new(Prototype);
 
 Exp compile((Expr) `new <Expr p>`) = new(Prototype, [compile(p)]);
      
-Exp compile((Expr) `new { <Definition+ defs> }`)
+Exp compile((Expr) `new { <Definition* defs> }`)
   = new(prototype("<uuid()>", methods(defs), fields(defs)));
 
-Exp compile((Expr) `new <Expr p> { <Definition+ defs> }`) 
+Exp compile((Expr) `new <Expr p> { <Definition* defs> }`) 
   = new(prototype("<uuid()>", methods(defs), fields(defs)), [compile(p)]);
       
 Exp compile((Expr) `(<Expr e>)`) = compile(e); 
@@ -139,7 +142,7 @@ Exp compile((Expr) `<Expr l> \> <Expr r>`)
 Exp compile((Expr) `<Expr l> \>= <Expr r>`) 
   = compile(l, r, ge);    
 
-list[Method] methods(Definition+ defs) 
+list[Method] methods(Definition* defs) 
   = [ method("<name>", args, commands) 
     | (Definition) `<Id name>(<{Id ","}* args>) { <Command* commands> }` <- defs]
     +
@@ -158,7 +161,7 @@ Method setter(str name)
 {Id ","}* missingArgs(Id name, Id args)
   = ((Definition) `dummy(<Id name>, <Id args>) { }`).args;
   
-list[Field] fields(Definition+ defs)  
+list[Field] fields(Definition* defs)  
   = [ field("<name>", val) | (Definition) `<Id name> = <Expr val>` <- defs];
 
 Method method(str name, {Id ","}* args, Command* commands)
@@ -181,5 +184,5 @@ Class removePrototypeClasses(Class main) = visit(main) {
 
 // lifts local class declarations at newInstance locations to the top:
 list[Class] extractPrototypeClasses(Class main) 
-  = [ class(reference(name), methods=methods, fields=fields) 
+  = [ class(object(name), methods=methods, fields=fields) 
     | /prototype(str name, methods, fields) := main];

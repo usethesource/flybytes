@@ -121,6 +121,11 @@ public class Prototype {
 		  return name;
 	  }
 	  
+	  @Override
+	  public String toString() {
+		  return "{}";
+	  }
+	  
 	  /**
 	   * Bootstrap sets up _every_ method call via a dynamic finder method.
 	   */

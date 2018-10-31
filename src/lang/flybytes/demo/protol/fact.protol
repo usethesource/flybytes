@@ -10,4 +10,9 @@ math = new {
    }
 };
 
-print math.fact(6);
+test = new {
+  x = 1
+  y = 2
+};
+
+print test;

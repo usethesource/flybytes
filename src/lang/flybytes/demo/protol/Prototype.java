@@ -64,6 +64,15 @@ public class Prototype {
 			  this.string = s;
 		  }
 		  
+		  public Prototype concat(Prototype p) {
+			  if (p instanceof Str) {
+				  return new Str(string + ((Str) p).string);
+			  }
+			  else {
+				  return new Str(string + p.toString());
+			  }
+		  }
+		  
 		  @Override
 		  public String toString() {
 			  return "\"" + string + "\"";
@@ -165,6 +174,7 @@ public class Prototype {
 	    		target = lookup.findVirtual(receiverClass, callSite.methodName, type.dropParameterTypes(0, 1));
 	    		target = target.asType(type);
 	    		
+	    		// TODO: let the cache fail!
 	    		// if the cache fails, try to find the method again:
 //	    		target = MethodHandles.guardWithTest(
 //	    				TESTER, 

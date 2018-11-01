@@ -10,12 +10,30 @@ math = new {
   }
   
   missing(name, args) {
-    print name;
-    print args;
+    print "missing name: " << name;
+    print "missing args: " << args;
     return name;
   }
 };
 
 print math.fact(6);
+print math.fibo(8);
 
-print math.fibo(2,3);
+math2 = new math {
+  fibo(n) {
+     if (n == 0) {
+        return 0;
+     }
+     else { 
+        if (n <= 2) {
+          return 1;
+        }
+        else {
+          return this.fibo(n - 1) + this.fibo(n - 2);
+        }
+     } 
+  }
+};
+
+print math2.fibo(7);
+print math2.fac(7);

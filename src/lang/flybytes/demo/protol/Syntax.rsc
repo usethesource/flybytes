@@ -34,6 +34,7 @@ syntax Expr
   | \str: String
   | field: Expr receiver "." Id name
   > array: Expr array "[" Expr index "]"
+  > left  Expr "\<\<" Expr
   > left  (Expr "*" Expr | Expr "/" Expr)
   > left  (Expr "+" Expr | Expr "-" Expr )
   > right (Expr "==" Expr | Expr "!=" Expr)

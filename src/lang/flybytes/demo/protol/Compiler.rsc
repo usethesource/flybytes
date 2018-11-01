@@ -141,6 +141,9 @@ Exp compile((Expr) `<Expr l> == <Expr r>`)
 Exp compile((Expr) `<Expr l> != <Expr r>`) 
   = neg(equals(compile(l), compile(r)));
 
+Exp compile((Expr) `<Expr l> \<\< <Expr r>`)
+  = invokeVirtual(Str, compile(l), methodDesc(Prototype, "concat", [Prototype]), [compile(r)]);
+  
 Exp compile((Expr) `<Expr l> \<= <Expr r>`) 
   = compile(l, r, le);
   

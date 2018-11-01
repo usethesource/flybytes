@@ -13,6 +13,9 @@ import IO;
 void testProtol() {
   tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/fact.protol|).top;
   compileProgram(tree, "ProtolFactorial", |project://flybytes/generated|);
+  
+  tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/missing.protol|).top;
+  compileProgram(tree, "ProtolMissing", |project://flybytes/generated|);
 }
 
 int prototypes = 0;

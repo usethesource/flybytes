@@ -130,7 +130,7 @@ public class Prototype {
 	  public Prototype(Prototype prototype) throws CloneNotSupportedException {
 		  // inheritance creates a shallow clone of the template prototype, so 
 		  // the objects can continue to live and be updated independently
-		  this.prototype = (Prototype) prototype.clone();
+		  this.prototype = prototype; // (Prototype) prototype.clone();
 	  }
 	  
 	  public Prototype concat(Prototype p) {

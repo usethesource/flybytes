@@ -375,7 +375,7 @@ BootstrapCall bootstrap(Type class, str name, list[CallSiteInfo] args)
       methodDesc(object("java.lang.invoke.CallSite"),
                  name,
                  [
-                    object("java.lang.invoke.MethodHandles.Lookup"),
+                    object("java.lang.invoke.MethodHandles$Lookup"),
                     string(),
                     object("java.lang.invoke.MethodType"),
                     *[callsiteInfoType(a) | a <- args]
@@ -392,7 +392,7 @@ method to call.
 Method bootstrapMethod(BootstrapCall b, list[Stat] body)
   = method(b.desc, 
       [
-         var(object("java.lang.invoke.MethodHandles.Lookup"), "callerClass"),
+         var(object("java.lang.invoke.MethodHandles$Lookup"), "callerClass"),
          var(string(), "dynMethodName"),
          var(object("java.lang.invoke.MethodType"), "dynMethodType"),
          *[var(callsiteInfoType(args[i]), "info_<i>") | i <- index(args), csi <- args]

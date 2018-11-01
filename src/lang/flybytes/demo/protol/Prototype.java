@@ -7,6 +7,8 @@ import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.MutableCallSite;
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Inspired mainly by the JSR-292 cookbook by @headius, this class provides the 
@@ -180,7 +182,52 @@ public class Prototype {
 	  
 	  @Override
 	  public String toString() {
-		  return "{}";
+		  try {
+			  StringBuilder sb = new StringBuilder();
+			  sb.append("{");
+
+			  Map<String,Prototype> fields = new HashMap<>();
+			  collectFields(fields);
+
+			  if (!fields.isEmpty()) {
+				  sb.append("\n");
+			  }
+			  
+			  for (String key : fields.keySet()) {
+				  sb.append("  ");
+				  sb.append(key);
+				  sb.append(" = ");
+				  sb.append(fields.get(key).toString());
+				  sb.append("\n");
+			  }
+			 
+			  sb.append("}");
+			  if (!fields.isEmpty()) {
+				  sb.append("\n");
+			  }
+			  
+			  return sb.toString();
+		  } catch (IllegalArgumentException | IllegalAccessException e) {
+			  return "{}";
+		  } 
+	  }
+	  
+	  private int countFields() {
+		  return getClass().getFields().length + (prototype != null ? prototype.countFields() : 0);
+	  }
+	  
+	  private void collectFields(Map<String, Prototype> fields) throws IllegalArgumentException, IllegalAccessException {
+		  for (Field f : getClass().getFields()) {
+			  if (!f.getName().equals("prototype") && !f.getName().equals("PROTO")) {
+				  if (!fields.containsKey(f.getName())) {
+					  fields.put(f.getName(), (Prototype) f.get(this));
+				  }
+			  }
+		  }
+
+		  if (prototype != null) {
+			  prototype.collectFields(fields);
+		  }
 	  }
 	  
 	  @Override
@@ -189,33 +236,25 @@ public class Prototype {
 			  return false;
 		  }
 		  
-		  Field[] fields = getClass().getFields();
-		  Field[] otherFields = obj.getClass().getFields();
-		
-		  if (fields.length != otherFields.length) {
+		  if (countFields() != ((Prototype) obj).countFields()) {
 			  return false;
 		  }
 		  
 		  try {
-			  OUTER:for (int i = 0; i < fields.length; i++) {
-				  for (int j = 0; i < otherFields.length; i++) {
-					  if (fields[i].getName().equals(otherFields[j].getName())) {
-						  if (!fields[i].get(this).equals(otherFields[j].get(obj))) {
-							  // names match but content does not
-							  return false;
-						  }
-						  else {
-							  // name matches and content matches
-							  continue OUTER;
-						  }
-					  }
+			  Map<String, Prototype> fields = new HashMap<>();
+			  collectFields(fields);
+			  Map<String, Prototype>  otherFields = new HashMap<>();
+			  ((Prototype) obj).collectFields(otherFields);
+		
+			  for (String key : fields.keySet()) {
+				  if (!otherFields.containsKey(key)) {
+					  return false;
 				  }
-				  
-				  // no mathing field name
-				  return false;
+				  else if (!fields.get(key).equals(otherFields.get(key))) {
+					  return false;
+				  }
 			  }
-		  
-		      // no unmatching fields found
+			  
 		      return true;
 		  } catch (IllegalArgumentException | IllegalAccessException e) {
 			  return false;

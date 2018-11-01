@@ -19,6 +19,9 @@ void testProtol() {
   
   tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/missing.protol|).top;
   compileProgram(tree, "ProtolMissing", |project://flybytes/generated|);
+  
+  tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/fields.protol|).top;
+  compileProgram(tree, "ProtolFields", |project://flybytes/generated|);
 }
 
 private int prototypes = 0;
@@ -189,7 +192,7 @@ Method method(str name, {Id ","}* args, Command* commands)
   = method(\public(), Prototype, name, [var(Prototype, "<a>") | a <- args], compile(commands));
 
 Field field(str name, Expr val)
-  = field(Prototype, name, init=compile(val));
+  = field(Prototype, name, init=compile(val), modifiers={\public()});
    
 &T declareVariables(&T classes) 
   = visit(classes) {
@@ -219,19 +222,6 @@ list[Class] extractPrototypeClasses(Class main)
            constructor(\public(), [var(Prototype, "proto")], [
               invokeSuper([Prototype], [load("proto")]),
               \return()
-           ]),
-           // public String toString() { StringBuilder sb = new StringBuilder(); ...; return sb.toString(); }
-           method(\public(), string(), "toString", [], [
-              decl(object("java.lang.StringBuilder"), "sb", init=new(object("java.lang.StringBuilder"))),
-              appendString(sconst("{\n")),
-              *[  appendString(sconst("  ")), 
-                  appendString(sconst(f.name)), 
-                  appendString(sconst(" = ")), 
-                  appendObject(getField(Prototype, f.name)), 
-                  appendString(sconst("\n")) 
-               | f <- fs],
-              appendString(sconst("}")),
-              \return(toString(load("sb")))
            ])
          ], 
          fields=fs

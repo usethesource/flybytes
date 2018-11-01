@@ -6,7 +6,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.MutableCallSite;
-import java.util.Arrays;
 
 /**
  * Inspired mainly by the JSR-292 cookbook by @headius, this class provides the 

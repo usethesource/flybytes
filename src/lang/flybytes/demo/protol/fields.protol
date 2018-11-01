@@ -1,0 +1,35 @@
+
+person1 = new {
+  firstName = "John"
+  lastName  = "Doe"
+};
+
+person2 = new {
+  firstName = "John"
+  lastName  = "Doe"
+};
+
+if (person1 == person2) {
+  print "they are the same indeed: " << person1 << " and " << person2;
+}
+else {
+  print "nope";
+}
+
+print "changing a name";
+
+person3 = new person1 {
+  firstName = "Jane"
+};
+
+print "new person: " << person3;
+print "old person: " << person1;
+
+if (person1 == person3) {
+  print "the new person should not be the same as the old person?!?!";
+}
+else {
+  print "right, the person with the new first name is now different";
+}
+
+

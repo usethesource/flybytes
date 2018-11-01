@@ -20,6 +20,7 @@ import java.util.Arrays;
  * lead to a dynamically computed binding. 
  */
 public class Prototype {
+	  public static final Prototype PROTO = new Prototype();
 	  private static final Lookup lookup = MethodHandles.lookup();
 	  private static class ProtoCallSite extends MutableCallSite {
 		  final String methodName;
@@ -41,6 +42,7 @@ public class Prototype {
 		  public int integer;
 		  
 		  public Int(int i) {
+			  this.prototype = PROTO;
 			  this.integer = i;
 		  }
 		  
@@ -59,6 +61,7 @@ public class Prototype {
 		  public String string;
 		  
 		  public Str(String s) {
+			  this.prototype = PROTO;
 			  this.string = s;
 		  }
 		  
@@ -73,6 +76,7 @@ public class Prototype {
 		  public Prototype[] array;
 		  
 		  public Arr(Prototype[] array) {
+			  this.prototype = PROTO;
 			  this.array = array;
 		  }
 		  
@@ -103,7 +107,7 @@ public class Prototype {
 	  }
 	  
 	  /** the object this object inherited from at allocation time */
-	  public final Prototype prototype;
+	  public Prototype prototype;
 	  
 	  public Prototype() {
 		  this.prototype = null;
@@ -120,7 +124,7 @@ public class Prototype {
 		  this.prototype = (Prototype) prototype.clone();
 	  }
 	  
-	  public Prototype missing(Str name, Arr args) {
+	  public Prototype missing(Prototype name, Prototype args) {
 		  System.err.println("missed " + name + "!");
 		  return name;
 	  }
@@ -139,7 +143,7 @@ public class Prototype {
 		  MethodHandle findMethod = FINDER.bindTo(callSite);
 		  findMethod = findMethod.asCollector(Object[].class, type.parameterCount());
 		  findMethod = findMethod.asType(type);
-
+		  
 		  callSite.setTarget(findMethod);
 		  return callSite;
 	  }
@@ -151,22 +155,27 @@ public class Prototype {
 	   */
 	  public static Object finder(ProtoCallSite callSite, Object[] args) throws Throwable {
 		Prototype receiver = (Prototype) args[0];
-		Class<?> receiverClass = receiver.getClass();
 	    MethodType type = callSite.type();
 	    MethodHandle target;
 	    
 	    while (receiver != null) {
+	    	Class<?> receiverClass = receiver.getClass();
+	    	
 	    	try {
 	    		// happy path: we just call a method in the receiver class
 	    		target = lookup.findVirtual(receiverClass, callSite.methodName, type.dropParameterTypes(0, 1));
 	    		target = target.asType(type);
 	    		
+	    		// if the cache fails, try to find the method again:
+//	    		target = MethodHandles.guardWithTest(
+//	    				TESTER, 
+//	    				target, 
+//	    				FINDER
+//	    				);
+	    		
 	    		// cache the target
 	    		callSite.setTarget(target);
 	    		callSite.setObject(receiver);
-
-	    		// if the cache fails, try to find the method again:
-	    		target = MethodHandles.guardWithTest(TESTER, target, FINDER);
 	    		
 	    		return target.invokeWithArguments(args);
 	    	}
@@ -174,17 +183,20 @@ public class Prototype {
 	    		// common enough, we don't actually find the method in the receiver!
 	    		// so we look in its prototype, and try again:
 	    		receiver = receiver.prototype;
-	    		receiverClass = receiver.getClass();
 	    	}
 	    }
 	    
 	    // try again with method_missing:
 	    receiver = (Prototype) args[0];
-	    receiverClass = receiver.getClass();
+	    
 	    
 	    while (receiver != null) {
+	    	Class<?> receiverClass = receiver.getClass();
+	    	
 	    	try {
-	    		target = lookup.findVirtual(receiverClass, "method", type);
+	    		MethodType missingType = MethodType.methodType(Prototype.class, Prototype.class, Prototype.class);
+				target = lookup.findVirtual(receiverClass, "missing", missingType);
+				target = target.asType(missingType);
 	    		callSite.setTarget(target);
 	    		callSite.setObject(receiver);
 	    		Prototype[] newArgs = Arrays.copyOf(args, args.length, Prototype[].class);
@@ -192,7 +204,6 @@ public class Prototype {
 	    	}
 	    	catch (NoSuchMethodException e) {
 	    		receiver = receiver.prototype;
-	    		receiverClass = receiver.getClass();
 	    	}
 	    }
 	    

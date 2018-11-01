@@ -65,6 +65,7 @@ Stat compile((Command) `<Id id> = <Expr v>;`)
 Stat compile((Command) `<Expr obj>.<Id name> = <Expr v>;`)
   = \do(invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "$set_<name>", [Prototype]), [compile(obj), compile(v)])); 
 
+Exp PROTO() = getStatic(Prototype, Prototype, "PROTO");
   
 Stat compile((Command) `<Expr array>[<Expr index>] = <Expr v>;`)
   = astore(compile(array), getField(Str, compile(index), integer(), "integer"), compile(v));
@@ -94,15 +95,15 @@ Exp compile((Expr) `[<{Expr ","}* elems>]`)
 Exp compile((Expr) `<Expr receiver>.<Id name>`)
   = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "$get_<name>", []), []);
   
-Exp compile((Expr) `new`) = new(Prototype);
+Exp compile((Expr) `new`) = new(Prototype, [Prototype], [PROTO()]);
 
-Exp compile((Expr) `new <Expr p>`) = new(Prototype, [compile(p)]);
+Exp compile((Expr) `new <Expr p>`) = new(Prototype, [Prototype], [compile(p)]);
      
 Exp compile((Expr) `new { <Definition* defs> }`)
-  = new(prototype(protoClass(), methods(defs), fields(defs)));
+  = new(prototype(protoClass(), methods(defs), fields(defs)), [Prototype], [PROTO()]);
 
 Exp compile((Expr) `new <Expr p> { <Definition* defs> }`) 
-  = new(prototype(protoClass(), methods(defs), fields(defs)), [compile(p)]);
+  = new(prototype(protoClass(), methods(defs), fields(defs)), [Prototype], [compile(p)]);
       
 Exp compile((Expr) `(<Expr e>)`) = compile(e); 
 

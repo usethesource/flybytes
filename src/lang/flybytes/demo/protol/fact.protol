@@ -1,18 +1,15 @@
 
 math = new {
-   fact(n) {
-     if (n <= 1) {
-       return 1;
-     }
-     else {
-       return n * this.fact(n - 1);
-     }
-   }
+  fact(n) {
+    if (n <= 1) {
+      return 1;
+    }
+    else {
+      return n * this.fact(n - 1);
+    }
+  }
 };
 
-test = new {
-  x = 1
-  y = 2
-};
+print math.fact(6);
 
-print test;
+print math.fibo(2,3);

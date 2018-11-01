@@ -1945,7 +1945,7 @@ public class ClassCompiler {
 			expr(arg);
 			// weird inconsistency in CHECKCAST instruction?
 			if (cons == "object") {
-				method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type));
+				method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type).replace('.','/'));
 			}
 			else if (cons == "array") {
 				method.visitTypeInsn(Opcodes.CHECKCAST, Signature.type(type));

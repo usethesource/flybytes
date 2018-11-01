@@ -85,12 +85,12 @@ public class Prototype {
 			  StringBuilder b = new StringBuilder();
 			  b.append("[\n");
 			  for (Prototype p : array) {
-				  b.append("\t");
+				  b.append("  ");
 				  b.append(p.toString());
 				  b.append(",\n");
 			  }
 			  b.delete(b.length() - 2, b.length()); // remove last comma and newline
-			  b.append("]\n");
+			  b.append("\n]\n");
 			  return b.toString();
 		  }
 	  }
@@ -188,19 +188,19 @@ public class Prototype {
 	    
 	    // try again with method_missing:
 	    receiver = (Prototype) args[0];
-	    
-	    
+
 	    while (receiver != null) {
 	    	Class<?> receiverClass = receiver.getClass();
 	    	
 	    	try {
 	    		MethodType missingType = MethodType.methodType(Prototype.class, Prototype.class, Prototype.class);
 				target = lookup.findVirtual(receiverClass, "missing", missingType);
-				target = target.asType(missingType);
-	    		callSite.setTarget(target);
-	    		callSite.setObject(receiver);
-	    		Prototype[] newArgs = Arrays.copyOf(args, args.length, Prototype[].class);
-	    		return target.invoke(new Str(callSite.methodName), new Arr(newArgs));
+				target = target.bindTo(receiver);
+				target = MethodHandles.insertArguments(target, 0, new Str(callSite.methodName));
+	    		
+	    		Prototype[] newArgs = new Prototype[args.length - 1];
+	    		System.arraycopy(args, 1, newArgs, 0, args.length - 1);
+	    		return target.invoke(new Arr(newArgs));
 	    	}
 	    	catch (NoSuchMethodException e) {
 	    		receiver = receiver.prototype;

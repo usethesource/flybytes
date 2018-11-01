@@ -8,6 +8,12 @@ math = new {
       return n * this.fact(n - 1);
     }
   }
+  
+  missing(name, args) {
+    print name;
+    print args;
+    return name;
+  }
 };
 
 print math.fact(6);

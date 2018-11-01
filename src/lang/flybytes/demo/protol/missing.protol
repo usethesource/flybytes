@@ -1,14 +1,20 @@
 
 math = new {
-  f() {
-    return 1;
+  twice(n) {
+    return 2 * n;
+  }
+  
+  missing(name, args) {
+    if (name == "add") {
+      return args[0] + args[1];
+    }
+    else {
+      return "we are missing this method: " << name << " for args " << args;
+    }
   }
 };
 
-math2 = new math {
-  g() {
-    return 2;
-  }
-};
+print "sub(2,1) is missing a priori, see: " << math.sub(2,1);
+print "add(1,2) is picked up by the missing method method: " << math.add(1,2);
+print "twice(2) is simply not missing: " << math.twice(2);
 
-print math2.f();

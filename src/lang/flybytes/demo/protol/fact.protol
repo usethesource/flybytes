@@ -10,14 +10,21 @@ math = new {
   }
   
   missing(name, args) {
-    print "missing name: " << name;
-    print "missing args: " << args;
-    return name;
+    if (name == "add") {
+      print "adding: " << args[0] << " and " << args[1];
+      return args[0] + args[1];
+    }
+    else {
+      print "missing name: " << name;
+      print "missing args: " << args;
+      return name;
+    }
   }
 };
 
 print math.fact(6);
 print math.fibo(8);
+print math.add(1,2);
 
 math2 = new math {
   fibo(n) {

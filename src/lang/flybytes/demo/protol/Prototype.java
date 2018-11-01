@@ -64,18 +64,19 @@ public class Prototype {
 			  this.string = s;
 		  }
 		  
-		  public Prototype concat(Prototype p) {
-			  if (p instanceof Str) {
-				  return new Str(string + ((Str) p).string);
-			  }
-			  else {
-				  return new Str(string + p.toString());
-			  }
-		  }
+		 
 		  
 		  @Override
 		  public String toString() {
-			  return "\"" + string + "\"";
+			  return string;
+		  }
+
+		  @Override
+		  public boolean equals(Object obj) {
+			  if (obj instanceof Str) {
+				  return ((Str) obj).string.equals(string);
+			  }
+			  return false;
 		  }
 	  }
 	  
@@ -130,6 +131,10 @@ public class Prototype {
 		  // inheritance creates a shallow clone of the template prototype, so 
 		  // the objects can continue to live and be updated independently
 		  this.prototype = (Prototype) prototype.clone();
+	  }
+	  
+	  public Prototype concat(Prototype p) {
+		  return new Str(toString().concat(p.toString()));
 	  }
 	  
 	  public Prototype missing(Prototype name, Prototype args) {

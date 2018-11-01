@@ -113,8 +113,8 @@ Exp compile((Expr) `<Int i>`) = newInt(iconst(toInt("<i>")));
 Exp compile((Expr) `<String s>`) = new(Str, [string()], [sconst("<s>"[1..-1])]);
 
 Exp compile((Expr) `<Expr a>[<Expr index>]`) 
-  = aload(getField(Arr, compile(a), array(Prototype), "array"),
-          compile(index));
+  = aload(getField(Arr, checkcast(compile(a), Arr), array(Prototype), "array"),
+          getField(Int, checkcast(compile(index), Int), integer(), "integer"));
   
 Exp newInt(Exp e) = new(Int, [integer()], [e]);
      
@@ -141,7 +141,7 @@ Exp compile((Expr) `<Expr l> != <Expr r>`)
   = neg(equals(compile(l), compile(r)));
 
 Exp compile((Expr) `<Expr l> \<\< <Expr r>`)
-  = invokeVirtual(Str, compile(l), methodDesc(Prototype, "concat", [Prototype]), [compile(r)]);
+  = invokeVirtual(Prototype, compile(l), methodDesc(Prototype, "concat", [Prototype]), [compile(r)]);
   
 Exp compile((Expr) `<Expr l> \<= <Expr r>`) 
   = compile(l, r, le);

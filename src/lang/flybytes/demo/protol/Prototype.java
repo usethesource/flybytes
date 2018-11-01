@@ -48,6 +48,10 @@ public class Prototype {
 		  public String toString() {
 			  return Integer.toString(integer);
 		  }
+		  
+		  public int $get_integer() {
+			  return integer;
+		  }
 	  }
 	  
 	  /** basic wrapper for builtin strings; everything in Protol _is_ an object prototype */
@@ -60,7 +64,7 @@ public class Prototype {
 		  
 		  @Override
 		  public String toString() {
-			  return string;
+			  return "\"" + string + "\"";
 		  }
 	  }
 	  

@@ -110,7 +110,7 @@ Exp compile((Expr) `<Id i>`) = load("<i>");
 
 Exp compile((Expr) `<Int i>`) = newInt(iconst(toInt("<i>")));
  
-Exp compile((Expr) `<String s>`) = new(Str, sconst("<s>"[1..-1]));
+Exp compile((Expr) `<String s>`) = new(Str, [string()], [sconst("<s>"[1..-1])]);
 
 Exp compile((Expr) `<Expr a>[<Expr index>]`) 
   = aload(getField(Arr, compile(a), array(Prototype), "array"),
@@ -195,7 +195,7 @@ Class removePrototypeClasses(Class main) = visit(main) {
 
 private Stat appendString(Exp s)
   = \do(invokeVirtual(object("java.lang.StringBuilder"), load("sb"), 
-           methodDesc(\void(), "append", [string()]), [s]));
+           methodDesc(object("java.lang.StringBuilder"), "append", [string()]), [s]));
            
 private Stat appendObject(Exp e) = appendString(toString(e));
 
@@ -212,8 +212,8 @@ list[Class] extractPrototypeClasses(Class main)
            // public String toString() { StringBuilder sb = new StringBuilder(); ...; return sb.toString(); }
            method(\public(), string(), "toString", [], [
               decl(object("java.lang.StringBuilder"), "sb", init=new(object("java.lang.StringBuilder"))),
-              appendString(sconst("{")),
-              *[  appendString(sconst("\t")), 
+              appendString(sconst("{\n")),
+              *[  appendString(sconst("  ")), 
                   appendString(sconst(f.name)), 
                   appendString(sconst(" = ")), 
                   appendObject(getField(Prototype, f.name)), 

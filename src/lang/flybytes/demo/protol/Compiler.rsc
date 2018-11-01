@@ -207,12 +207,6 @@ Class removePrototypeClasses(Class main) = visit(main) {
   case prototype(n, _, _) => object(n)
 };
 
-private Stat appendString(Exp s)
-  = \do(invokeVirtual(object("java.lang.StringBuilder"), load("sb"), 
-           methodDesc(object("java.lang.StringBuilder"), "append", [string()]), [s]));
-           
-private Stat appendObject(Exp e) = appendString(toString(e));
-
 // lifts local class declarations at newInstance locations to the top:
 list[Class] extractPrototypeClasses(Class main) 
   = [ class(object(name),

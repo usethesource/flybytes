@@ -51,7 +51,6 @@ list[Class] compile(Program p, str name) {
       ]
     );
  
-  iprintln(declareVariables(removePrototypeClasses(progClass)));
   allClasses = [removePrototypeClasses(progClass), *extractPrototypeClasses(progClass)];
 
   return declareVariables(allClasses);  

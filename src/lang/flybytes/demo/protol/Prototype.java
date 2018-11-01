@@ -206,7 +206,6 @@ public class Prototype {
 				target = lookup.findVirtual(receiverClass, "missing", missingType);
 				target = target.bindTo(receiver);
 				target = MethodHandles.insertArguments(target, 0, new Str(callSite.methodName));
-	    		
 	    		Prototype[] newArgs = new Prototype[args.length - 1];
 	    		System.arraycopy(args, 1, newArgs, 0, args.length - 1);
 	    		return target.invoke(new Arr(newArgs));

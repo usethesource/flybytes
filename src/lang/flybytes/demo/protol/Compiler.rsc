@@ -14,20 +14,25 @@ void testProtol() {
   tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/fact.protol|).top;
   compileProgram(tree, "ProtolFactorial", |project://flybytes/generated|);
   
+  tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/inheritance.protol|).top;
+  compileProgram(tree, "ProtolInheritance", |project://flybytes/generated|);
+  
   tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/missing.protol|).top;
   compileProgram(tree, "ProtolMissing", |project://flybytes/generated|);
 }
 
-int prototypes = 0;
+private int prototypes = 0;
+private str program = "Program";
 
 str protoClass() {
-  res = "Proto_<prototypes>";
+  res = "Proto_<program>_<prototypes>";
   prototypes += 1;
   return res;
 }
 
 void compileProgram(Program p, str name, loc binFolder) {
   prototypes = 0;
+  program = name;
   
   classes = compile(p, name);
   for (cl <- classes) {

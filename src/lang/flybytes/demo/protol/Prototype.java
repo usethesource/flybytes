@@ -316,6 +316,10 @@ public class Prototype {
 	    		// match the target method with the new method type
 	    		target = target.asType(type);
 	    		
+	    		// if the cache fails, try to find the method again, recursively.
+	    		// for this we rebind the finder method and a tester method (which simply
+	    		// looks if the receiver is still the same), and
+	    		// then we wrap the method we've found with a guardWithTest:
 	    		MethodHandle findMethod = FINDER.bindTo(callSite);
 	    		findMethod = findMethod.asCollector(Prototype[].class, type.parameterCount());
 	    		findMethod = findMethod.asType(type);
@@ -323,7 +327,6 @@ public class Prototype {
 	    		MethodHandle testMethod = TESTER.bindTo(callSite);
 	    		testMethod = testMethod.asCollector(Prototype[].class, type.parameterCount());
 	   		  
-	    		// if the cache fails, try to find the method again, recursively:
 	    		MethodHandle cond = MethodHandles.guardWithTest(
 	    				testMethod, 
 	    				target, 

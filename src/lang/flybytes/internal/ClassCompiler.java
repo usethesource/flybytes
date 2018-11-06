@@ -2609,11 +2609,12 @@ public class ClassCompiler {
 			Handle bootstrapper = bootstrapHandler(handler);
 			Object[] bArgs = bootstrapArgs(handler);
 
-			// push arguments to the method on the stack
+			// push arguments to the method on the stack, (including the receiver, if its not a static method)
 			expressions(args);
-
+            
 			// invoke the dynamic handle (and registeres it as side-effect using the bootstrap method)
 			method.visitInvokeDynamicInsn(name, Signature.method(sig), bootstrapper, bArgs);
+			
 			return AST.$getReturn(sig);
 		}
 

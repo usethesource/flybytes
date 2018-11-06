@@ -226,6 +226,8 @@ data Exp(loc src = |unknown:///|)
     invokeSuper(Signature desc, list[Exp] args)
     
   | /* Generate a call site using a static "bootstrap" method, cache it and invoke it */
+    /* NB: the first type in `desc` must be the receiver type if the method is not static,
+     * and the first argument in `args` is then also the receiver itself */
     invokeDynamic(BootstrapCall handle, Signature desc, list[Exp] args)
       
   | newInstance(Type class, Signature desc, list[Exp] args)

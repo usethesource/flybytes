@@ -16,8 +16,7 @@ i = 0;
 inputs = [6,7,8];
 
 while (i < 3) {
-  // here every call to `fact` invalidates the receiver cache and a dynamic lookup is done
-  // every iteration of the loop:
+  //  // here every call to `fact` is to the same object, so the cache is reused in every iteration of the loop but the first:
   print i << ":fact(" << inputs[i] << ") = " << math.fact(inputs[i]);
   i = i + 1;
 }

@@ -11,3 +11,12 @@ math = new {
 };
 
 print "fact(6) = " << math.fact(6);
+
+six = new 6 {
+  fact(math) {
+    return math.fact(this);
+  }
+};
+
+print "6.fact(math) = " << six.fact(math);
+

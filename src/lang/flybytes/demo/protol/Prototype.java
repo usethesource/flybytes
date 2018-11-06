@@ -42,6 +42,7 @@ public class Prototype {
 		  public void setObject(Prototype object) {
 			this.receiver = object;
 		  }
+		  
 	  }
 	  
 	  /** basic wrapper for builtin ints; everything in Protol _is_ an object prototype */
@@ -104,6 +105,10 @@ public class Prototype {
 		  public Arr(Prototype[] array) {
 			  this.prototype = PROTO;
 			  this.array = array;
+		  }
+		  
+		  public Prototype[] $get_array() {
+			  return array;
 		  }
 		  
 		  @Override
@@ -220,7 +225,19 @@ public class Prototype {
 		  for (Field f : getClass().getFields()) {
 			  if (!f.getName().equals("prototype") && !f.getName().equals("PROTO")) {
 				  if (!fields.containsKey(f.getName())) {
-					  fields.put(f.getName(), (Prototype) f.get(this));
+					  Object object = f.get(this);
+					  if (object instanceof Prototype) {
+						  fields.put(f.getName(), (Prototype) object);
+					  }
+					  else if (object instanceof Integer) {
+						  fields.put(f.getName(), new Int((int) object));
+					  }
+					  else if (object instanceof String) {
+						  fields.put(f.getName(), new Str((String) object));
+					  }
+					  else if (object instanceof Prototype[]) {
+						  fields.put(f.getName(), new Arr((Prototype[]) object));
+					  }
 				  }
 			  }
 		  }
@@ -270,6 +287,7 @@ public class Prototype {
 		  MethodHandle findMethod = FINDER.bindTo(callSite);
 		  findMethod = findMethod.asCollector(Object[].class, type.parameterCount());
 		  findMethod = findMethod.asType(type);
+		
 		  
 		  callSite.setTarget(findMethod);
 		  return callSite;
@@ -285,6 +303,7 @@ public class Prototype {
 		Prototype original = receiver;
 	    MethodType type = callSite.type();
 	    MethodHandle target;
+	    int counter = 0;
 	    
 	    while (receiver != null) {
 	    	Class<?> receiverClass = receiver.getClass();
@@ -297,18 +316,23 @@ public class Prototype {
 	    		// match the target method with the new method type
 	    		target = target.asType(type);
 	    		
-	    		// TODO: let the cache fail!
-	    		// if the cache fails, try to find the method again:
-//	    		target = MethodHandles.guardWithTest(
-//	    				TESTER, 
-//	    				target, 
-//	    				FINDER
-//	    				);
+	    		MethodHandle findMethod = FINDER.bindTo(callSite);
+	    		findMethod = findMethod.asCollector(Prototype[].class, type.parameterCount());
+	    		findMethod = findMethod.asType(type);
 	    		
+	    		MethodHandle testMethod = TESTER.bindTo(callSite);
+	    		testMethod = testMethod.asCollector(Prototype[].class, type.parameterCount());
+	   		  
+	    		// if the cache fails, try to find the method again, recursively:
+	    		MethodHandle cond = MethodHandles.guardWithTest(
+	    				testMethod, 
+	    				target, 
+	    				findMethod
+	    				);
+	  		  
 	    		// cache the target
-	    		callSite.setTarget(target);
+	    		callSite.setTarget(cond);
 	    		callSite.setObject(receiver);
-	    		
 	    		return target.invokeWithArguments(args);
 	    	}
 	    	catch (NoSuchMethodException e) {

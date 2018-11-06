@@ -52,6 +52,12 @@ Type Int       = object("lang.flybytes.demo.protol.Prototype$Int");
 Type Str       = object("lang.flybytes.demo.protol.Prototype$Str");
 Type Arr       = object("lang.flybytes.demo.protol.Prototype$Arr");
 
+Signature Prototype_getInteger = methodDesc(integer(), "$get_integer", [Prototype]);
+Signature Prototype_getArray = methodDesc(array(Prototype), "$get_array", [Prototype]);
+
+Exp getInt(Exp rec) = invokeDynamic(bootstrap(Prototype, "bootstrap", []), Prototype_getInteger, [rec]);
+Exp getArray(Exp rec) = invokeDynamic(bootstrap(Prototype, "bootstrap", []), Prototype_getArray, [rec]);
+
 // an intermediate representation for prototype classes
 data Type = prototype(str name, list[Method] methods, list[Field] fields);
 
@@ -78,7 +84,7 @@ Stat compile((Command) `<Expr obj>.<Id name> = <Expr v>;`)
 Exp PROTO() = getStatic(Prototype, Prototype, "PROTO");
   
 Stat compile((Command) `<Expr array>[<Expr index>] = <Expr v>;`)
-  = astore(compile(array), getField(Str, compile(index), integer(), "integer"), compile(v));
+  = astore(compile(array), getInt(compile(index)), compile(v));
 
 Stat compile((Command) `if(<Expr cond >) { <Command* thenPart> } else { <Command* elsePart> }`)
   = \if(compile(cond), compile(thenPart), compile(elsePart));
@@ -124,11 +130,13 @@ Exp compile((Expr) `<Int i>`) = newInt(iconst(toInt("<i>")));
 Exp compile((Expr) `<String s>`) = new(Str, [string()], [sconst("<s>"[1..-1])]);
 
 Exp compile((Expr) `<Expr a>[<Expr index>]`) 
-  = aload(getField(Arr, checkcast(compile(a), Arr), array(Prototype), "array"),
-          getField(Int, checkcast(compile(index), Int), integer(), "integer"));
+  = aload(getArray(compile(a)), getInt(compile(index)));
   
 Exp newInt(Exp e) = new(Int, [integer()], [e]);
-     
+
+Exp compile(Expr l, Expr r, Exp (Exp, Exp) op) 
+  = op(getInt(compile(l)), getInt(compile(r)));
+       
 Exp compile((Expr) `<Expr l> * <Expr r>`) 
   = newInt(compile(l, r, mul));
   
@@ -140,10 +148,6 @@ Exp compile((Expr) `<Expr l> + <Expr r>`)
 
 Exp compile((Expr) `<Expr l> - <Expr r>`) 
   = newInt(compile(l, r, sub));  
-
-Exp compile(Expr l, Expr r, Exp (Exp, Exp) op) 
-  = op(getField(Int, checkcast(compile(l), Int), integer(), "integer"),
-       getField(Int, checkcast(compile(r), Int), integer(), "integer"));
 
 Exp compile((Expr) `<Expr l> == <Expr r>`) 
   = equals(compile(l), compile(r));

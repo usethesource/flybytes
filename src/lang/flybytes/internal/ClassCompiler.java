@@ -2003,8 +2003,8 @@ public class ClassCompiler {
 					(d) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_DOUBLE) ,
 					(j) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_LONG) , 
 					(v) -> { throw new IllegalArgumentException("void array"); }, 
-					(c) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type))), 
-					(a) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$string(AST.$getArg(type))),
+					(c) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$getRefClassFromType(type, classNode.name)), 
+					(a) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$getRefClassFromType(type, classNode.name)),
 					(S) -> method.visitTypeInsn(Opcodes.ANEWARRAY, Signature.stringType)
 					);
 		}

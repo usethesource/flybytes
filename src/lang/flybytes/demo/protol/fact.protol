@@ -12,11 +12,19 @@ math = new {
 
 print "fact(6) = " << math.fact(6);
 
-six = new 6 {
-  fact(math) {
-    return math.fact(this);
-  }
-};
+i = 0;
+inputs = [6,7,8];
 
-print "6.fact(math) = " << six.fact(math);
+while (i < 3) {
+  x = new inputs[i] {
+    fact(math) {
+      return math.fact(this);
+    }
+  };
+   
+  print x << ".fact(math) = " << x.fact(math);
+
+  i = i + 1;
+}
+
 

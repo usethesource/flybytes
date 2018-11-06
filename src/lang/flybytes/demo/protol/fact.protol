@@ -10,10 +10,15 @@ math = new {
   }
 };
 
-print "fact(6) = " << math.fact(6);
-
 i = 0;
 inputs = [6,7,8];
+
+while (i < 3) {
+  print i << ":fact(" << inputs[i] << ") = " << math.fact(inputs[i]);
+  i = i + 1;
+}
+
+i = 0;
 
 while (i < 3) {
   x = new inputs[i] {

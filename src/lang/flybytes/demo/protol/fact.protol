@@ -5,6 +5,8 @@ math = new {
       return 1;
     }
     else {
+      // this recursive call will be optimized by dynamicinvoke because the receiver does not change
+      // during the recursion:
       return n * this.fact(n - 1);
     }
   }
@@ -14,6 +16,8 @@ i = 0;
 inputs = [6,7,8];
 
 while (i < 3) {
+  // here every call to `fact` invalidates the receiver cache and a dynamic lookup is done
+  // every iteration of the loop:
   print i << ":fact(" << inputs[i] << ") = " << math.fact(inputs[i]);
   i = i + 1;
 }
@@ -23,6 +27,10 @@ i = 0;
 while (i < 3) {
   x = new inputs[i] {
     fact(math) {
+      // the receiver cache does not even see that this is a different location for calling `fact`
+      // from the `x.fact(math)` statement below. So `.fact` was first bound to the currently 
+      // defined method, and the receiver cache will now invalidate that cache and bind the 
+      // current `math.fact` to the right method dynamically: 
       return math.fact(this);
     }
   };

@@ -170,7 +170,7 @@ data Stat(loc src = |unknown:///|)
   | \while(Exp condition, list[Stat] block, str label = "") 
   | \doWhile(list[Stat] block, Exp condition, str label = "") 
   | \throw(Exp arg) 
-  | \monitor(Exp arg, list[Stat] block)  
+  | \monitor(Exp arg, list[Stat] block) // exception safe
   | \try(list[Stat] block, list[Handler] \catch) 
   | \switch(Exp arg, list[Case] cases, SwitchOption option = lookup(/*for best performance on current JVMs*/)) 
   ;

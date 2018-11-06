@@ -10,8 +10,8 @@ syntax Class
   ;
 
 syntax Method 
-  = methodWParamsDef: "method" Name "(" {AttributedName ","}+ ")" "is" Decl* Stmt "end" 
-  | methodDef: "method" Name "is" Decl* Stmt "end" 
+  = methodWParamsDef: "method" Name "(" {AttributedName ","}+ attrs ")" "is" Decl* decls Stmt block "end" 
+  | methodDef: "method" Name "is" Decl* decls Stmt block "end" 
   ;
 
 syntax Stmt 
@@ -85,9 +85,9 @@ lexical Float
 
 lexical Integer = [+ \-]? [0-9]+ ; 
 
-syntax AttributedName = attribName: Attribute* Name;
+syntax AttributedName = attribName: Attribute* attrs Name name;
 
-syntax Decl = decl: "var" {AttributedName ","}+ ";" ;
+syntax Decl = decl: "var" {AttributedName ","}+ attrs ";" ;
 
 syntax Case = \case: "case" Name "of" Stmt ;
 

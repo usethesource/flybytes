@@ -846,6 +846,12 @@ public class ClassCompiler {
 			case "monitor":
 				monitorStat(AST.$getArg(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
 				break;
+			case "acquire":
+				acquireStat(AST.$getArg(stat));
+				break;
+			case "release":
+				releaseStat(AST.$getArg(stat));
+				break;
 			case "try":
 				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), continueLabel, breakLabel, joinLabel);
 				break;
@@ -854,6 +860,16 @@ public class ClassCompiler {
 				switchStat(option, AST.$getArg(stat), AST.$getCases(stat), continueLabel, breakLabel, joinLabel);
 				break;
 			}
+		}
+
+		private void releaseStat(IConstructor arg) {
+			expr(arg);
+			method.visitInsn(Opcodes.MONITOREXIT);
+		}
+
+		private void acquireStat(IConstructor arg) {
+			expr(arg);
+			method.visitInsn(Opcodes.MONITORENTER);
 		}
 
 		private void switchStat(String option, IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
@@ -1169,6 +1185,7 @@ public class ClassCompiler {
 			return tryFinallyNestingLevel.add(finallyCode);
 		}
 
+		
 		/** 
 		 * Generating a monitor block is a matter of wrapping a block in MONITORENTER and MONITOREXIT,
 		 * but the existence of jump instructions such as throw, return, break and continue interacts with

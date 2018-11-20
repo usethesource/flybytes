@@ -88,13 +88,16 @@ list[Stat] compile((Stmt) `begin <Decl* decls> <Stmt b> end`)
 
 list[Stat] compile((Stmt) `skip`) = [];
 
+// TODO: this seems simplistic
+list[Stat] compile((Stmt) `<Name n> \<- <Exp r>`)
+  = store("<n>", compile(r));
+
      
 /*
   | forLoop: "for" Name "\<-" Exp "to" Exp "do" Stmt "od" 
   | \assert: "assert" Exp ";" 
   | typeCaseElse: "typecase" Exp "of" Case+ ElseCase "end" 
   | typeCase: "typecase" Exp "of" Case+ "end" 
-  | assign: Exp "\<-" Exp ";" 
   | release: "release" Exp ";" 
   | spawn: "spawn" Exp ";" 
   | acquire: "acquire" Exp ";" 

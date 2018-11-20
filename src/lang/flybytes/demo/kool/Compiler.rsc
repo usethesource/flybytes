@@ -90,17 +90,46 @@ list[Stat] compile((Stmt) `skip`) = [];
 
 // TODO: this seems simplistic
 list[Stat] compile((Stmt) `<Name n> \<- <Exp r>`)
-  = store("<n>", compile(r));
+  = [store("<n>", compile(r))];
 
-     
+list[Stat] compile((Stmt) `acquire <Exp e>;`)
+  = [acquire(compile(e))];
+
+list[Stat] compile((Stmt) `release <Exp e>;`)
+  = [release(compile(e))];
+ 
+list[Stat] compile((Stmt) `for <Name n> \<- <Exp from> to <Exp to> do <Stmt body> od`)
+  = [decl("$<n>_from", init=compile(from)),
+     decl("$<n>_to", init=compile(to)),
+     \if(lt(load("$<n>_from"), load("$<n>to")), [
+       \for([
+           // for (int n = from; 
+           decl(integer(), "<n>", \init=load("$<n>_from"))],
+           // n < to;
+           lt(load("<n>"), load("$<n>_to")),    
+           // i++) {
+           [incr("<n>", 1)],
+           compile(body)
+           // }
+       )
+     ],[
+       \for([
+           // for (int n = from; 
+           decl(integer(), "<n>", \init=load("$<n>_from"))],
+           // n >= to;
+           ge(load("<n>"), load("$<n>_to")),    
+           // i--) {
+           [incr("<n>", -1)],
+           compile(body)
+           // }
+       )
+     ])
+     ];        
 /*
-  | forLoop: "for" Name "\<-" Exp "to" Exp "do" Stmt "od" 
   | \assert: "assert" Exp ";" 
   | typeCaseElse: "typecase" Exp "of" Case+ ElseCase "end" 
   | typeCase: "typecase" Exp "of" Case+ "end" 
-  | release: "release" Exp ";" 
   | spawn: "spawn" Exp ";" 
-  | acquire: "acquire" Exp ";" 
   | labelStmt: Name ":" 
   | stmtExp: Exp ";" 
   ;

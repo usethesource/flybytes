@@ -170,9 +170,9 @@ data Stat(loc src = |unknown:///|)
   | \while(Exp condition, list[Stat] block, str label = "") 
   | \doWhile(list[Stat] block, Exp condition, str label = "") 
   | \throw(Exp arg) 
-  | \monitor(Exp arg, list[Stat] block) // safe exit of monitor in case of exceptions, break and continue
+  | \monitor(Exp arg, list[Stat] block) // features guaranteed release of the lock in case of exceptions, break and continue out of the block
   | \acquire(Exp arg) // this is a bare lock acquire with no regard for exceptions or break and continue
-  | \release(Exp arg) // this is a bare lock release
+  | \release(Exp arg) // this is a bare lock release. do not mix with the monitor statement on the same lock object.
   | \try(list[Stat] block, list[Handler] \catch) 
   | \switch(Exp arg, list[Case] cases, SwitchOption option = lookup(/*for best performance on current JVMs*/)) 
   ;

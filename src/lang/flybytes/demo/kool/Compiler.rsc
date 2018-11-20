@@ -88,7 +88,9 @@ list[Stat] compile((Stmt) `begin <Decl* decls> <Stmt b> end`)
 
 list[Stat] compile((Stmt) `skip`) = [];
 
-// TODO: this seems simplistic
+// TODO: this seems simplistic, but since we do not have name analysis, I can not figure out
+// if this assignment is into a field or into something else. Perhaps a little environment must be
+// passed down to list at least which names are fields. 
 list[Stat] compile((Stmt) `<Name n> \<- <Exp r>`)
   = [store("<n>", compile(r))];
 

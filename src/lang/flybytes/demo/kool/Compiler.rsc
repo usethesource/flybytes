@@ -124,14 +124,16 @@ list[Stat] compile((Stmt) `for <Name n> \<- <Exp from> to <Exp to> do <Stmt body
            // }
        )
      ])
-     ];        
+     ]; 
+     
+list[Stat] compile((Stmt) `<Exp e>;`) = \do(compile(e));
+            
 /*
   | \assert: "assert" Exp ";" 
   | typeCaseElse: "typecase" Exp "of" Case+ ElseCase "end" 
   | typeCase: "typecase" Exp "of" Case+ "end" 
   | spawn: "spawn" Exp ";" 
   | labelStmt: Name ":" 
-  | stmtExp: Exp ";" 
   ;
 */
 Stat compile((Stmt) `return;`) = \return();

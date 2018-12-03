@@ -103,24 +103,25 @@ list[Stat] compile((Stmt) `release <Exp e>;`)
 list[Stat] compile((Stmt) `for <Name n> \<- <Exp from> to <Exp to> do <Stmt body> od`)
   = [decl("$<n>_from", init=compile(from)),
      decl("$<n>_to", init=compile(to)),
+     // if (from < to) { and so we count up:
      \if(lt(load("$<n>_from"), load("$<n>to")), [
        \for([
            // for (int n = from; 
            decl(integer(), "<n>", \init=load("$<n>_from"))],
            // n < to;
            lt(load("<n>"), load("$<n>_to")),    
-           // i++) {
+           // n++) {
            [incr("<n>", 1)],
            compile(body)
            // }
        )
-     ],[
+     ],[ // } else { ( from >= to ), and so we count down:
        \for([
            // for (int n = from; 
            decl(integer(), "<n>", \init=load("$<n>_from"))],
            // n >= to;
            ge(load("<n>"), load("$<n>_to")),    
-           // i--) {
+           // n--) {
            [incr("<n>", -1)],
            compile(body)
            // }

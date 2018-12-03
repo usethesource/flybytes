@@ -283,8 +283,7 @@ Type object() = object("java.lang.Object");
 Stat invokeSuper(list[Type] formals, list[Exp] args)
   = do(invokeSuper(constructorDesc(formals), args));
   
-Stat invokeSuper()
-  = invokeSuper([], []);
+Stat invokeSuper() = invokeSuper([], []);
   
 // main method shorthand
 Method main(str args, list[Stat] block) 
@@ -317,8 +316,7 @@ Exp new(Type class, list[Type] argTypes, list[Exp] args)
   = newInstance(class, constructorDesc(argTypes), args);
   
 // "new" short-hand, without parameters  
-Exp new(Type class)
-  = new(class, [], []);
+Exp new(Type class) = new(class, [], []);
      
 // Load the standard "this" reference for every object. 
 // NB! This works only inside non-static methods and inside constructors 
@@ -326,6 +324,8 @@ Exp this() = load("this");
 
 // the "<current>" class refers to the class currently being generated
 private Type CURRENT = object("\<current\>");
+
+Type current() = CURRENT;
 
 // Load a field from the currently defined class
 Exp getField(Type \type, str name) = getField(CURRENT, this(), \type, name);
@@ -364,13 +364,19 @@ Exp fconst(real i) = const(float(), i);
 
 @doc{
 A bootstrap handle is a name of a static method (as defined by its host class,
-its name and its type signature), and a list of constant str arguments (for convenience).
+its name and its type signature), and a list of "constant" arguments. 
 
-It's advised to use the convenience function below:
+These "constant"
+arguments can be used to declare properties of the call site which can then be used by
+the bootstrap method to define in which way the dynamic call must be resolved. So these
+argument help to avoid having to define a combinatorially large number of bootstrap methods
+(one for each call site situation).  
+
+It's advisable to use the convenience function below to create a `BootstrapCall` instance:
   * `bootstrap(Type class, str name, list[BootstrapInfo] args)`
   
-That function makes sure to line up any additional information about the call site with
-the type of the static bootstrap method.
+That function makes sure to line up the additional information in the extra arguments about 
+the call site with the static type of the static bootstrap method.
 } 
 data BootstrapCall = bootstrap(Type class, str name, Signature desc, list[CallSiteInfo] args);
  
@@ -399,7 +405,7 @@ Method bootstrapMethod(BootstrapCall b, list[Stat] body)
          var(object("java.lang.invoke.MethodHandles$Lookup"), "callerClass"),
          var(string(), "dynMethodName"),
          var(object("java.lang.invoke.MethodType"), "dynMethodType"),
-         *[var(callsiteInfoType(args[i]), "info_<i>") | i <- index(args), csi <- args]
+         *[var(callsiteInfoType(args[i]), "info_<i>") | i <- index(b.args), csi <- args]
       ], 
       block, {\public(), \static()});
       

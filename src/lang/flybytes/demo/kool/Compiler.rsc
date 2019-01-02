@@ -1,3 +1,4 @@
+@synopsis{A compiler from the Kool language to JVM bytecode}
 module lang::flybytes::demo::kool::Compiler
 
 import lang::flybytes::demo::pico::Syntax;
@@ -15,7 +16,26 @@ import lang::flybytes::macros::ControlFlow; // for_array
 import String;
 import ParseTree;
 
-
+@synopsis{Compiles a parse tree of a complete Kool program to a list of Flybytes classes}
+@parameter{name		: name of the main class}
+@parameter{Program	: parse tree of a Kool `Program`}
+@description{
+This Kool to Flybytes compiler accepts a list of class definitions and a final expression to execute.
+This final expression is nested in a main class with a given `name`. Each 
+class in the prelude is compiled to an individual JVM class first.
+  
+This compiler does not have a classpath to search for pre-compiled classes or additional
+source files. All necessary classes must be included in the parse tree of a Program.
+  
+This compiler is simplistic, in the sense that it does not use a name analysis or type analysis stage.
+It is meant to demonstrate a mapping of a realistic programming language syntax tree to Flybytes only. 
+Therefore it may deviate from the official Kool language definition 
+(by Mark Hills written in the K framework) in certain areas. Explicit comments have been added where 
+this is known, but there may be other (more implicit) deviations. 
+  
+After Flybytes classes have been constructed, the Flybytes compiler can quickly map them
+to JVM bytecode.
+}
 list[Class] compile(str name, (Program) `<Class* classes> <Exp main>`) {
   mainClass = class(object(name)
     methods=[

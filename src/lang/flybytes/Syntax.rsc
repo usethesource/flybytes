@@ -74,7 +74,7 @@ module lang::flybytes::Syntax
 
 import List;
 
-data Class(list[Annotation] annotations = [], loc source = |unknown:///|)
+data Class(list[Annotation] annotations = [], loc src = |unknown:///|)
   = class(Type \type /* object(str name) */, 
       set[Modifier] modifiers = {\public()},
       Type super              = object(),
@@ -170,7 +170,9 @@ data Stat(loc src = |unknown:///|)
   | \while(Exp condition, list[Stat] block, str label = "") 
   | \doWhile(list[Stat] block, Exp condition, str label = "") 
   | \throw(Exp arg) 
-  | \monitor(Exp arg, list[Stat] block) // features guaranteed release of the lock in case of exceptions, break and continue out of the block
+  // `monitor` guarantees release of the lock in case of exceptions, break and continue out of the block, 
+  // but only if `release` and `acquire` are not used on the same lock object anywhere:
+  | \monitor(Exp arg, list[Stat] block) 
   | \acquire(Exp arg) // this is a bare lock acquire with no regard for exceptions or break and continue
   | \release(Exp arg) // this is a bare lock release. do not mix with the monitor statement on the same lock object.
   | \try(list[Stat] block, list[Handler] \catch) 

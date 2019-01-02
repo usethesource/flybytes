@@ -13,9 +13,10 @@ import java.util.Map;
 /**
  * Inspired mainly by the JSR-292 cookbook by @headius, this class provides the 
  * base class for all prototype objects "Prototype". It also contains the bootstrap methods for
- * invokeDynamic instructions. This bootstrap method binds all method invocations to an indirect 
+ * invokeDynamic instructions. These bootstrap methods bind all method invocations to an indirect 
  * dynamic lookup method called "finder" which traverses the prototype hierarchy to locate the 
- * method which was invoked, and finally resorts to calling the "missing" method if all else fails.
+ * method which was invoked at run-time, and finally resorts to calling the "missing" method if 
+ * all else fails.
  * 
  * There is caching to make sure repeated calls to the same prototype will not result in repeated
  * method lookups, but otherwise (for example in a loop over an object array), each invocation will
@@ -303,7 +304,6 @@ public class Prototype {
 		Prototype original = receiver;
 	    MethodType type = callSite.type();
 	    MethodHandle target;
-	    int counter = 0;
 	    
 	    while (receiver != null) {
 	    	Class<?> receiverClass = receiver.getClass();

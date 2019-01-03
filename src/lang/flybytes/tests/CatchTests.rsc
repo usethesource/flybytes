@@ -70,7 +70,7 @@ Class finallyClass() {
            ],
            [ 
              \catch(object("java.lang.ArithmeticException"), "e", [
-               \return(iconst(2)
+               \return(iconst(2))
              ]),
              \finally([
                \return(iconst(3))

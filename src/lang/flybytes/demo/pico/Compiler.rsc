@@ -65,7 +65,7 @@ Stat stat((Statement)
    = \while(expr(cond), stats(body));
    
 Exp expr((Expression) `<Id name>`)                        = load("<name>");
-Exp expr((Expression) `<String string>`)                  = const(string(), "<string>"[1..-1]);
+Exp expr((Expression) `<String s>`)                       = const(string(), "<s>"[1..-1]);
 Exp expr((Expression) `<Natural natcon>`)                 = const(integer(), toInt("<natcon>"));  
 Exp expr((Expression) `(<Expression e>)`)                 = expr(e);
 Exp expr((Expression) `<Expression l> || <Expression r>`) = String_concat(expr(l), expr(r));

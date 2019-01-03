@@ -1,20 +1,13 @@
 @synopsis{A compiler from the Kool language to JVM bytecode}
 module lang::flybytes::demo::kool::Compiler
 
-import lang::flybytes::demo::pico::Syntax;
+import lang::flybytes::demo::kool::Syntax;
 
 import lang::flybytes::Syntax;
 import lang::flybytes::Compiler;
 
 import lang::flybytes::api::System; // for stdout
-import lang::flybytes::api::Object; // for toString
-import lang::flybytes::api::String; // for concat
-import lang::flybytes::api::JavaLang; // for parseInt
 
-import lang::flybytes::macros::ControlFlow; // for_array
-
-import String;
-import ParseTree;
 
 @synopsis{Compiles a parse tree of a complete Kool program to a list of Flybytes classes}
 @parameter{name		: name of the main class}
@@ -36,11 +29,11 @@ this is known, but there may be other (more implicit) deviations.
 After Flybytes classes have been constructed, the Flybytes compiler can quickly map them
 to JVM bytecode.
 }
-list[Class] compile(str name, (Program) `<Class* classes> <Exp main>`) {
+list[Class] compile(str name, (Program) `<Class* classes> <Exp m>`) {
   mainClass = class(object(name)
     methods=[
       main("args", [
-         stdout(compile(main))
+         stdout(compile(m))
       ])
     ]
   );
@@ -48,24 +41,24 @@ list[Class] compile(str name, (Program) `<Class* classes> <Exp main>`) {
   return [mainClass] + [compile(cl) | cl <- classes];
 }
 
-Class compile((Class) `class <Name n> extends  <Name super> is <Decl* fields> <Method* methods> end`)
-  = class(object(n),
-      super=object(super),
-      fields = [*fields(decl) | decl <- fields],
+Class compile((Class) `class <Name n> extends  <Name super> is <Decl* fs> <Method* methods> end`)
+  = class(object("<n>"),
+      super=object("<super>"),
+      fields = [*fields(decl) | decl <- fs],
       methods = [method(m) | m <- methods]
     );
 
-Class compile((Class) `class <Name n> is <Decl* fields> <Method* methods> end`)
-  = class(object(n),
-      fields = [*fields(decl) | decl <- fields],
+Class compile((Class) `class <Name n> is <Decl* fs> <Method* methods> end`)
+  = class(object("<n>"),
+      fields = [*fields(decl) | decl <- fs],
       methods = [method(m) | m <- methods]
     );    
  
 list[Field] fields((Decl) `var <{AttributedName ","}+ attrs>`) = fields(attrs);
 
-list[Field] field({AttributedName ","}+ attrs) = [field(attr) | attr <- attrs];
+list[Field] fields({AttributedName ","}+ attrs) = [field(attr) | attr <- attrs];
 
-Field field((AttributeName) `<Attribute* attrs> <Name name>`) = field(object(), "<name>");
+Field field((AttributedName) `<Attribute* attrs> <Name name>`) = field(object(), "<name>");
  
 Method method((Method) `method <Name name>(<{AttributedName ","}+ attrs>) is <Decl* decls> <Stmt block> end`)
   = method(\public(), "<name>", [object() | _ <- attrs], 
@@ -96,11 +89,11 @@ list[Stat] compile((Stmt) `break;`) = [\break()];
 
 list[Stat] compile((Stmt) `continue;`) = [\continue()];
 
-list[Stat] compile((Stmr) `if <Exp cond> then <Stmt thenPart> else <Stmt elsePart> fi`)
-  = \if(compile(cond), compile(thenPart), compile(elsePart));
+list[Stat] compile((Stmt) `if <Exp cond> then <Stmt thenPart> else <Stmt elsePart> fi`)
+  = [\if(compile(cond), compile(thenPart), compile(elsePart))];
 
-list[Stat] compile((Stmr) `if <Exp cond> then <Stmt thenPart> fi`)
-  = \if(compile(cond), compile(thenPart));
+list[Stat] compile((Stmt) `if <Exp cond> then <Stmt thenPart> fi`)
+  = [\if(compile(cond), compile(thenPart))];
 
 list[Stat] compile((Stmt) `begin <Decl* decls> <Stmt b> end`)
   = [decl(object(), "<d.name>") | a <- decls, d <- d.attrs]
@@ -121,8 +114,8 @@ list[Stat] compile((Stmt) `release <Exp e>;`)
   = [release(compile(e))];
  
 list[Stat] compile((Stmt) `for <Name n> \<- <Exp from> to <Exp to> do <Stmt body> od`)
-  = [decl("$<n>_from", init=compile(from)),
-     decl("$<n>_to", init=compile(to)),
+  = [decl(integer(), "$<n>_from", init=compile(from)),
+     decl(integer(), "$<n>_to", init=compile(to)),
      // if (from < to) { and so we count up:
      \if(lt(load("$<n>_from"), load("$<n>to")), [
        \for([
@@ -149,7 +142,7 @@ list[Stat] compile((Stmt) `for <Name n> \<- <Exp from> to <Exp to> do <Stmt body
      ])
      ]; 
      
-list[Stat] compile((Stmt) `<Exp e>;`) = \do(compile(e));
+list[Stat] compile((Stmt) `<Exp e>;`) = [\do(compile(e))];
             
 /*
   | \assert: "assert" Exp ";" 

@@ -6,8 +6,6 @@ import lang::flybytes::Syntax;
 import lang::flybytes::Compiler;
 
 import lang::flybytes::api::System; // for stdout
-import lang::flybytes::api::Object; // for toString
-import lang::flybytes::api::String; // for concat
 import lang::flybytes::api::JavaLang; // for parseInt
 
 import String;

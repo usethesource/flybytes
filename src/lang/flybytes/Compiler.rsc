@@ -2,9 +2,6 @@ module lang::flybytes::Compiler
 
 extend lang::flybytes::Mirror;
 extend lang::flybytes::Syntax;
-import lang::flybytes::api::Object;
-import lang::flybytes::api::System;
-import IO;
 extend util::Maybe;
 
 data JDKVersion = v1_6() | v1_7() | v1_8();

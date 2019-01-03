@@ -7,8 +7,6 @@ import lang::flybytes::api::Object;
 import lang::flybytes::api::System;
 import ParseTree;
 import String;
-import util::UUID;
-import IO;
 
 void testProtol() {
   tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/fact.protol|).top;
@@ -109,7 +107,7 @@ Exp compile((Expr) `[<{Expr ","}* elems>]`)
   = new(Arr, [array(Prototype)], [newArray(array(Prototype), [compile(e) | e <- elems])]); 
 
 Exp compile((Expr) `<Expr receiver>.<Id name>`)
-  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "$get_<name>", []), []);
+  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "$get_<name>", []), [compile(receiver)]);
   
 Exp compile((Expr) `new`) = new(Prototype, [Prototype], [PROTO()]);
 

@@ -97,10 +97,11 @@ data Modifier
    | \static()
    | \final()
    | \synchronized()
+   | \abstract()
    ;
 
 data Field(list[Annotation] annotations = [], set[Modifier] modifiers = {\private()})
-  = field(Type \type, str name, Exp init = defValue(\type));
+  = field(Type \type, str name, Exp init = defVal(\type));
          
 data Method(list[Annotation] annotations = [])
   = method(Signature desc, list[Formal] formals, list[Stat] block, set[Modifier] modifiers = {\public()})
@@ -145,12 +146,12 @@ data RetentionPolicy
  
 @doc{optional init expressions will be used at run-time if `null` is passed as actual parameter}
 data Formal
-  = var(Type \type, str name, Exp init = defValue(\type)); 
+  = var(Type \type, str name, Exp init = defVal(\type)); 
 
 @doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
 data Stat(loc src = |unknown:///|)
   = \store(str name, Exp \value)
-  | \decl(Type \type, str name, Exp init = defValue(\type))
+  | \decl(Type \type, str name, Exp init = defVal(\type))
   | \astore(Exp array, Exp index, Exp arg)
   | \do(Exp exp) 
   | \incr(str name, int inc)
@@ -311,7 +312,7 @@ Method staticMethod(Modifier access, Type ret, str name, list[Formal] args, list
 // constructor shorthand with arguments and code 
 //   NB: don't forget to generate super call in the block!    
 Method constructor(Modifier access, list[Formal] formals, list[Stat] block)
-  = method(constructorDesc([ var.\type | var <- formals]), formals, block);
+  = method(constructorDesc([ var.\type | var <- formals]), formals, block, modifiers={access});
   
 // "new" short-hand with parameters
 Exp new(Type class, list[Type] argTypes, list[Exp] args)
@@ -394,7 +395,7 @@ BootstrapCall bootstrap(Type class, str name, list[CallSiteInfo] args)
                  ]),
        args);
 
-BootstrapCall bootstrap(Type class, str name, list[CallSiteInfo] args)
+BootstrapCall bootstrap(str name, list[CallSiteInfo] args)
   = bootstrap(object("\<CURRENT\>"), name, args);
   
 @doc{
@@ -407,9 +408,9 @@ Method bootstrapMethod(BootstrapCall b, list[Stat] body)
          var(object("java.lang.invoke.MethodHandles$Lookup"), "callerClass"),
          var(string(), "dynMethodName"),
          var(object("java.lang.invoke.MethodType"), "dynMethodType"),
-         *[var(callsiteInfoType(args[i]), "info_<i>") | i <- index(b.args), csi <- args]
+         *[var(callsiteInfoType(b.args[i]), "info_<i>") | i <- index(b.args), csi <- b.args]
       ], 
-      block, {\public(), \static()});
+      body, modifiers={\public(), \static()});
       
      
 data CallSiteInfo
@@ -449,4 +450,4 @@ Type callsiteInfoType(setterHandle(_,_,_))       = object("java.lang.invoke.Meth
 Type callsiteInfoType(staticGetterHandle(_,_,_)) = object("java.lang.invoke.MethodHandle");
 Type callsiteInfoType(staticSetterHandle(_,_,_)) = object("java.lang.invoke.MethodHandle");
 Type callsiteInfoType(constructorHandle(_,_))    = object("java.lang.invoke.MethodHandle");
-Type callsiteInfoType(methodTypeInfo())          = object("java.lang.invoke.MethodType");   
+Type callsiteInfoType(methodTypeInfo(_))         = object("java.lang.invoke.MethodType");   

@@ -28,8 +28,6 @@ import org.rascalmpl.objectweb.asm.TypeReference;
 import org.rascalmpl.objectweb.asm.tree.ClassNode;
 import org.rascalmpl.objectweb.asm.tree.FieldNode;
 import org.rascalmpl.objectweb.asm.tree.MethodNode;
-import org.rascalmpl.objectweb.asm.util.CheckClassAdapter;
-import org.rascalmpl.objectweb.asm.util.TraceClassVisitor;
 import org.rascalmpl.uri.URIResolverRegistry;
 import org.rascalmpl.uri.URIUtil;
 import org.rascalmpl.values.ValueFactoryFactory;
@@ -70,9 +68,9 @@ public class ClassCompiler {
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES + ClassWriter.COMPUTE_MAXS);
 			ClassVisitor cv = cw;
-			if (debugMode.getValue()) {
-				cv = new CheckClassAdapter(new TraceClassVisitor(cw, out));
-			}
+//			if (debugMode.getValue()) {
+//				cv = new CheckClassAdapter(new TraceClassVisitor(cw, out));
+//			}
 			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 
 			output.write(cw.toByteArray());
@@ -97,9 +95,9 @@ public class ClassCompiler {
 
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 			ClassVisitor cv = cw;
-			if (debugMode.getValue()) {
-				cv = new CheckClassAdapter(new TraceClassVisitor(cw, out));
-			}
+//			if (debugMode.getValue()) {
+//				cv = new CheckClassAdapter(new TraceClassVisitor(cw, out));
+//			}
 
 			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 			byte[] bytes = cw.toByteArray();
@@ -139,9 +137,9 @@ public class ClassCompiler {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 			ClassVisitor cv = cw;
 
-			if (debugMode.getValue()) {
-				cv = new TraceClassVisitor(new CheckClassAdapter(cw), out);
-			}
+//			if (debugMode.getValue()) {
+//				cv = new TraceClassVisitor(new CheckClassAdapter(cw), out);
+//			}
 			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 
 			Class<?> loaded = loadSingleClass(className, cw);
@@ -493,13 +491,7 @@ public class ClassCompiler {
 			// return
 			method.visitInsn(Opcodes.RETURN);
 			method.visitLabel(l1);
-
-			if (debug) {
-				method.visitMaxs(Short.MAX_VALUE, Short.MAX_VALUE);
-			}
-			else {
-				method.visitMaxs(0, 0);
-			}
+			method.visitMaxs(0, 0);
 			method.visitEnd();
 			classNode.methods.add(method);
 		}
@@ -553,12 +545,7 @@ public class ClassCompiler {
 
 			method.visitLabel(methodEndLabel);
 			method.visitInsn(Opcodes.RETURN);
-			if (debug) {
-				method.visitMaxs(Short.MAX_VALUE, Short.MAX_VALUE);
-			}
-			else {
-				method.visitMaxs(0, 0);
-			}
+			method.visitMaxs(0, 0);
 			method.visitEnd();
 
 			classNode.methods.add(method);
@@ -651,12 +638,7 @@ public class ClassCompiler {
 					}
 				}
 
-				if (debug) {
-					method.visitMaxs(Short.MAX_VALUE, Short.MAX_VALUE);
-				}
-				else {
-					method.visitMaxs(0, 0);
-				}
+				method.visitMaxs(0, 0);
 			}
 
 			if (kws.hasParameter("annotations")) {
@@ -2957,7 +2939,7 @@ public class ClassCompiler {
 		}
 
 		private void lineNumber(int line) {
-			if (line != -1 && line != currentLine) {
+			if (debug && line != -1 && line != currentLine) {
 				Label label = new Label();
 				method.visitLabel(label);
 				method.visitLineNumber(line, label);

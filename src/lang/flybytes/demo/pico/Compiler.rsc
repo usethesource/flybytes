@@ -21,7 +21,7 @@ void testFactorial() {
 }
 
 void compileProgram(Program p, str name, loc folder) {
-  compileClass(compileProgram(p, name), folder + "<name>.class");
+  compileClass(compileProgram(p, name), folder + "<name>.class", debugMode=true);
 }
 
 @doc{compile Pico program to a class object}

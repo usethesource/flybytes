@@ -322,13 +322,6 @@ public class ClassCompiler {
 				classNode.interfaces = interfaces;
 			}
 
-			if (kws.hasParameter("source")) {
-				classNode.sourceFile = AST.$getSourceParameter(kws);
-			}
-			else {
-				classNode.sourceFile = null;
-			}
-
 			if (kws.hasParameter("fields")) {
 				fields(classNode, AST.$getFieldsParameter(kws), isInterface);
 			}
@@ -357,15 +350,7 @@ public class ClassCompiler {
 				ISourceLocation loc = (ISourceLocation) o.asWithKeywordParameters().getParameter("src");
 
 				if (loc != null) {
-					
-					String path = loc.getPath();
-//					
-//					if (!loc.getScheme().equals("file") && path.startsWith("/")) {
-//						path = path.substring(1);
-//					}
-					
-					out.println(path);
-					return path;
+					return loc.getPath();
 				}
 			}
 
@@ -2973,7 +2958,6 @@ public class ClassCompiler {
 
 		private void lineNumber(int line) {
 			if (line != -1 && line != currentLine) {
-				out.println("new line: " + line);
 				Label label = new Label();
 				method.visitLabel(label);
 				method.visitLineNumber(line, label);

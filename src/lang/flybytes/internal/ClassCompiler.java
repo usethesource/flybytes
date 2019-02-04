@@ -363,9 +363,7 @@ public class ClassCompiler {
 			if (o.mayHaveKeywordParameters()) {
 				ISourceLocation loc = (ISourceLocation) o.asWithKeywordParameters().getParameter("src");
 				if (loc != null && loc.hasLineColumn()) {
-					if (currentLine != loc.getBeginLine()) {
-						return loc.getBeginLine();
-					}
+					return loc.getBeginLine();
 				}
 			}
 
@@ -1273,7 +1271,8 @@ public class ClassCompiler {
 			}
 
 			method.visitLabel(testConditional);
-
+			lineNumber(line, testConditional);
+			
 			// deal efficiently with negated conditionals
 			int cmpCode = Opcodes.IFEQ;
 			if (cond.getConstructorType().getName().equals("neg")) {
@@ -1285,7 +1284,7 @@ public class ClassCompiler {
 			invertedConditionalFlow(0, cmpCode, 
 					() -> statements(body, testConditional, joinLabel, testConditional), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
-					testConditional, line);
+					testConditional, getLineNumber(cond));
 
 			jumpTo(testConditional); // this might be superfluous
 		}
@@ -1314,7 +1313,7 @@ public class ClassCompiler {
 			invertedConditionalFlow(0, cmpCode, 
 					() -> jumpTo(nextIteration), 
 					null /* end of loop */, 
-					joinLabel, line);
+					joinLabel, getLineNumber(cond));
 		}
 
 		private void breakStat(IConstructor stat, LeveledLabel join) {
@@ -1409,7 +1408,7 @@ public class ClassCompiler {
 			invertedConditionalFlow(0, cmpCode, 
 					() -> statements(body, nextIterationLabel, joinLabel, nextIterationLabel), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
-					nextIterationLabel, line);
+					nextIterationLabel, getLineNumber(cond));
 
 			method.visitLabel(nextIterationLabel);
 			LeveledLabel endNext = newLabel();
@@ -2938,6 +2937,22 @@ public class ClassCompiler {
 			return type;
 		}
 
+		private void forceLineNumber(int line) {
+			if (debug && line != -1) {
+				Label label = new Label();
+				method.visitLabel(label);
+				method.visitLineNumber(line, label);
+				currentLine = line;
+			}
+		}
+		
+		private void lineNumber(int line, Label label) {
+			if (debug && line != -1) {
+				method.visitLineNumber(line, label);
+				currentLine = line;
+			}
+		}
+		
 		private void lineNumber(int line) {
 			if (debug && line != -1 && line != currentLine) {
 				Label label = new Label();

@@ -34,8 +34,8 @@ Class compileProgram(Program p, str name)
           *stats(p.body),
           *output(p.decls),
           \return()
-        ])
-      ]
+        ], src=p@\loc)
+      ], src=p@\loc
   );
   
 list[Stat] decls(Declarations p)
@@ -47,30 +47,30 @@ Type \type((Type) `string`)  = string();
   
 list[Stat] stats({Statement  ";"}* stats) = [stat(s) | s <- stats];
   
-Stat stat((Statement) `<Id var> := <Expression val>`)
-   = store("<var>", expr(val)); 
+Stat stat(s:(Statement) `<Id var> := <Expression val>`)
+   = store("<var>", expr(val), src=s@\loc); 
    
-Stat stat((Statement) 
+Stat stat(s:(Statement) 
                  `if <Expression cond> then 
                  '  <{Statement ";"}* thenPart> 
                  'else 
                  '  <{Statement ";"}* elsePart> 
                  'fi`)
-   = \if(expr(cond), stats(thenPart), stats(elsePart));
+   = \if(expr(cond), stats(thenPart), stats(elsePart), src=s@\loc);
    
-Stat stat((Statement) 
+Stat stat(s:(Statement) 
                  `while <Expression cond> do 
                  '  <{Statement ";"}* body> 
                  'od`)
-   = \while(expr(cond), stats(body));
+   = \while(expr(cond), stats(body), src=s@\loc);
    
-Exp expr((Expression) `<Id name>`)                        = load("<name>");
-Exp expr((Expression) `<String s>`)                       = const(string(), "<s>"[1..-1]);
-Exp expr((Expression) `<Natural natcon>`)                 = const(integer(), toInt("<natcon>"));  
-Exp expr((Expression) `(<Expression e>)`)                 = expr(e);
-Exp expr((Expression) `<Expression l> || <Expression r>`) = String_concat(expr(l), expr(r));
-Exp expr((Expression) `<Expression l> + <Expression r>`)  = add(expr(l), expr(r));
-Exp expr((Expression) `<Expression l> - <Expression r>`)  = sub(expr(l), expr(r));
+Exp expr(e:(Expression) `<Id name>`)                        = load("<name>", src=e@\loc);
+Exp expr(e:(Expression) `<String s>`)                       = const(string(), "<s>"[1..-1], src=e@\loc);
+Exp expr(e:(Expression) `<Natural natcon>`)                 = const(integer(), toInt("<natcon>"), src=e@\loc);  
+Exp expr(e:(Expression) `(<Expression e>)`)                 = expr(e);
+Exp expr(e:(Expression) `<Expression l> || <Expression r>`) = String_concat(expr(l), expr(r), src=e@\loc);
+Exp expr(e:(Expression) `<Expression l> + <Expression r>`)  = add(expr(l), expr(r), src=e@\loc);
+Exp expr(e:(Expression) `<Expression l> - <Expression r>`)  = sub(expr(l), expr(r), src=e@\loc);
 
 list[Stat] output(Declarations p)
   = [stdout(String_concat(const(string(), "<i>\t: "), toString(i, t))) 

@@ -273,6 +273,7 @@ public class ClassCompiler {
 		private final Builder<IConstructor> pushTrue = () -> trueExp();
 		private final Builder<IConstructor> pushFalse = () -> falseExp();
 		private Map<String, LeveledLabel> labels;
+		private int currentLine = 1;
 		private boolean emittingFinally = false;
 		private final boolean debug;
 
@@ -292,6 +293,7 @@ public class ClassCompiler {
 			classNode.version = version;
 			classNode.signature = null; /* anything else leads to the class extending itself! */
 			classNode.name = AST.$getName(classType);
+			classNode.sourceFile = sourceFile(o);
 
 			if (kws.hasParameter("modifiers")) {
 				classNode.access = access(AST.$getModifiers(o));
@@ -347,6 +349,36 @@ public class ClassCompiler {
 			}
 
 			classNode.accept(cw);
+		}
+
+		private String sourceFile(IConstructor o) {
+			if (o.mayHaveKeywordParameters()) {
+				ISourceLocation loc = (ISourceLocation) o.asWithKeywordParameters().getParameter("src");
+
+				if (loc != null) {
+					out.println(loc);
+					return loc.getPath();
+				}
+			}
+
+			return null;
+		}
+
+		private LeveledLabel newLabel() {
+			return newLabel(tryFinallyNestingLevel);
+		}
+
+		private int getLineNumber(IConstructor o) {
+			if (o.mayHaveKeywordParameters()) {
+				ISourceLocation loc = (ISourceLocation) o.asWithKeywordParameters().getParameter("src");
+				if (loc != null && loc.hasLineColumn()) {
+					if (currentLine != loc.getBeginLine()) {
+						return loc.getBeginLine();
+					}
+				}
+			}
+
+			return -1;
 		}
 
 		private void annotations(ClassNode cn, IList annotations) {
@@ -586,14 +618,16 @@ public class ClassCompiler {
 				variableAnnotations = new ArrayList<>();
 
 				if (!isStatic) {
-					declareVariable(classType, "this", null, false, null);
+					declareVariable(classType, "this", null, false, null, getLineNumber(cons));
 				}
 
 				methodStartLabel = new LeveledLabel(0);
 				methodEndLabel = new LeveledLabel(0);
+				currentLine = getLineNumber(cons);
 
 				method.visitCode(); 
 				method.visitLabel(methodStartLabel);
+
 
 				formalVariables(varFormals, false /* no initialization */);
 
@@ -640,7 +674,7 @@ public class ClassCompiler {
 			classNode.methods.add(method);
 		}
 
-		private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize, IList annotations) {
+		private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize, IList annotations, int line) {
 			int pos = variableNames.size();
 
 			variableTypes.add(type);
@@ -669,8 +703,8 @@ public class ClassCompiler {
 				if (def != null && (typeName.equals("object") || typeName.equals("array"))) {
 					// if somebody passed 'null' as actual parameter and we have something to initialize with here,
 					// then we store that into the variable now. flybytes has default parameters!
-					loadExp(name);
-					invertedConditionalFlow(0, Opcodes.IFNONNULL, () -> storeStat(name, def), null, null);
+					loadExp(name, line);
+					invertedConditionalFlow(0, Opcodes.IFNONNULL, () -> storeStat(name, def), null, null, line);
 				}
 			}
 
@@ -681,7 +715,7 @@ public class ClassCompiler {
 			for (String field : fieldInitializers.keySet()) {
 				IConstructor def = fieldInitializers.get(field);
 				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("init");
-				loadExp("this");
+				loadExp("this", getLineNumber(exp));
 				expr(exp);
 				method.visitFieldInsn(Opcodes.PUTFIELD, classNode.name, field, Signature.type(AST.$getType(def)));
 			}
@@ -703,7 +737,7 @@ public class ClassCompiler {
 				final int index = i;
 				IConstructor var = (IConstructor) elem;
 				IConstructor varType = AST.$getType(var);
-				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize, null);
+				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize, null, getLineNumber(var));
 
 				if (var.asWithKeywordParameters().hasParameter("annotations")) {
 					annotation((s,v) -> method.visitParameterAnnotation(index, s, v), (IList) var.asWithKeywordParameters().getParameter("annotations"));
@@ -770,7 +804,7 @@ public class ClassCompiler {
 			for (IValue elem : statements) {
 				// generate the label for where the next statement ends, unless this is the last statement, because
 				// then we rejoin the context and we have a label for that given in the parameter 'joinLabel'
-				LeveledLabel nextLabel = (++i < len) ? newLabel(tryFinallyNestingLevel) : joinLabel;
+				LeveledLabel nextLabel = (++i < len) ? newLabel() : joinLabel;
 				statement((IConstructor) elem, continueLabel, breakLabel, nextLabel);
 				if (i < len) {
 					method.visitLabel(nextLabel);
@@ -780,16 +814,18 @@ public class ClassCompiler {
 		}
 
 		private void statement(IConstructor stat, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+			int line = getLineNumber(stat);
+			
 			switch (stat.getConstructorType().getName()) {
 			case "incr":
 				incStat(AST.$getName(stat), AST.$getInc(stat));
 				break;
 			case "decl":
-				declStat(stat, joinLabel);
+				declStat(stat, joinLabel, line);
 				break;
 			case "block":
 				String blockLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
-				blockStat(blockLabel, AST.$getBlock(stat), joinLabel);
+				blockStat(blockLabel, AST.$getBlock(stat), joinLabel, line);
 				break;
 			case "do" : 
 				doStat((IConstructor) stat.get("exp"));
@@ -821,30 +857,30 @@ public class ClassCompiler {
 
 			case "if":
 				if (stat.getConstructorType().getArity() == 3) {
-					ifThenElseStat(AST.$getCondition(stat), AST.$getThenBlock(stat), AST.$getElseBlock(stat), continueLabel, breakLabel, joinLabel);
+					ifThenElseStat(AST.$getCondition(stat), AST.$getThenBlock(stat), AST.$getElseBlock(stat), continueLabel, breakLabel, joinLabel, line);
 				}
 				else {
 					assert stat.getConstructorType().getArity() == 2;
-					ifStat(AST.$getCondition(stat), AST.$getThenBlock(stat), continueLabel, breakLabel, joinLabel);
+					ifStat(AST.$getCondition(stat), AST.$getThenBlock(stat), continueLabel, breakLabel, joinLabel, line);
 				}
 				break;
 			case "for":
 				String forLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
-				forStat(forLabel, AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continueLabel, breakLabel, joinLabel);
+				forStat(forLabel, AST.$getInit(stat), AST.$getCondition(stat), AST.$getNext(stat), AST.$getStatements(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
 			case "while":
 				String whileLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
-				whileStat(whileLabel, AST.$getCondition(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
+				whileStat(whileLabel, AST.$getCondition(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
 			case "doWhile":
 				String doWhileLabel = stat.asWithKeywordParameters().hasParameter("label") ? ((IString) stat.asWithKeywordParameters().getParameter("label")).getValue() : null;
-				doWhileStat(doWhileLabel, AST.$getCondition(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
+				doWhileStat(doWhileLabel, AST.$getCondition(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
 			case "throw":
 				throwStat(AST.$getArg(stat));
 				break;
 			case "monitor":
-				monitorStat(AST.$getArg(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel);
+				monitorStat(AST.$getArg(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
 			case "acquire":
 				acquireStat(AST.$getArg(stat));
@@ -853,11 +889,11 @@ public class ClassCompiler {
 				releaseStat(AST.$getArg(stat));
 				break;
 			case "try":
-				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), continueLabel, breakLabel, joinLabel);
+				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
 			case "switch":
 				String option = stat.asWithKeywordParameters().hasParameter("option") ? ((IConstructor) stat.asWithKeywordParameters().getParameter("option")).getConstructorType().getName() : "lookup";
-				switchStat(option, AST.$getArg(stat), AST.$getCases(stat), continueLabel, breakLabel, joinLabel);
+				switchStat(option, AST.$getArg(stat), AST.$getCases(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
 			}
 		}
@@ -872,20 +908,20 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.MONITORENTER);
 		}
 
-		private void switchStat(String option, IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+		private void switchStat(String option, IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
 			switch (option) {
 			case "table":
-				tableSwitch(arg, cases, continueLabel, joinLabel);
+				tableSwitch(arg, cases, continueLabel, joinLabel, line);
 				return;
 			case "lookup":
-				lookupSwitch(arg, cases, continueLabel, joinLabel);
+				lookupSwitch(arg, cases, continueLabel, joinLabel, line);
 				return;
 			case "auto":
-				autoSwitch(arg, cases, continueLabel, joinLabel);
+				autoSwitch(arg, cases, continueLabel, joinLabel, line);
 				return;
 			}
 
-			lookupSwitch(arg, cases, continueLabel, joinLabel);
+			lookupSwitch(arg, cases, continueLabel, joinLabel, line);
 			return;
 		}
 
@@ -894,7 +930,7 @@ public class ClassCompiler {
 		 * be said that the JVM JIT compiler may optimize either instruction to use any kind of 
 		 * implementations and nowadays it thus best to generate the smallest code using a lookup table. 
 		 */
-		private void autoSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel) {
+		private void autoSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel, int line) {
 			int max = Integer.MAX_VALUE;
 			int min = Integer.MIN_VALUE;
 			long labelCount = 0;
@@ -922,10 +958,10 @@ public class ClassCompiler {
 			long lookupCost = lookupSpaceCost + 3 * lookupTimeCost;
 
 			if (labelCount > 0 && tableCost <= lookupCost) {
-				tableSwitch(arg, cases, continueLabel, joinLabel);
+				tableSwitch(arg, cases, continueLabel, joinLabel, line);
 			}
 			else {
-				lookupSwitch(arg, cases, continueLabel, joinLabel);
+				lookupSwitch(arg, cases, continueLabel, joinLabel, line);
 			}
 		}
 
@@ -952,7 +988,7 @@ public class ClassCompiler {
 		 * lookpSwitch is best to call if the case labels are not consecutive integers, the total set of integers
 		 * is a sparse and/or more or less uniformally distributed set (like hashcode's of Strings for example).
 		 */
-		private void lookupSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel) {
+		private void lookupSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel, int line) {
 			ArrayList<CaseLabel> labels = new ArrayList<>();
 			Label defaultLabel = new Label();
 			boolean hasDef = false;
@@ -1000,7 +1036,7 @@ public class ClassCompiler {
 					method.visitLabel(labels.get(i));
 				}
 
-				LeveledLabel endCase = newLabel(tryFinallyNestingLevel);
+				LeveledLabel endCase = newLabel();
 				statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase);
 				method.visitLabel(endCase);
 			}
@@ -1025,7 +1061,7 @@ public class ClassCompiler {
 		 * tableSwitch is best to call if the case labels are consecutive integers and if there are not so many 
 		 * as to trigger a cache misses all the time.
 		 */
-		private void tableSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel) {
+		private void tableSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel, int line) {
 			int min = Integer.MAX_VALUE;
 			int max = Integer.MIN_VALUE;
 			boolean hasDefault = false;
@@ -1051,7 +1087,7 @@ public class ClassCompiler {
 				}
 			}
 
-			LeveledLabel defaultLabel = hasDefault ? newLabel(tryFinallyNestingLevel) : joinLabel;
+			LeveledLabel defaultLabel = hasDefault ? newLabel() : joinLabel;
 			Label[] labels = new LeveledLabel[max - min + 1];
 
 			for (int i = 0; i < labels.length; i++) {
@@ -1066,7 +1102,7 @@ public class ClassCompiler {
 				}
 				else {
 					// overwrite the default label with the case label
-					labels[AST.$getKey(c) - min] = newLabel(tryFinallyNestingLevel);
+					labels[AST.$getKey(c) - min] = newLabel();
 				}
 			}
 
@@ -1088,7 +1124,7 @@ public class ClassCompiler {
 					method.visitLabel(labels[AST.$getKey(c) - min]);
 				}
 
-				LeveledLabel endCase = newLabel(tryFinallyNestingLevel);
+				LeveledLabel endCase = newLabel();
 				statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase);
 				method.visitLabel(endCase);
 			}
@@ -1106,14 +1142,14 @@ public class ClassCompiler {
 		 * we find it in the AST, such that later when streaming this MethoeNode to bytecode the 
 		 * handlers are printed in the right order.
 		 */
-		private void tryStat(IList block, IList catches, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+		private void tryStat(IList block, IList catches, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
 			if (block.length() == 0) {
 				// JVM can not deal with empty catch ranges anyway
 				return;
 			}
 
-			Label tryStart = newLabel(tryFinallyNestingLevel);
-			Label tryEnd = newLabel(tryFinallyNestingLevel);
+			Label tryStart = newLabel();
+			Label tryEnd = newLabel();
 			Label[] handlers = new LeveledLabel[catches.length()];
 
 			String finallyVarName = null;
@@ -1124,11 +1160,11 @@ public class ClassCompiler {
 				IConstructor catcher = (IConstructor) catches.get(i);
 				boolean isFinally = AST.$is("finally", catcher);
 				boolean isLast = i == catches.length() - 1;
-				handlers[i] = newLabel(tryFinallyNestingLevel);
+				handlers[i] = newLabel();
 
 				if (isLast && isFinally) {
 					finallyVarName = "finally:" + UUID.randomUUID();
-					declareVariable(Types.throwableType(), finallyVarName, null, false, null);
+					declareVariable(Types.throwableType(), finallyVarName, null, false, null, line);
 					finallyCode = () -> statements(AST.$getBlock(catcher), breakLabel, continueLabel, joinLabel);
 					pushFinally(finallyCode);
 				}
@@ -1138,7 +1174,7 @@ public class ClassCompiler {
 				else {
 					IConstructor exceptionType = AST.$getType(catcher);
 					String varName = AST.$getName(catcher);
-					declareVariable(exceptionType, varName, null, false, null);
+					declareVariable(exceptionType, varName, null, false, null, line);
 				}
 			}
 
@@ -1185,28 +1221,29 @@ public class ClassCompiler {
 			return tryFinallyNestingLevel.add(finallyCode);
 		}
 
-		
+
 		/** 
 		 * Generating a monitor block is a matter of wrapping a block in MONITORENTER and MONITOREXIT,
 		 * but the existence of jump instructions such as throw, return, break and continue interacts with
 		 * this simplicity. We generate two nested try-catch blocks to make sure that in all cases when
 		 * the monitored block ends, the monitor is indeed closed using MONITOREXIT.
 		 */
-		private void monitorStat(IConstructor lock, IList block, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+		private void monitorStat(IConstructor lock, IList block, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
 			if (block.isEmpty()) {
 				return;
 			}
 
-			LeveledLabel startExceptionBlock = newLabel(tryFinallyNestingLevel);
-			LeveledLabel endExceptionBlock = newLabel(tryFinallyNestingLevel);
-			LeveledLabel handlerStart = newLabel(tryFinallyNestingLevel);
-			LeveledLabel handlerEnd = newLabel(tryFinallyNestingLevel);
+			LeveledLabel startExceptionBlock = newLabel();
+			LeveledLabel endExceptionBlock = newLabel();
+			LeveledLabel handlerStart = newLabel();
+			LeveledLabel handlerEnd = newLabel();
 
 			method.visitTryCatchBlock(startExceptionBlock, endExceptionBlock, handlerStart, null);
 			method.visitTryCatchBlock(handlerStart, handlerEnd, handlerStart, null);
 
 			String lockVarName = "$lock:" + UUID.randomUUID().toString();
 			Builder<IConstructor> finallyCode = () -> {
+				lineNumber(line);
 				method.visitVarInsn(Opcodes.ALOAD, positionOf(lockVarName));
 				method.visitInsn(Opcodes.MONITOREXIT);	
 				return null;
@@ -1215,7 +1252,7 @@ public class ClassCompiler {
 			// compute the lock object
 			IConstructor type = expr(lock);
 			// declare lock object var for later usage in the sinks of the control flow
-			declareVariable(type, lockVarName, null, false, null);
+			declareVariable(type, lockVarName, null, false, null, getLineNumber(lock));
 			// keep the lock object ready for MONITORENTER:
 			dup(); 
 			// store lock object var for later use
@@ -1252,8 +1289,8 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.ATHROW);
 		}
 
-		private void whileStat(String label, IConstructor cond, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
-			LeveledLabel testConditional = newLabel(tryFinallyNestingLevel);
+		private void whileStat(String label, IConstructor cond, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
+			LeveledLabel testConditional = newLabel();
 
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
@@ -1273,13 +1310,13 @@ public class ClassCompiler {
 			invertedConditionalFlow(0, cmpCode, 
 					() -> statements(body, testConditional, joinLabel, testConditional), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
-					testConditional);
+					testConditional, line);
 
 			jumpTo(testConditional); // this might be superfluous
 		}
 
-		private void doWhileStat(String label, IConstructor cond, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
-			LeveledLabel nextIteration = newLabel(tryFinallyNestingLevel);
+		private void doWhileStat(String label, IConstructor cond, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
+			LeveledLabel nextIteration = newLabel();
 
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
@@ -1302,7 +1339,7 @@ public class ClassCompiler {
 			invertedConditionalFlow(0, cmpCode, 
 					() -> jumpTo(nextIteration), 
 					null /* end of loop */, 
-					joinLabel);
+					joinLabel, line);
 		}
 
 		private void breakStat(IConstructor stat, LeveledLabel join) {
@@ -1347,8 +1384,8 @@ public class ClassCompiler {
 			return l;
 		}
 
-		private void blockStat(String label, IList body, LeveledLabel joinLabel) {
-			LeveledLabel again = newLabel(tryFinallyNestingLevel);
+		private void blockStat(String label, IList body, LeveledLabel joinLabel, int line) {
+			LeveledLabel again = newLabel();
 
 			labels.put("break:" + label, joinLabel);
 			labels.put("continue:" + label, again);
@@ -1357,7 +1394,7 @@ public class ClassCompiler {
 			statements(body, again, joinLabel, joinLabel);
 		}
 
-		private void declStat(IConstructor stat, LeveledLabel joinLabel) {
+		private void declStat(IConstructor stat, LeveledLabel joinLabel, int line) {
 			IConstructor def = null;
 			IList annotations = null;
 			IWithKeywordParameters<? extends IConstructor> kws = stat.asWithKeywordParameters();
@@ -1370,12 +1407,12 @@ public class ClassCompiler {
 				annotations = (IList) kws.getParameter("annotations");
 			}
 
-			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true, annotations);
+			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true, annotations, getLineNumber(stat));
 		}
 
-		private void forStat(String label, IList init, IConstructor cond, IList next, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
-			LeveledLabel testConditional = newLabel(tryFinallyNestingLevel);
-			LeveledLabel nextIterationLabel = newLabel(tryFinallyNestingLevel);
+		private void forStat(String label, IList init, IConstructor cond, IList next, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
+			LeveledLabel testConditional = newLabel();
+			LeveledLabel nextIterationLabel = newLabel();
 
 			if (label != null) {
 				labels.put("break:" + label, joinLabel);
@@ -1397,10 +1434,10 @@ public class ClassCompiler {
 			invertedConditionalFlow(0, cmpCode, 
 					() -> statements(body, nextIterationLabel, joinLabel, nextIterationLabel), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
-					nextIterationLabel);
+					nextIterationLabel, line);
 
 			method.visitLabel(nextIterationLabel);
-			LeveledLabel endNext = newLabel(tryFinallyNestingLevel);
+			LeveledLabel endNext = newLabel();
 			statements(next, continueLabel /*outerloop */, breakLabel /*outerloop*/, endNext);
 			method.visitLabel(endNext);
 			jumpTo(testConditional); // this might be superfluous
@@ -1411,17 +1448,17 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private void ifStat(IConstructor cond, IList thenBlock, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
-			ifThenElseStat(cond, thenBlock, null, continueLabel, breakLabel, joinLabel);
+		private void ifStat(IConstructor cond, IList thenBlock, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
+			ifThenElseStat(cond, thenBlock, null, continueLabel, breakLabel, joinLabel, line);
 		}
 
-		private void ifThenElseStat(IConstructor cond, IList thenBlock, IList elseBlock, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+		private void ifThenElseStat(IConstructor cond, IList thenBlock, IList elseBlock, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
 			Builder<IConstructor> thenBuilder = () -> statements(thenBlock, continueLabel, breakLabel, joinLabel);
 			Builder<IConstructor> elseBuilder = elseBlock != null ? () -> statements(elseBlock, continueLabel, breakLabel, joinLabel) : DONE;
-			ifThenElse(cond, thenBuilder, elseBuilder, continueLabel, breakLabel, joinLabel);
+			ifThenElse(cond, thenBuilder, elseBuilder, continueLabel, breakLabel, joinLabel, line);
 		}
 
-		private IConstructor ifThenElse(IConstructor cond, Builder<IConstructor> thenBuilder, Builder<IConstructor> elseBuilder, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+		private IConstructor ifThenElse(IConstructor cond, Builder<IConstructor> thenBuilder, Builder<IConstructor> elseBuilder, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
 			// here we special case for !=, ==, <=, >=, < and >, because
 			// there are special jump instructions for these operators on the JVM and we don't want to push
 			// a boolean on the stack and then conditionally have to jump on that boolean again:
@@ -1431,24 +1468,24 @@ public class ClassCompiler {
 			case "false":
 				return elseBuilder.build();
 			case "eq":
-				return eqExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				return eqExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
 			case "ne":
-				return neExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				return neExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
 			case "le":
-				return leExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				return leExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
 			case "gt":
-				return gtExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				return gtExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
 			case "ge":
-				return geExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				return geExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
 			case "lt":
-				return ltExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel);
+				return ltExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
 			case "neg":
 				// if(!expr) is compiled to IFNE directly without intermediate (inefficient) negation code
 				expr(AST.$getArg(cond));
-				return invertedConditionalFlow(0, Opcodes.IFNE, thenBuilder, elseBuilder, joinLabel);
+				return invertedConditionalFlow(0, Opcodes.IFNE, thenBuilder, elseBuilder, joinLabel, line);
 			default:
 				expr(cond);
-				return invertedConditionalFlow(0, Opcodes.IFEQ, thenBuilder, elseBuilder, joinLabel);
+				return invertedConditionalFlow(0, Opcodes.IFEQ, thenBuilder, elseBuilder, joinLabel, line);
 			}
 		}
 
@@ -1556,123 +1593,133 @@ public class ClassCompiler {
 		}
 
 		private IConstructor expr(IConstructor exp) {
-			switch (exp.getConstructorType().getName()) {
-			case "const" : 
-				return constExp(AST.$getType(exp), AST.$getConstant(exp)); 
-			case "this" : 
-				return loadExp("this");
-			case "newInstance":
-				return newInstanceExp(exp);
-			case "newArray":
-				if (exp.get(1) instanceof IList) {
-					return newArrayExp(AST.$getType(exp), AST.$getArgs(exp));
+			int line = getLineNumber(exp);
+			
+			try {
+				switch (exp.getConstructorType().getName()) {
+				case "const" : 
+					return constExp(AST.$getType(exp), AST.$getConstant(exp), line); 
+				case "this" : 
+					return loadExp("this", line);
+				case "newInstance":
+					return newInstanceExp(exp, line);
+				case "newArray":
+					if (exp.get(1) instanceof IList) {
+						return newArrayExp(AST.$getType(exp), AST.$getArgs(exp), line);
+					}
+					else {
+						return newArrayExp(AST.$getType(exp), AST.$getSize(exp), line);
+					}
+				case "alength":
+					return alengthExp(AST.$getArg(exp), line);
+				case "load" : 
+					return loadExp(AST.$getName(exp), line); 
+				case "aload" :
+					return aaloadExp(AST.$getArray(exp), AST.$getIndex(exp), line);
+				case "getStatic":
+					return getstaticExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp), line);
+				case "invokeVirtual" : 
+					return invokeVirtualExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp), line);
+				case "invokeInterface" : 
+					return invokeInterfaceExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp), line);
+				case "invokeSpecial" : 
+					return invokeSpecialExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp), line);
+				case "invokeSuper" : 
+					return invokeSuperStat(classNode.superName, AST.$getDesc(exp), AST.$getArgs(exp), line);
+				case "invokeStatic" : 
+					return invokeStaticExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getArgs(exp), line);
+				case "invokeDynamic" : 
+					return invokeDynamicExp(AST.$getHandle(exp), AST.$getDesc(exp), AST.$getArgs(exp), line);
+				case "getField":
+					return getfieldExp(AST.$getReceiver(exp), AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp), line);
+				case "instanceof":
+					return instanceofExp(AST.$getArg(exp), AST.$getRefClassFromType(exp, classNode.name), line);
+				case "sblock":
+					return sblockExp(AST.$getStatements(exp), AST.$getArg(exp), line);
+				case "null":
+					if (exp.getConstructorType().getArity() == 0) {
+						return nullExp();  // null constant
+					}
+					else { 
+						return isNullTest(AST.$getArg(exp), pushTrue, pushFalse, null, line); // null check 
+					}
+				case "nonnull":
+					return isNonNullTest(AST.$getArg(exp), pushTrue, pushFalse, null, line); // null check 
+				case "true":
+					lineNumber(line);
+					return trueExp();
+				case "false":
+					lineNumber(line);
+					return falseExp();
+				case "coerce":
+					return coerceExp(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp), line);
+				case "eq":
+					eqExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null, line);
+					return Types.booleanType();
+				case "ne":
+					neExp(AST.$getLhs(exp), AST.$getRhs(exp), (Builder<IConstructor>) pushTrue, (Builder<IConstructor>) pushFalse, null, line);
+					return Types.booleanType();
+				case "le":
+					leExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null, line);
+					return Types.booleanType();
+				case "gt":
+					gtExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null, line);
+					return Types.booleanType();
+				case "ge":
+					geExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null, line);
+					return Types.booleanType();
+				case "lt":
+					ltExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null, line);
+					return Types.booleanType();
+				case "add":
+					return addExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "div":
+					return divExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "rem":
+					return remExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "sub":
+					return subExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "mul":
+					return mulExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "and":
+					return andExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "or":
+					return orExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "xor":
+					return xorExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "neg":
+					return negExp(AST.$getArg(exp), line);
+				case "inc":
+					return incExp(AST.$getName(exp), AST.$getInc(exp), line);
+				case "shr":
+					return shrExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "shl":
+					return shlExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "ushr":
+					return ushrExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "checkcast":
+					return checkCastExp(AST.$getArg(exp), AST.$getType(exp), line);
+				case "cond":
+					return cond(AST.$getCondition(exp), AST.$getThenExp(exp), AST.$getElseExp(exp), line);
+				default: 
+					throw new IllegalArgumentException("unknown expression: " + exp);                                     
 				}
-				else {
-					return newArrayExp(AST.$getType(exp), AST.$getSize(exp));
-				}
-			case "alength":
-				return alengthExp(AST.$getArg(exp));
-			case "load" : 
-				return loadExp(AST.$getName(exp)); 
-			case "aload" :
-				return aaloadExp(AST.$getArray(exp), AST.$getIndex(exp));
-			case "getStatic":
-				return getstaticExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));
-			case "invokeVirtual" : 
-				return invokeVirtualExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
-			case "invokeInterface" : 
-				return invokeInterfaceExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
-			case "invokeSpecial" : 
-				return invokeSpecialExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp));
-			case "invokeSuper" : 
-				return invokeSuperStat(classNode.superName, AST.$getDesc(exp), AST.$getArgs(exp));
-			case "invokeStatic" : 
-				return invokeStaticExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getArgs(exp));
-			case "invokeDynamic" : 
-				return invokeDynamicExp(AST.$getHandle(exp), AST.$getDesc(exp), AST.$getArgs(exp));
-			case "getField":
-				return getfieldExp(AST.$getReceiver(exp), AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp));
-			case "instanceof":
-				return instanceofExp(AST.$getArg(exp), AST.$getRefClassFromType(exp, classNode.name));
-			case "sblock":
-				return sblockExp(AST.$getStatements(exp), AST.$getArg(exp));
-			case "null":
-				if (exp.getConstructorType().getArity() == 0) {
-					return nullExp();  // null constant
-				}
-				else { 
-					return isNullTest(AST.$getArg(exp), pushTrue, pushFalse, null); // null check 
-				}
-			case "nonnull":
-				return isNonNullTest(AST.$getArg(exp), pushTrue, pushFalse, null); // null check 
-			case "true":
-				return trueExp();
-			case "false":
-				return falseExp();
-			case "coerce":
-				return coerceExp(AST.$getFrom(exp), AST.$getTo(exp), AST.$getArg(exp));
-			case "eq":
-				eqExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
-				return Types.booleanType();
-			case "ne":
-				neExp(AST.$getLhs(exp), AST.$getRhs(exp), (Builder<IConstructor>) pushTrue, (Builder<IConstructor>) pushFalse, null);
-				return Types.booleanType();
-			case "le":
-				leExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
-				return Types.booleanType();
-			case "gt":
-				gtExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
-				return Types.booleanType();
-			case "ge":
-				geExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
-				return Types.booleanType();
-			case "lt":
-				ltExp(AST.$getLhs(exp), AST.$getRhs(exp), pushTrue, pushFalse, null);
-				return Types.booleanType();
-			case "add":
-				return addExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "div":
-				return divExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "rem":
-				return remExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "sub":
-				return subExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "mul":
-				return mulExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "and":
-				return andExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "or":
-				return orExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "xor":
-				return xorExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "neg":
-				return negExp(AST.$getArg(exp));
-			case "inc":
-				return incExp(AST.$getName(exp), AST.$getInc(exp));
-			case "shr":
-				return shrExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "shl":
-				return shlExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "ushr":
-				return ushrExp(AST.$getLhs(exp), AST.$getRhs(exp));
-			case "checkcast":
-				return checkCastExp(AST.$getArg(exp), AST.$getType(exp));
-			case "cond":
-				return cond(AST.$getCondition(exp), AST.$getThenExp(exp), AST.$getElseExp(exp));
-			default: 
-				throw new IllegalArgumentException("unknown expression: " + exp);                                     
+			}
+			finally {
+				
 			}
 		}
 
-		private IConstructor cond(IConstructor cond, IConstructor thenExp, IConstructor elseExp) {
-			LeveledLabel joinLabel = newLabel(tryFinallyNestingLevel);
-			IConstructor res = ifThenElse(cond, () -> expr(thenExp), () -> expr(elseExp), null, null, joinLabel);
+		private IConstructor cond(IConstructor cond, IConstructor thenExp, IConstructor elseExp, int line) {
+			LeveledLabel joinLabel = newLabel();
+			IConstructor res = ifThenElse(cond, () -> expr(thenExp), () -> expr(elseExp), null, null, joinLabel, line);
 			method.visitLabel(joinLabel);
 			return res;
 		}
 
-		private IConstructor shlExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor shlExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareShiftArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.ISHL),
 					(i) -> method.visitInsn(Opcodes.ISHL), 
@@ -1698,8 +1745,9 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor ushrExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor ushrExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareShiftArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IUSHR),
 					(i) -> method.visitInsn(Opcodes.IUSHR), 
@@ -1717,8 +1765,9 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor shrExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor shrExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareShiftArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.ISHR),
 					(i) -> method.visitInsn(Opcodes.ISHR), 
@@ -1736,14 +1785,16 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor incExp(String name, int inc) {
+		private IConstructor incExp(String name, int inc, int line) {
+			lineNumber(line);
 			method.visitIincInsn(positionOf(name), inc);
-			loadExp(name);
+			loadExp(name, line);
 			return Types.integerType();
 		}
 
-		private IConstructor addExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor addExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IOR),
 					(i) -> method.visitInsn(Opcodes.IADD), 
@@ -1761,8 +1812,9 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor subExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor subExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> { throw new IllegalArgumentException("sub on bool"); },
 					(i) -> method.visitInsn(Opcodes.ISUB), 
@@ -1780,8 +1832,9 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor remExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor remExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> { throw new IllegalArgumentException("rem on bool"); },
 					(i) -> method.visitInsn(Opcodes.IREM), 
@@ -1799,8 +1852,9 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor divExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor divExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> { throw new IllegalArgumentException("div on bool"); },
 					(i) -> method.visitInsn(Opcodes.IDIV), 
@@ -1818,8 +1872,9 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor mulExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor mulExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IAND),
 					(i) -> method.visitInsn(Opcodes.IMUL), 
@@ -1837,8 +1892,9 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor andExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor andExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IAND),
 					(i) -> method.visitInsn(Opcodes.IAND), 
@@ -1856,8 +1912,9 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor orExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor orExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IOR),
 					(i) -> method.visitInsn(Opcodes.IOR), 
@@ -1875,8 +1932,9 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor xorExp(IConstructor lhs, IConstructor rhs) {
+		private IConstructor xorExp(IConstructor lhs, IConstructor rhs, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IXOR),
 					(i) -> method.visitInsn(Opcodes.IXOR), 
@@ -1894,13 +1952,14 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor negExp(IConstructor arg) {
+		private IConstructor negExp(IConstructor arg, int line) {
 			IConstructor type = expr(arg);
+			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> { 
 						// TODO: is there really not a better way to negate a boolean on the JVM?
-						Label zeroLabel = newLabel(tryFinallyNestingLevel);
-						Label contLabel = newLabel(tryFinallyNestingLevel);
+						Label zeroLabel = newLabel();
+						Label contLabel = newLabel();
 						method.visitJumpInsn(Opcodes.IFEQ, zeroLabel);
 						falseExp();
 						jumpTo(contLabel);
@@ -1924,9 +1983,10 @@ public class ClassCompiler {
 		}
 
 
-		private IConstructor invokeSuperStat(String superclass, IConstructor sig, IList args) {
-			loadExp("this");
+		private IConstructor invokeSuperStat(String superclass, IConstructor sig, IList args, int line) {
+			loadExp("this", line);
 			expressions(args);
+			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, superclass, "<init>", Signature.constructor(sig), false);
 			return Types.voidType();
 		}
@@ -1956,15 +2016,17 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor checkCastExp(IConstructor arg, IConstructor type) {
+		private IConstructor checkCastExp(IConstructor arg, IConstructor type, int line) {
 			String cons = type.getConstructorType().getName();
 
 			expr(arg);
 			// weird inconsistency in CHECKCAST instruction?
 			if (cons == "object") {
+				lineNumber(line);
 				method.visitTypeInsn(Opcodes.CHECKCAST, AST.$getName(type).replace('.','/'));
 			}
 			else if (cons == "array") {
+				lineNumber(line);
 				method.visitTypeInsn(Opcodes.CHECKCAST, Signature.type(type));
 			}
 			else {
@@ -1974,30 +2036,33 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor alengthExp(IConstructor arg) {
+		private IConstructor alengthExp(IConstructor arg, int line) {
 			expr(arg);
+			lineNumber(line);
 			method.visitInsn(Opcodes.ARRAYLENGTH);
 			return Types.integerType();
 		}
 
-		private IConstructor newArrayExp(IConstructor type, IConstructor size) {
+		private IConstructor newArrayExp(IConstructor type, IConstructor size, int line) {
 			expr(size);
 
 			if (!type.getConstructorType().getName().equals("array")) {
 				throw new IllegalArgumentException("arg should be an array type");
 			}
-			newArrayWithSizeOnStack(AST.$getArg(type));
+			
+			newArrayWithSizeOnStack(AST.$getArg(type), line);
 			return type;
 		}
 
-		private IConstructor newArrayExp(IConstructor type, IList elems) {
+		private IConstructor newArrayExp(IConstructor type, IList elems, int line) {
 			intConstant(elems.length());
 			if (!type.getConstructorType().getName().equals("array")) {
 				throw new IllegalArgumentException("arg should be an array type");
 			}
 
-			newArrayWithSizeOnStack(AST.$getArg(type));
-
+			lineNumber(line);
+			newArrayWithSizeOnStack(AST.$getArg(type), line);
+		
 			int i = 0;
 			for (IValue elem : elems) {
 				dup();
@@ -2009,7 +2074,7 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private void newArrayWithSizeOnStack(IConstructor type) {
+		private void newArrayWithSizeOnStack(IConstructor type, int line) {
 			Switch.type0(type,
 					(z) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BOOLEAN) ,
 					(i) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_INT) , 
@@ -2024,20 +2089,21 @@ public class ClassCompiler {
 					(a) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$getRefClassFromType(type, classNode.name)),
 					(S) -> method.visitTypeInsn(Opcodes.ANEWARRAY, Signature.stringType)
 					);
+			lineNumber(line);
 		}
 
-		private IConstructor ltExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel) {
+		private IConstructor ltExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
-
+			lineNumber(line);
 			return Switch.type(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFGE, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFGE, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFGE, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel, line),
+					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel, line), 
+					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel, line), 
+					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel, line), 
+					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel, line), 
+					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFGE, thenPart, elsePart, joinLabel, line),
+					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFGE, thenPart, elsePart, joinLabel, line),
+					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFGE, thenPart, elsePart, joinLabel, line),
 					(v) -> { throw new IllegalArgumentException("< on void"); }, 
 					(c) -> { throw new IllegalArgumentException("< on class"); }, 
 					(a) -> { throw new IllegalArgumentException("< on array"); },
@@ -2045,17 +2111,18 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor leExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel) {
+		private IConstructor leExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
+			lineNumber(line);
 			return Switch.type(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFGT, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFGT, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFGT, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel, line),
+					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel, line), 
+					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel, line), 
+					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel, line), 
+					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel, line), 
+					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFGT, thenPart, elsePart, joinLabel, line),
+					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFGT, thenPart, elsePart, joinLabel, line),
+					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFGT, thenPart, elsePart, joinLabel, line),
 					(v) -> { throw new IllegalArgumentException("<= on void"); }, 
 					(c) -> { throw new IllegalArgumentException("<= on class"); }, 
 					(a) -> { throw new IllegalArgumentException("<= on array"); },
@@ -2063,18 +2130,18 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor gtExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel) {
+		private IConstructor gtExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
-
+			lineNumber(line);
 			return Switch.type(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFLE, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFLE, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFLE, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel, line),
+					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel, line), 
+					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel, line), 
+					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel, line), 
+					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel, line), 
+					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFLE, thenPart, elsePart, joinLabel, line),
+					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFLE, thenPart, elsePart, joinLabel, line),
+					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFLE, thenPart, elsePart, joinLabel, line),
 					(v) -> { throw new IllegalArgumentException("> on void"); }, 
 					(c) -> { throw new IllegalArgumentException("> on class"); }, 
 					(a) -> { throw new IllegalArgumentException("> on array"); },
@@ -2082,18 +2149,18 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor geExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel) {
+		private IConstructor geExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
-
+			lineNumber(line);
 			return Switch.type(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFLT, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFLT, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFLT, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel, line),
+					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel, line), 
+					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel, line), 
+					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel, line), 
+					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel, line), 
+					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFLT, thenPart, elsePart, joinLabel, line),
+					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFLT, thenPart, elsePart, joinLabel, line),
+					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFLT, thenPart, elsePart, joinLabel, line),
 					(v) -> { throw new IllegalArgumentException(">= on void"); }, 
 					(c) -> { throw new IllegalArgumentException(">= on class"); }, 
 					(a) -> { throw new IllegalArgumentException(">= on array"); },
@@ -2101,29 +2168,29 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor eqExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel) {
+		private IConstructor eqExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			if (lhs.getConstructorType().getName().equals("null")) {
-				return isNullTest(rhs, thenPart, elsePart, joinLabel);
+				return isNullTest(rhs, thenPart, elsePart, joinLabel, line);
 			}
 			else if (rhs.getConstructorType().getName().equals("null")) {
-				return isNullTest(lhs, thenPart, elsePart, joinLabel);
+				return isNullTest(lhs, thenPart, elsePart, joinLabel, line);
 			}
 
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			return Switch.type(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFNE, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFNE, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFNE, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel, line),
+					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel, line), 
+					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel, line), 
+					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel, line), 
+					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel, line), 
+					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFNE, thenPart, elsePart, joinLabel, line),
+					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFNE, thenPart, elsePart, joinLabel, line),
+					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFNE, thenPart, elsePart, joinLabel, line),
 					(v) -> { throw new IllegalArgumentException(">= on void"); }, 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel), 
-					(a) -> invertedConditionalFlow(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel),
-					(S) -> invertedConditionalFlow(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel)
+					(c) -> invertedConditionalFlow(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel, line), 
+					(a) -> invertedConditionalFlow(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel, line),
+					(S) -> invertedConditionalFlow(0, Opcodes.IF_ACMPNE, thenPart, elsePart, joinLabel, line)
 					);
 		}
 
@@ -2132,6 +2199,8 @@ public class ClassCompiler {
 			if (type.getConstructorType() != expr(rhs).getConstructorType()) {
 				throw new IllegalArgumentException("incomparable types for operator");
 			}
+			
+			
 			return type;
 		}
 
@@ -2150,16 +2219,18 @@ public class ClassCompiler {
 		 * @param thenPart     emit code for the thenPart
 		 * @param elsePart     emit code for the elsePart
 		 * @param joinLabel emit code for what runs after this conditional
+		 * @param line 
 		 */
-		private IConstructor invertedConditionalFlow(int compare, int opcode, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel) {
-			Label jump = newLabel(tryFinallyNestingLevel);
-			Label next = joinLabel == null ? newLabel(tryFinallyNestingLevel) : joinLabel;
+		private IConstructor invertedConditionalFlow(int compare, int opcode, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
+			Label jump = newLabel();
+			Label next = joinLabel == null ? newLabel() : joinLabel;
 			IConstructor res1 = null, res2 = null;
 
 			if (compare != 0) {
 				method.visitInsn(compare);
 			}
 
+			lineNumber(line);
 			method.visitJumpInsn(opcode, elsePart != null ? jump : next);
 			res1 = thenPart.build();
 
@@ -2192,61 +2263,62 @@ public class ClassCompiler {
 			return res1;
 		}
 
-		private IConstructor isNullTest(IConstructor arg, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel) {
+		private IConstructor isNullTest(IConstructor arg, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			expr(arg);
-			return invertedConditionalFlow(0, Opcodes.IFNONNULL, thenPart, elsePart, joinLabel);
+			return invertedConditionalFlow(0, Opcodes.IFNONNULL, thenPart, elsePart, joinLabel, line);
 		}
 
-		private IConstructor isNonNullTest(IConstructor arg, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel) {
+		private IConstructor isNonNullTest(IConstructor arg, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			expr(arg);
-			return invertedConditionalFlow(0, Opcodes.IFNULL, thenPart, elsePart, joinLabel);
+			return invertedConditionalFlow(0, Opcodes.IFNULL, thenPart, elsePart, joinLabel, line);
 		}
 
-		private IConstructor neExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel) {
+		private IConstructor neExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			if (lhs.getConstructorType().getName().equals("null")) {
-				return isNonNullTest(rhs, thenPart, elsePart, joinLabel);
+				return isNonNullTest(rhs, thenPart, elsePart, joinLabel, line);
 			}
 			else if (rhs.getConstructorType().getName().equals("null")) {
-				return isNonNullTest(lhs, thenPart, elsePart, joinLabel);
+				return isNonNullTest(lhs, thenPart, elsePart, joinLabel, line);
 			}
 
 			IConstructor type = prepareArguments(lhs, rhs);
 
 			return Switch.type(type, 
-					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel),
-					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
-					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
-					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel), 
-					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
-					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
-					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFEQ, thenPart, elsePart, joinLabel),
+					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel, line),
+					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel, line), 
+					(s) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel, line), 
+					(b) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel, line), 
+					(c) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel, line), 
+					(f) -> invertedConditionalFlow(Opcodes.FCMPG, Opcodes.IFEQ, thenPart, elsePart, joinLabel, line),
+					(d) -> invertedConditionalFlow(Opcodes.DCMPG, Opcodes.IFEQ, thenPart, elsePart, joinLabel, line),
+					(l) -> invertedConditionalFlow(Opcodes.LCMP, Opcodes.IFEQ, thenPart, elsePart, joinLabel, line),
 					(v) -> { throw new IllegalArgumentException("!= on void"); }, 
-					(c) -> invertedConditionalFlow(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel), 
-					(a) -> invertedConditionalFlow(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel),
-					(S) -> invertedConditionalFlow(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel)
+					(c) -> invertedConditionalFlow(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel, line), 
+					(a) -> invertedConditionalFlow(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel, line),
+					(S) -> invertedConditionalFlow(0, Opcodes.IF_ACMPEQ, thenPart, elsePart, joinLabel, line)
 					);
 		}
 
-		private IConstructor coerceExp(IConstructor from, IConstructor to, IConstructor arg) {
+		private IConstructor coerceExp(IConstructor from, IConstructor to, IConstructor arg, int line) {
 			Switch.type0(from,
-					(z) -> coerceFromBool(to, arg),
-					(i) -> coerceFromInt(to, arg),
-					(s) -> coerceFromShort(to, arg),
-					(b) -> coerceFromByte(to, arg),
-					(c) -> coerceFromChar(to, arg),
-					(f) -> coerceFromFloat(to, arg),
-					(d) -> coerceFromDouble(to, arg),
-					(l) -> coerceFromLong(to, arg),
+					(z) -> coerceFromBool(to, arg, line),
+					(i) -> coerceFromInt(to, arg, line),
+					(s) -> coerceFromShort(to, arg, line),
+					(b) -> coerceFromByte(to, arg, line),
+					(c) -> coerceFromChar(to, arg, line),
+					(f) -> coerceFromFloat(to, arg, line),
+					(d) -> coerceFromDouble(to, arg, line),
+					(l) -> coerceFromLong(to, arg, line),
 					(v) -> failedCoercion("void", to),
-					(c) -> coerceFromClass(from, to, arg),
-					(a) -> coerceFromArray(from, to, arg), 
-					(S) -> coerceFromString(from, to, arg) 
+					(c) -> coerceFromClass(from, to, arg, line),
+					(a) -> coerceFromArray(from, to, arg, line), 
+					(S) -> coerceFromString(from, to, arg, line) 
 					);
 			return to;
 		}
 
-		private void coerceFromString(IConstructor from, IConstructor to, IConstructor arg) {
+		private void coerceFromString(IConstructor from, IConstructor to, IConstructor arg, int line) {
+			lineNumber(line);
 			Switch.type0(to, 
 					(z) -> {
 						expr(arg);
@@ -2284,7 +2356,7 @@ public class ClassCompiler {
 					);
 		}
 
-		private void coerceFromBool(IConstructor to, IConstructor arg) {
+		private void coerceFromBool(IConstructor to, IConstructor arg, int line) {
 			throw new IllegalArgumentException("Can not coerce " + "bool" + " to " + to.getConstructorType().getName());
 		}
 
@@ -2292,7 +2364,8 @@ public class ClassCompiler {
 			throw new IllegalArgumentException("Can not coerce " + from + " to " + to.getConstructorType().getName());
 		}
 
-		private void coerceFromArray(IConstructor from, IConstructor to, IConstructor arg) {
+		private void coerceFromArray(IConstructor from, IConstructor to, IConstructor arg, int line) {
+			lineNumber(line);
 			Switch.type0(to,
 					(z) -> failedCoercion("int", to),
 					(i) -> failedCoercion("int", to),
@@ -2313,7 +2386,8 @@ public class ClassCompiler {
 
 		}
 
-		private void coerceFromLong(IConstructor to, IConstructor arg) {
+		private void coerceFromLong(IConstructor to, IConstructor arg, int line) {
+			lineNumber(line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { method.visitInsn(Opcodes.L2I); },
@@ -2333,9 +2407,10 @@ public class ClassCompiler {
 					);
 		}
 
-		private void coerceFromClass(IConstructor from, IConstructor to, IConstructor arg) {
+		private void coerceFromClass(IConstructor from, IConstructor to, IConstructor arg, int line) {
 			String cls = AST.$getName(from);
-
+			lineNumber(line);
+			
 			Switch.type0(to,
 					(z) -> {
 						if (cls.equals("java/lang/Boolean")) {
@@ -2418,7 +2493,9 @@ public class ClassCompiler {
 					);
 		}
 
-		private void coerceFromDouble(IConstructor to, IConstructor arg) {
+		private void coerceFromDouble(IConstructor to, IConstructor arg, int line) {
+			lineNumber(line);
+			
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { method.visitInsn(Opcodes.D2I); },
@@ -2438,7 +2515,8 @@ public class ClassCompiler {
 					);
 		}
 
-		private void coerceFromFloat(IConstructor to, IConstructor arg) {
+		private void coerceFromFloat(IConstructor to, IConstructor arg, int line) {
+			lineNumber(line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { method.visitInsn(Opcodes.F2I); },
@@ -2458,7 +2536,8 @@ public class ClassCompiler {
 					);
 		}
 
-		private void coerceFromChar(IConstructor to, IConstructor arg) {
+		private void coerceFromChar(IConstructor to, IConstructor arg, int line) {
+			lineNumber(line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
@@ -2478,7 +2557,8 @@ public class ClassCompiler {
 					);
 		}
 
-		private void coerceFromByte(IConstructor to, IConstructor arg) {
+		private void coerceFromByte(IConstructor to, IConstructor arg, int line) {
+			lineNumber(line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
@@ -2498,7 +2578,8 @@ public class ClassCompiler {
 					);
 		}
 
-		private void coerceFromShort(IConstructor to, IConstructor arg) {
+		private void coerceFromShort(IConstructor to, IConstructor arg, int line) {
+			lineNumber(line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
@@ -2518,7 +2599,8 @@ public class ClassCompiler {
 					);
 		}
 
-		private void coerceFromInt(IConstructor to, IConstructor arg) {
+		private void coerceFromInt(IConstructor to, IConstructor arg, int line) {
+			lineNumber(line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
@@ -2553,8 +2635,8 @@ public class ClassCompiler {
 			return Types.voidType();
 		}
 
-		private IConstructor sblockExp(IList block, IConstructor arg) {
-			LeveledLabel blockEnd = newLabel(tryFinallyNestingLevel);
+		private IConstructor sblockExp(IList block, IConstructor arg, int line) {
+			LeveledLabel blockEnd = newLabel();
 			statements(block, null, null, blockEnd);
 			method.visitLabel(blockEnd);
 			IConstructor type = expr(arg);
@@ -2565,32 +2647,36 @@ public class ClassCompiler {
 			return new LeveledLabel(level.size());
 		}
 
-		private IConstructor instanceofExp(IConstructor arg, String cls) {
+		private IConstructor instanceofExp(IConstructor arg, String cls, int line) {
 			expr(arg);
+			lineNumber(line);
 			method.visitTypeInsn(Opcodes.INSTANCEOF, cls);
 			return Types.booleanType();
 		}
 
-		private IConstructor getfieldExp(IConstructor receiver, String cls, IConstructor type, String name) {
+		private IConstructor getfieldExp(IConstructor receiver, String cls, IConstructor type, String name, int line) {
 			expr(receiver);
+			lineNumber(line);
 			method.visitFieldInsn(Opcodes.GETFIELD, cls, name, Signature.type(type));
 			return type;
 		}
 
-		private IConstructor newInstanceExp(IConstructor exp) {
+		private IConstructor newInstanceExp(IConstructor exp, int line) {
 			IConstructor type = AST.$getClass(exp);
 			String cls = AST.$getRefClassFromType(type, classNode.name);
 			String desc = Signature.constructor(AST.$getDesc(exp));
 			method.visitTypeInsn(Opcodes.NEW, cls);
 			dup();
 			expressions(AST.$getArgs(exp));
+			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", desc, false);
 			return type;
 		}
 
-		private IConstructor aaloadExp(IConstructor array, IConstructor index) {
+		private IConstructor aaloadExp(IConstructor array, IConstructor index, int line) {
 			IConstructor type = expr(array);
 			expr(index);
+			lineNumber(line);
 			Switch.type0(AST.$getArg(type), 
 					(b) -> method.visitInsn(Opcodes.BALOAD), 
 					(i) -> method.visitInsn(Opcodes.IALOAD), 
@@ -2608,30 +2694,33 @@ public class ClassCompiler {
 			return AST.$getArg(type);
 		}
 
-		private IConstructor getstaticExp(String cls, IConstructor type, String name) {
+		private IConstructor getstaticExp(String cls, IConstructor type, String name, int line) {
+			lineNumber(line);
 			method.visitFieldInsn(Opcodes.GETSTATIC, cls, name, Signature.type(type));
 			return type;
 		}
 
-		private IConstructor invokeSpecialExp(String cls, IConstructor sig, IConstructor receiver, IList args) {
+		private IConstructor invokeSpecialExp(String cls, IConstructor sig, IConstructor receiver, IList args, int line) {
 			expr(receiver);
 			expressions(args);
-
+			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, AST.$getName(sig), Signature.method(sig), false);
 			return AST.$getReturn(sig);
 		}
 
-		private IConstructor invokeDynamicExp(IConstructor handler, IConstructor sig, IList args) {
+		private IConstructor invokeDynamicExp(IConstructor handler, IConstructor sig, IList args, int line) {
 			String name = AST.$getName(sig);
 			Handle bootstrapper = bootstrapHandler(handler);
 			Object[] bArgs = bootstrapArgs(handler);
 
 			// push arguments to the method on the stack, (including the receiver, if its not a static method)
 			expressions(args);
-            
+			
+			lineNumber(line);
+			
 			// invoke the dynamic handle (and registeres it as side-effect using the bootstrap method)
 			method.visitInvokeDynamicInsn(name, Signature.method(sig), bootstrapper, bArgs);
-			
+
 			return AST.$getReturn(sig);
 		}
 
@@ -2714,18 +2803,19 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor invokeVirtualExp(String cls, IConstructor sig, IConstructor receiver, IList args) {
+		private IConstructor invokeVirtualExp(String cls, IConstructor sig, IConstructor receiver, IList args, int line) {
 			expr(receiver);
 			expressions(args);
 
+			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, cls, AST.$getName(sig), Signature.method(sig), false);
 			return AST.$getReturn(sig);
 		}
 
-		private IConstructor invokeInterfaceExp(String interf, IConstructor sig, IConstructor receiver, IList args) {
+		private IConstructor invokeInterfaceExp(String interf, IConstructor sig, IConstructor receiver, IList args, int line) {
 			expr(receiver);
 			expressions(args);
-
+			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKEINTERFACE, interf, AST.$getName(sig), Signature.method(sig), true);
 			return AST.$getReturn(sig);
 		}
@@ -2741,14 +2831,14 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private IConstructor invokeStaticExp(String cls, IConstructor sig, IList args) {
+		private IConstructor invokeStaticExp(String cls, IConstructor sig, IList args, int line) {
 			expressions(args);
-
+			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKESTATIC, cls, AST.$getName(sig), Signature.method(sig), false);
 			return AST.$getReturn(sig);
 		}
 
-		private IConstructor loadExp(String name) {
+		private IConstructor loadExp(String name, int line) {
 			int pos = positionOf(name);
 			IConstructor type = variableTypes.get(pos);
 
@@ -2767,6 +2857,8 @@ public class ClassCompiler {
 					(S,p) -> method.visitVarInsn(Opcodes.ALOAD, p)
 					);
 
+			lineNumber(line);
+			
 			return type;
 		}
 
@@ -2844,7 +2936,7 @@ public class ClassCompiler {
 			throw new IllegalArgumentException("name not found: " + name);
 		}
 
-		private IConstructor constExp(IConstructor type, IValue constant) {
+		private IConstructor constExp(IConstructor type, IValue constant, int line) {
 			Switch.type0(type, 
 					(z) -> booleanConstant(AST.$getBooleanConstant(constant)), 
 					(i) -> intConstant(AST.$getIntegerConstant(constant)), 
@@ -2858,7 +2950,7 @@ public class ClassCompiler {
 					(c) -> { throw new IllegalArgumentException("object constant"); }, 
 					(a) -> {
 						if (constant instanceof IList) {
-							constantArray(AST.$getArg(type), (IList) constant);
+							constantArray(AST.$getArg(type), (IList) constant, line);
 						}
 						else {
 							{ throw new IllegalArgumentException("array constant without list input"); }	
@@ -2867,18 +2959,29 @@ public class ClassCompiler {
 					(S) -> stringConstant(AST.$getStringConstant(constant))
 					);
 
+			lineNumber(line);
 			return type;
 		}
 
-		private void constantArray(IConstructor type, IList constant) {
+		private void lineNumber(int line) {
+			if (line != -1 && line != currentLine) {
+				out.println("new line: " + line);
+				Label label = new Label();
+				method.visitLabel(label);
+				method.visitLineNumber(line, label);
+				currentLine = line;
+			}
+		}
+
+		private void constantArray(IConstructor type, IList constant, int line) {
 			intConstant(constant.length());
-			newArrayWithSizeOnStack(type);
+			newArrayWithSizeOnStack(type, line);
 			int index = 0;
 
 			for (IValue elem : constant) {
 				dup();
 				intConstant(index);
-				constExp((IConstructor) elem, elem);
+				constExp((IConstructor) elem, elem, line);
 				arrayStoreExpWithArrayIndexValueOnStack(type);
 			}
 		}

@@ -58,6 +58,7 @@ list[Field] fields((Decl) `var <{AttributedName ","}+ attrs>`) = fields(attrs);
 
 list[Field] fields({AttributedName ","}+ attrs) = [field(attr) | attr <- attrs];
 
+// TODO store the attributes in JVM annotations
 Field field((AttributedName) `<Attribute* attrs> <Name name>`) = field(object(), "<name>");
  
 Method method((Method) `method <Name name>(<{AttributedName ","}+ attrs>) is <Decl* decls> <Stmt block> end`)

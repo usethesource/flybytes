@@ -4,7 +4,7 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="lib" path="generated" sourcepath="src"/>
+	<classpathentry kind="lib" path="generated" sourcepath=""/>
 	<classpathentry kind="lib" path="lib/rascal-asm-7.0-beta.jar" sourcepath="lib/rascal-asm-7.0-beta-sources.jar"/>
 	<classpathentry kind="lib" path="lib/rascal-asm-analysis-7.0-beta.jar" sourcepath="lib/rascal-asm-analysis-7.0-beta-sources.jar"/>
 	<classpathentry kind="lib" path="lib/rascal-asm-commons-7.0-beta.jar" sourcepath="lib/rascal-asm-commons-7.0-beta-sources.jar"/>

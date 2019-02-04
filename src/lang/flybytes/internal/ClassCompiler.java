@@ -293,7 +293,8 @@ public class ClassCompiler {
 			classNode.version = version;
 			classNode.signature = null; /* anything else leads to the class extending itself! */
 			classNode.name = AST.$getName(classType);
-			classNode.sourceFile = sourceFile(o);
+			
+			classNode.visitSource(sourceFile(o), null);
 
 			if (kws.hasParameter("modifiers")) {
 				classNode.access = access(AST.$getModifiers(o));
@@ -356,8 +357,15 @@ public class ClassCompiler {
 				ISourceLocation loc = (ISourceLocation) o.asWithKeywordParameters().getParameter("src");
 
 				if (loc != null) {
-					out.println(loc);
-					return loc.getPath();
+					
+					String path = loc.getPath();
+//					
+//					if (!loc.getScheme().equals("file") && path.startsWith("/")) {
+//						path = path.substring(1);
+//					}
+					
+					out.println(path);
+					return path;
 				}
 			}
 

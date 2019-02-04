@@ -100,10 +100,10 @@ data Modifier
    | \abstract()
    ;
 
-data Field(list[Annotation] annotations = [], set[Modifier] modifiers = {\private()})
+data Field(list[Annotation] annotations = [], set[Modifier] modifiers = {\private()}, loc src=|unknown:///|)
   = field(Type \type, str name, Exp init = defVal(\type));
          
-data Method(list[Annotation] annotations = [])
+data Method(list[Annotation] annotations = [], loc src=|unknown:///|)
   = method(Signature desc, list[Formal] formals, list[Stat] block, set[Modifier] modifiers = {\public()})
   | method(Signature desc, set[Modifier] modifiers={\abstract(), \public()})
   | static(list[Stat] block)

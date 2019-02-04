@@ -34,9 +34,9 @@ Class compileProgram(Program p, str name)
           *stats(p.body),
           *output(p.decls),
           \return()
-        ], src=p@\loc)
-      ], src=p@\loc
-  );
+        ])[src=p@\loc]
+      ]
+  )[src=p@\loc];
   
 list[Stat] decls(Declarations p)
   = [decl(\type(t), "<i>") | (IdType) `<Id i> : <Type t>` <- p.decls];

@@ -271,7 +271,7 @@ public class ClassCompiler {
 		private final Builder<IConstructor> pushTrue = () -> trueExp();
 		private final Builder<IConstructor> pushFalse = () -> falseExp();
 		private Map<String, LeveledLabel> labels;
-		private int currentLine = 1;
+		private int currentLine = 0;
 		private boolean emittingFinally = false;
 		private final boolean debug;
 
@@ -1436,30 +1436,31 @@ public class ClassCompiler {
 			// here we special case for !=, ==, <=, >=, < and >, because
 			// there are special jump instructions for these operators on the JVM and we don't want to push
 			// a boolean on the stack and then conditionally have to jump on that boolean again:
+			
 			switch (cond.getConstructorType().getName()) {
 			case "true":
 				return thenBuilder.build();
 			case "false":
 				return elseBuilder.build();
 			case "eq":
-				return eqExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
+				return eqExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
 			case "ne":
-				return neExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
+				return neExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
 			case "le":
-				return leExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
+				return leExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
 			case "gt":
-				return gtExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
+				return gtExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
 			case "ge":
-				return geExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
+				return geExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
 			case "lt":
-				return ltExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, line);
+				return ltExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
 			case "neg":
 				// if(!expr) is compiled to IFNE directly without intermediate (inefficient) negation code
 				expr(AST.$getArg(cond));
-				return invertedConditionalFlow(0, Opcodes.IFNE, thenBuilder, elseBuilder, joinLabel, line);
+				return invertedConditionalFlow(0, Opcodes.IFNE, thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
 			default:
 				expr(cond);
-				return invertedConditionalFlow(0, Opcodes.IFEQ, thenBuilder, elseBuilder, joinLabel, line);
+				return invertedConditionalFlow(0, Opcodes.IFEQ, thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
 			}
 		}
 
@@ -2200,11 +2201,13 @@ public class ClassCompiler {
 			Label next = joinLabel == null ? newLabel() : joinLabel;
 			IConstructor res1 = null, res2 = null;
 
+			Label testConditional = new Label();
+			lineNumber(line, testConditional);
+			
 			if (compare != 0) {
 				method.visitInsn(compare);
 			}
 
-			lineNumber(line);
 			method.visitJumpInsn(opcode, elsePart != null ? jump : next);
 			res1 = thenPart.build();
 
@@ -2937,15 +2940,6 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private void forceLineNumber(int line) {
-			if (debug && line != -1) {
-				Label label = new Label();
-				method.visitLabel(label);
-				method.visitLineNumber(line, label);
-				currentLine = line;
-			}
-		}
-		
 		private void lineNumber(int line, Label label) {
 			if (debug && line != -1) {
 				method.visitLineNumber(line, label);

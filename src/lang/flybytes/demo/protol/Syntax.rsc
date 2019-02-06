@@ -51,4 +51,7 @@ lexical Id     = ([A-Za-z][a-zA-Z0-9]*) \ "if" \ "new" \ "else" \ "while"  \ "re
 lexical Int    = [0-9]+;
 lexical String = "\"" ![\"]* "\"";
 
-layout WS = [\t\n\r\ ]* !>> [\t\n\r\ ];
+layout WSC = (WS | COMM)* !>> "//" !>> [\t\n\r\ ];
+
+lexical WS = [\t\n\r\ ]+ !>> [\t\n\r\ ];
+lexical COMM = "//" ![\n]* "\n";

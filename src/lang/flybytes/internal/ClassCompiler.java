@@ -601,7 +601,6 @@ public class ClassCompiler {
 
 				methodStartLabel = new LeveledLabel(0);
 				methodEndLabel = new LeveledLabel(0);
-				currentLine = getLineNumber(cons);
 
 				method.visitCode(); 
 				method.visitLabel(methodStartLabel);
@@ -1509,6 +1508,7 @@ public class ClassCompiler {
 				// so pop that and push it back when done.
 				emitFinally(0);
 
+				lineNumber(getLineNumber(stat));
 				Switch.type0(type,
 						(z) -> { method.visitInsn(Opcodes.IRETURN); },
 						(i) -> { method.visitInsn(Opcodes.IRETURN); },
@@ -2030,12 +2030,13 @@ public class ClassCompiler {
 		}
 
 		private IConstructor newArrayExp(IConstructor type, IList elems, int line) {
+			lineNumber(line);
+			
 			intConstant(elems.length());
 			if (!type.getConstructorType().getName().equals("array")) {
 				throw new IllegalArgumentException("arg should be an array type");
 			}
 
-			lineNumber(line);
 			newArrayWithSizeOnStack(AST.$getArg(type), line);
 		
 			int i = 0;
@@ -2050,6 +2051,8 @@ public class ClassCompiler {
 		}
 
 		private void newArrayWithSizeOnStack(IConstructor type, int line) {
+			lineNumber(line);
+			
 			Switch.type0(type,
 					(z) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BOOLEAN) ,
 					(i) -> method.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_INT) , 
@@ -2064,12 +2067,10 @@ public class ClassCompiler {
 					(a) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$getRefClassFromType(type, classNode.name)),
 					(S) -> method.visitTypeInsn(Opcodes.ANEWARRAY, Signature.stringType)
 					);
-			lineNumber(line);
 		}
 
 		private IConstructor ltExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
-			lineNumber(line);
 			return Switch.type(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel, line),
 					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel, line), 
@@ -2088,7 +2089,6 @@ public class ClassCompiler {
 
 		private IConstructor leExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
-			lineNumber(line);
 			return Switch.type(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel, line),
 					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel, line), 
@@ -2107,7 +2107,6 @@ public class ClassCompiler {
 
 		private IConstructor gtExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
-			lineNumber(line);
 			return Switch.type(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel, line),
 					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel, line), 
@@ -2126,7 +2125,6 @@ public class ClassCompiler {
 
 		private IConstructor geExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
 			IConstructor type = prepareArguments(lhs, rhs);
-			lineNumber(line);
 			return Switch.type(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel, line),
 					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel, line), 
@@ -2201,8 +2199,7 @@ public class ClassCompiler {
 			Label next = joinLabel == null ? newLabel() : joinLabel;
 			IConstructor res1 = null, res2 = null;
 
-			Label testConditional = new Label();
-			lineNumber(line, testConditional);
+			lineNumber(line);
 			
 			if (compare != 0) {
 				method.visitInsn(compare);
@@ -2819,6 +2816,8 @@ public class ClassCompiler {
 			int pos = positionOf(name);
 			IConstructor type = variableTypes.get(pos);
 
+			lineNumber(line);
+			
 			Switch.type(type, pos,
 					(z,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
 					(i,p) -> method.visitVarInsn(Opcodes.ILOAD, p),
@@ -2834,8 +2833,6 @@ public class ClassCompiler {
 					(S,p) -> method.visitVarInsn(Opcodes.ALOAD, p)
 					);
 
-			lineNumber(line);
-			
 			return type;
 		}
 
@@ -2914,6 +2911,8 @@ public class ClassCompiler {
 		}
 
 		private IConstructor constExp(IConstructor type, IValue constant, int line) {
+			lineNumber(line);
+			
 			Switch.type0(type, 
 					(z) -> booleanConstant(AST.$getBooleanConstant(constant)), 
 					(i) -> intConstant(AST.$getIntegerConstant(constant)), 
@@ -2936,7 +2935,6 @@ public class ClassCompiler {
 					(S) -> stringConstant(AST.$getStringConstant(constant))
 					);
 
-			lineNumber(line);
 			return type;
 		}
 

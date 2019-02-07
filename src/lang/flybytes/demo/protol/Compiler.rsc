@@ -92,9 +92,9 @@ Stat compile((Command) `while(<Expr cond>) { <Command* body> }`)
 
 Stat compile((Command) `<Expr e>;`) = \do(compile(e));
 
-Stat compile((Command) `return <Expr e>;`) = \return(compile(e));
+Stat compile(c:(Command) `return <Expr e>;`) = \return(compile(e))[src=c@\loc];
 
-Stat compile((Command) `print <Expr e>;`) = stdout(compile(e));
+Stat compile(c:(Command) `print <Expr e>;`) = stdout(compile(e))[src=c@\loc];
  
 Exp compile(e:(Expr) `this`) = load("this", src=e@\loc);
   
@@ -104,7 +104,7 @@ Exp compile((Expr) `<Expr rec>.<Id name>(<{Expr ","}* args>)`)
 list[Exp] compile({Expr ","}* args) = [compile(a) | a <- args];
    
 Exp compile(x:(Expr) `[<{Expr ","}* elems>]`)
-  = new(Arr, [array(Prototype)], [newArray(array(Prototype), [compile(e) | e <- elems])])[src=x@\loc]; 
+  = new(Arr, [array(Prototype)[src=x@\loc]], [newArray(array(Prototype), [compile(e) | e <- elems])])[src=x@\loc]; 
 
 Exp compile((Expr) `<Expr receiver>.<Id name>`)
   = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "$get_<name>", []), [compile(receiver)], src=name@\loc);
@@ -123,12 +123,12 @@ Exp compile((Expr) `(<Expr e>)`) = compile(e);
 
 Exp compile(x:(Expr) `<Id i>`) = load("<i>", src=x@\loc);
 
-Exp compile(x:(Expr) `<Int i>`) = newInt(iconst(toInt("<i>")))[src=x@\loc];
+Exp compile(x:(Expr) `<Int i>`) = newInt(iconst(toInt("<i>"))[src=x@\loc])[src=x@\loc];
  
-Exp compile(x:(Expr) `<String s>`) = new(Str, [string()], [sconst("<s>"[1..-1])])[src=x@\loc];
+Exp compile(x:(Expr) `<String s>`) = new(Str, [string()], [sconst("<s>"[1..-1])[src=x@\loc]])[src=x@\loc];
 
 Exp compile(x:(Expr) `<Expr a>[<Expr index>]`) 
-  = aload(getArray(compile(a)), getInt(compile(index)), src=x@\loc);
+  = aload(getArray(compile(a))[src=x@\loc], getInt(compile(index)), src=x@\loc);
   
 Exp newInt(Exp e) = new(Int, [integer()], [e])[src=e@\loc];
 
@@ -175,14 +175,14 @@ list[Method] methods(Definition* defs)
     [ method("missing", missingArgs(name, args), commands)
     | (Definition) `missing(<Id name>, <Id args>) { <Command* commands> }` <- defs]
     +
-    [ getter("<name>"), setter("<name>") | (Definition) `<Id name> = <Expr val>` <- defs]
+    [ getter("<name>", name@\loc), setter("<name>", name@\loc) | (Definition) `<Id name> = <Expr val>` <- defs]
     ;
 
-Method getter(str name) 
-  = method(\public(), Prototype, "$get_<name>", [], [\return(getField(Prototype, "<name>"))]);
+Method getter(str name, loc src) 
+  = method(\public(), Prototype, "$get_<name>", [], [\return(getField(Prototype, "<name>")[src=src])]);
 
-Method setter(str name)
-  = method(\public(), \void(), "$set_<name>", [var(Prototype, "a")], [putField(Prototype, "<name>", load("a")), \return()]);
+Method setter(str name, loc src)
+  = method(\public(), \void(), "$set_<name>", [var(Prototype, "a")], [putField(Prototype, "<name>", load("a"))[src=src], \return()]);
    
 {Id ","}* missingArgs(Id name, Id args)
   = ((Definition) `dummy(<Id name>, <Id args>) { }`).args;
@@ -221,5 +221,5 @@ list[Class] extractPrototypeClasses(Class main)
            ])
          ], 
          fields=fs
-      ) 
+      )[src=main.src] 
     | /prototype(str name, ms, fs) := main];

@@ -359,7 +359,7 @@ public class ClassCompiler {
 			return newLabel(tryFinallyNestingLevel);
 		}
 
-		private int getLineNumber(IConstructor o) {
+		private int getLineNumber(IConstructor o, int parentLine) {
 			if (o.mayHaveKeywordParameters()) {
 				ISourceLocation loc = (ISourceLocation) o.asWithKeywordParameters().getParameter("src");
 				if (loc != null && loc.hasLineColumn()) {
@@ -367,7 +367,7 @@ public class ClassCompiler {
 				}
 			}
 
-			return -1;
+			return parentLine;
 		}
 
 		private void annotations(ClassNode cn, IList annotations) {
@@ -538,7 +538,7 @@ public class ClassCompiler {
 
 			IList block = AST.$getBlock(cons);
 			if (block != null) {
-				statements(block, null, null, methodEndLabel);
+				statements(block, null, null, methodEndLabel, getLineNumber(cons, -1));
 			}
 
 			method.visitLabel(methodEndLabel);
@@ -596,7 +596,7 @@ public class ClassCompiler {
 				variableAnnotations = new ArrayList<>();
 
 				if (!isStatic) {
-					declareVariable(classType, "this", null, false, null, getLineNumber(cons));
+					declareVariable(classType, "this", null, false, null, getLineNumber(cons, -1));
 				}
 
 				methodStartLabel = new LeveledLabel(0);
@@ -612,7 +612,7 @@ public class ClassCompiler {
 					fieldInitializers(classNode, method);
 				}
 
-				statements(AST.$getBlock(cons), methodStartLabel, methodEndLabel, methodEndLabel);
+				statements(AST.$getBlock(cons), methodStartLabel, methodEndLabel, methodEndLabel, getLineNumber(cons, -1));
 
 				method.visitLabel(methodEndLabel);
 
@@ -668,7 +668,7 @@ public class ClassCompiler {
 					computeDefaultValueForVariable(type, pos);
 				}
 				else {
-					storeStat(name, def);
+					storeStat(name, def, line);
 				}
 			}
 			else {
@@ -676,7 +676,7 @@ public class ClassCompiler {
 					// if somebody passed 'null' as actual parameter and we have something to initialize with here,
 					// then we store that into the variable now. flybytes has default parameters!
 					loadExp(name, line);
-					invertedConditionalFlow(0, Opcodes.IFNONNULL, () -> storeStat(name, def), null, null, line);
+					invertedConditionalFlow(0, Opcodes.IFNONNULL, () -> storeStat(name, def, line), null, null, line);
 				}
 			}
 
@@ -687,8 +687,8 @@ public class ClassCompiler {
 			for (String field : fieldInitializers.keySet()) {
 				IConstructor def = fieldInitializers.get(field);
 				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("init");
-				loadExp("this", getLineNumber(exp));
-				expr(exp);
+				loadExp("this", getLineNumber(exp, -1));
+				expr(exp, -1);
 				method.visitFieldInsn(Opcodes.PUTFIELD, classNode.name, field, Signature.type(AST.$getType(def)));
 			}
 		}
@@ -697,7 +697,7 @@ public class ClassCompiler {
 			for (String field : staticFieldInitializers.keySet()) {
 				IConstructor def = staticFieldInitializers.get(field);
 				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("init");
-				expr(exp);
+				expr(exp, -1);
 				method.visitFieldInsn(Opcodes.PUTSTATIC, classNode.name, field, Signature.type(AST.$getType(def)));
 			}
 		}
@@ -709,7 +709,7 @@ public class ClassCompiler {
 				final int index = i;
 				IConstructor var = (IConstructor) elem;
 				IConstructor varType = AST.$getType(var);
-				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize, null, getLineNumber(var));
+				declareVariable(varType, AST.$getName(var), AST.$getDefault(var), initialize, null, getLineNumber(var, -1));
 
 				if (var.asWithKeywordParameters().hasParameter("annotations")) {
 					annotation((s,v) -> method.visitParameterAnnotation(index, s, v), (IList) var.asWithKeywordParameters().getParameter("annotations"));
@@ -771,13 +771,13 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor statements(IList statements, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
+		private IConstructor statements(IList statements, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int parentLine) {
 			int i = 0, len = statements.length();
 			for (IValue elem : statements) {
 				// generate the label for where the next statement ends, unless this is the last statement, because
 				// then we rejoin the context and we have a label for that given in the parameter 'joinLabel'
 				LeveledLabel nextLabel = (++i < len) ? newLabel() : joinLabel;
-				statement((IConstructor) elem, continueLabel, breakLabel, nextLabel);
+				statement((IConstructor) elem, continueLabel, breakLabel, nextLabel, parentLine);
 				if (i < len) {
 					method.visitLabel(nextLabel);
 				}
@@ -785,8 +785,8 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private void statement(IConstructor stat, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel) {
-			int line = getLineNumber(stat);
+		private void statement(IConstructor stat, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int parentLine) {
+			int line = getLineNumber(stat, parentLine);
 			
 			switch (stat.getConstructorType().getName()) {
 			case "incr":
@@ -800,22 +800,22 @@ public class ClassCompiler {
 				blockStat(blockLabel, AST.$getBlock(stat), joinLabel, line);
 				break;
 			case "do" : 
-				doStat((IConstructor) stat.get("exp"));
+				doStat((IConstructor) stat.get("exp"), line);
 				break;
 			case "store" : 
-				storeStat(AST.$getName(stat), AST.$getValue(stat)); 
+				storeStat(AST.$getName(stat), AST.$getValue(stat), line); 
 				break;
 			case "astore" :
-				aastoreStat(AST.$getArray(stat), AST.$getIndex(stat), AST.$getArg(stat));
+				aastoreStat(AST.$getArray(stat), AST.$getIndex(stat), AST.$getArg(stat), line);
 				break;
 			case "putField":
-				putFieldStat(AST.$getRefClassFromType(AST.$getClass(stat), classNode.name), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
+				putFieldStat(AST.$getRefClassFromType(AST.$getClass(stat), classNode.name), AST.$getReceiver(stat), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat), line);
 				break;
 			case "putStatic":
-				putStaticStat(AST.$getRefClassFromType(AST.$getClass(stat), classNode.name), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat));
+				putStaticStat(AST.$getRefClassFromType(AST.$getClass(stat), classNode.name), AST.$getType(stat), AST.$getName(stat), AST.$getArg(stat), line);
 				break;
 			case "return" : 
-				returnStat(stat);
+				returnStat(stat, line);
 				// dropping the joinLabel, there is nothing to do after return!
 				break;
 			case "break":
@@ -849,16 +849,16 @@ public class ClassCompiler {
 				doWhileStat(doWhileLabel, AST.$getCondition(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
 			case "throw":
-				throwStat(AST.$getArg(stat));
+				throwStat(AST.$getArg(stat), line);
 				break;
 			case "monitor":
 				monitorStat(AST.$getArg(stat), AST.$getBlock(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
 			case "acquire":
-				acquireStat(AST.$getArg(stat));
+				acquireStat(AST.$getArg(stat), line);
 				break;
 			case "release":
-				releaseStat(AST.$getArg(stat));
+				releaseStat(AST.$getArg(stat), line);
 				break;
 			case "try":
 				tryStat(AST.$getBlock(stat), AST.$getCatch(stat), continueLabel, breakLabel, joinLabel, line);
@@ -870,13 +870,13 @@ public class ClassCompiler {
 			}
 		}
 
-		private void releaseStat(IConstructor arg) {
-			expr(arg);
+		private void releaseStat(IConstructor arg, int parentLine) {
+			expr(arg, parentLine);
 			method.visitInsn(Opcodes.MONITOREXIT);
 		}
 
-		private void acquireStat(IConstructor arg) {
-			expr(arg);
+		private void acquireStat(IConstructor arg, int parentLine) {
+			expr(arg, parentLine);
 			method.visitInsn(Opcodes.MONITORENTER);
 		}
 
@@ -983,7 +983,7 @@ public class ClassCompiler {
 
 
 			// first put the key value on the stack
-			expr(arg);
+			expr(arg, line);
 
 			@SuppressWarnings("unchecked")
 			ArrayList<CaseLabel> sorted = (ArrayList<CaseLabel>) labels.clone();
@@ -1009,7 +1009,7 @@ public class ClassCompiler {
 				}
 
 				LeveledLabel endCase = newLabel();
-				statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase);
+				statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase, getLineNumber(c, line));
 				method.visitLabel(endCase);
 			}
 
@@ -1079,7 +1079,7 @@ public class ClassCompiler {
 			}
 
 			// first put the key value on the stack
-			expr(arg);
+			expr(arg, line);
 
 			// then we generate the switch tabel
 			method.visitTableSwitchInsn(min, max, defaultLabel, labels);
@@ -1097,7 +1097,7 @@ public class ClassCompiler {
 				}
 
 				LeveledLabel endCase = newLabel();
-				statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase);
+				statements(AST.$getBlock(c), continueLabel, joinLabel /* break will jump beyond the switch */, endCase, getLineNumber(c, line));
 				method.visitLabel(endCase);
 			}
 		}
@@ -1137,7 +1137,7 @@ public class ClassCompiler {
 				if (isLast && isFinally) {
 					finallyVarName = "finally:" + UUID.randomUUID();
 					declareVariable(Types.throwableType(), finallyVarName, null, false, null, line);
-					finallyCode = () -> statements(AST.$getBlock(catcher), breakLabel, continueLabel, joinLabel);
+					finallyCode = () -> statements(AST.$getBlock(catcher), breakLabel, continueLabel, joinLabel, line);
 					pushFinally(finallyCode);
 				}
 				else if (isFinally) {
@@ -1152,7 +1152,7 @@ public class ClassCompiler {
 
 			// the try block itself
 			method.visitLabel(tryStart);
-			statements(block, continueLabel, breakLabel, joinLabel);
+			statements(block, continueLabel, breakLabel, joinLabel, line);
 			method.visitLabel(tryEnd);
 
 			// jump over the catch blocks
@@ -1175,7 +1175,7 @@ public class ClassCompiler {
 					IConstructor exceptionType = AST.$getType(catcher);
 					String clsName = AST.$getRefClassFromType(exceptionType, classNode.name);
 					method.visitVarInsn(Opcodes.ASTORE, positionOf(varName));
-					statements(AST.$getBlock(catcher), continueLabel, breakLabel, joinLabel);
+					statements(AST.$getBlock(catcher), continueLabel, breakLabel, joinLabel, getLineNumber(catcher, line));
 					method.visitTryCatchBlock(tryStart, tryEnd, handlers[i], clsName);
 
 					if (!isLast) { // jump over the other handlers
@@ -1222,9 +1222,9 @@ public class ClassCompiler {
 			};
 
 			// compute the lock object
-			IConstructor type = expr(lock);
+			IConstructor type = expr(lock, line);
 			// declare lock object var for later usage in the sinks of the control flow
-			declareVariable(type, lockVarName, null, false, null, getLineNumber(lock));
+			declareVariable(type, lockVarName, null, false, null, getLineNumber(lock, line));
 			// keep the lock object ready for MONITORENTER:
 			dup(); 
 			// store lock object var for later use
@@ -1237,7 +1237,7 @@ public class ClassCompiler {
 			// register finally handlers for use by return, continue, break and throw:
 			pushFinally(finallyCode);
 			// compile the code in the block
-			statements(block, continueLabel, breakLabel, endExceptionBlock);
+			statements(block, continueLabel, breakLabel, endExceptionBlock, line);
 			// unregister the finally handler
 			popFinally();
 			// nothing happened so we can exit the monitor cleanly
@@ -1256,8 +1256,8 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.ATHROW); // rethrow
 		}
 
-		private void throwStat(IConstructor arg) {
-			expr(arg);
+		private void throwStat(IConstructor arg, int parentLine) {
+			expr(arg, parentLine);
 			method.visitInsn(Opcodes.ATHROW);
 		}
 
@@ -1275,15 +1275,15 @@ public class ClassCompiler {
 			// deal efficiently with negated conditionals
 			int cmpCode = Opcodes.IFEQ;
 			if (cond.getConstructorType().getName().equals("neg")) {
-				cond = expr(AST.$getArg(cond));
+				cond = expr(AST.$getArg(cond), line);
 				cmpCode = Opcodes.IFNE;
 			}
 
-			expr(cond);
+			expr(cond, line);
 			invertedConditionalFlow(0, cmpCode, 
-					() -> statements(body, testConditional, joinLabel, testConditional), 
+					() -> statements(body, testConditional, joinLabel, testConditional, line), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
-					testConditional, getLineNumber(cond));
+					testConditional, getLineNumber(cond, line));
 
 			jumpTo(testConditional); // this might be superfluous
 		}
@@ -1298,21 +1298,21 @@ public class ClassCompiler {
 
 			method.visitLabel(nextIteration);
 
-			statements(body, nextIteration, joinLabel, nextIteration);
+			statements(body, nextIteration, joinLabel, nextIteration, line);
 
 			// deal efficiently with negated conditionals
 			int cmpCode = Opcodes.IFEQ;
 			if (cond.getConstructorType().getName().equals("neg")) {
-				cond = expr(AST.$getArg(cond));
+				cond = expr(AST.$getArg(cond), line);
 				cmpCode = Opcodes.IFNE;
 			}
 
 			// while(cond)
-			expr(cond);
+			expr(cond, line);
 			invertedConditionalFlow(0, cmpCode, 
 					() -> jumpTo(nextIteration), 
 					null /* end of loop */, 
-					joinLabel, getLineNumber(cond));
+					joinLabel, getLineNumber(cond, line));
 		}
 
 		private void breakStat(IConstructor stat, LeveledLabel join) {
@@ -1364,7 +1364,7 @@ public class ClassCompiler {
 			labels.put("continue:" + label, again);
 
 			method.visitLabel(again);
-			statements(body, again, joinLabel, joinLabel);
+			statements(body, again, joinLabel, joinLabel, line);
 		}
 
 		private void declStat(IConstructor stat, LeveledLabel joinLabel, int line) {
@@ -1380,7 +1380,7 @@ public class ClassCompiler {
 				annotations = (IList) kws.getParameter("annotations");
 			}
 
-			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true, annotations, getLineNumber(stat));
+			declareVariable(AST.$getType(stat), AST.$getName(stat), def, true, annotations, getLineNumber(stat, line));
 		}
 
 		private void forStat(String label, IList init, IConstructor cond, IList next, IList body, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
@@ -1392,26 +1392,26 @@ public class ClassCompiler {
 				labels.put("continue:" + label, nextIterationLabel);
 			}
 
-			statements(init, continueLabel /*outerloop*/, breakLabel /*outerloop*/, testConditional /*start of inner loop*/);
+			statements(init, continueLabel /*outerloop*/, breakLabel /*outerloop*/, testConditional /*start of inner loop*/, line);
 
 			method.visitLabel(testConditional);
 
 			// deal efficiently with negated conditionals
 			int cmpCode = Opcodes.IFEQ;
 			if (cond.getConstructorType().getName().equals("neg")) {
-				cond = expr(AST.$getArg(cond));
+				cond = expr(AST.$getArg(cond), line);
 				cmpCode = Opcodes.IFNE;
 			}
 
-			expr(cond);
+			expr(cond, line);
 			invertedConditionalFlow(0, cmpCode, 
-					() -> statements(body, nextIterationLabel, joinLabel, nextIterationLabel), 
+					() -> statements(body, nextIterationLabel, joinLabel, nextIterationLabel, line), 
 					() -> jumpTo(joinLabel) /* end of loop */, 
-					nextIterationLabel, getLineNumber(cond));
+					nextIterationLabel, getLineNumber(cond, line));
 
 			method.visitLabel(nextIterationLabel);
 			LeveledLabel endNext = newLabel();
-			statements(next, continueLabel /*outerloop */, breakLabel /*outerloop*/, endNext);
+			statements(next, continueLabel /*outerloop */, breakLabel /*outerloop*/, endNext, line);
 			method.visitLabel(endNext);
 			jumpTo(testConditional); // this might be superfluous
 		}
@@ -1426,8 +1426,8 @@ public class ClassCompiler {
 		}
 
 		private void ifThenElseStat(IConstructor cond, IList thenBlock, IList elseBlock, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int line) {
-			Builder<IConstructor> thenBuilder = () -> statements(thenBlock, continueLabel, breakLabel, joinLabel);
-			Builder<IConstructor> elseBuilder = elseBlock != null ? () -> statements(elseBlock, continueLabel, breakLabel, joinLabel) : DONE;
+			Builder<IConstructor> thenBuilder = () -> statements(thenBlock, continueLabel, breakLabel, joinLabel, line);
+			Builder<IConstructor> elseBuilder = elseBlock != null ? () -> statements(elseBlock, continueLabel, breakLabel, joinLabel, line) : DONE;
 			ifThenElse(cond, thenBuilder, elseBuilder, continueLabel, breakLabel, joinLabel, line);
 		}
 
@@ -1442,41 +1442,41 @@ public class ClassCompiler {
 			case "false":
 				return elseBuilder.build();
 			case "eq":
-				return eqExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
+				return eqExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond, line));
 			case "ne":
-				return neExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
+				return neExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond, line));
 			case "le":
-				return leExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
+				return leExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond, line));
 			case "gt":
-				return gtExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
+				return gtExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond, line));
 			case "ge":
-				return geExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
+				return geExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond, line));
 			case "lt":
-				return ltExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
+				return ltExp(AST.$getLhs(cond), AST.$getRhs(cond), thenBuilder, elseBuilder, joinLabel, getLineNumber(cond, line));
 			case "neg":
 				// if(!expr) is compiled to IFNE directly without intermediate (inefficient) negation code
-				expr(AST.$getArg(cond));
-				return invertedConditionalFlow(0, Opcodes.IFNE, thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
+				expr(AST.$getArg(cond), line);
+				return invertedConditionalFlow(0, Opcodes.IFNE, thenBuilder, elseBuilder, joinLabel, getLineNumber(cond, line));
 			default:
-				expr(cond);
-				return invertedConditionalFlow(0, Opcodes.IFEQ, thenBuilder, elseBuilder, joinLabel, getLineNumber(cond));
+				expr(cond, line);
+				return invertedConditionalFlow(0, Opcodes.IFEQ, thenBuilder, elseBuilder, joinLabel, getLineNumber(cond, line));
 			}
 		}
 
-		private void putStaticStat(String cls, IConstructor type, String name, IConstructor arg) {
-			expr(arg);
+		private void putStaticStat(String cls, IConstructor type, String name, IConstructor arg, int parentLine) {
+			expr(arg, parentLine);
 			method.visitFieldInsn(Opcodes.PUTSTATIC, cls, name, Signature.type(type));
 		}
 
-		private void putFieldStat(String cls, IConstructor receiver, IConstructor type, String name, IConstructor arg) {
-			expr(receiver);
-			expr(arg);
+		private void putFieldStat(String cls, IConstructor receiver, IConstructor type, String name, IConstructor arg, int parentLine) {
+			expr(receiver, parentLine);
+			expr(arg, parentLine);
 			method.visitFieldInsn(Opcodes.PUTFIELD, cls, name, Signature.type(type));
 		}
 
-		private IConstructor storeStat(String name, IConstructor expression) {
+		private IConstructor storeStat(String name, IConstructor expression, int parentLine) {
 			int pos = positionOf(name);
-			expr(expression);
+			expr(expression, parentLine);
 
 			Switch.type0(variableTypes.get(pos),
 					(z) -> { method.visitVarInsn(Opcodes.ISTORE, pos); },
@@ -1496,19 +1496,19 @@ public class ClassCompiler {
 			return null;
 		}
 
-		private void returnStat(IConstructor stat) {
+		private void returnStat(IConstructor stat, int line) {
 			if (stat.getConstructorType().getArity() == 0) {
 				method.visitInsn(Opcodes.RETURN);
 			}
 			else {
-				IConstructor type = expr(AST.$getArg(stat));
+				IConstructor type = expr(AST.$getArg(stat), line);
 
 				// return, or break or continue from the finally block,
 				// must not execute current finally again (infinite loop),
 				// so pop that and push it back when done.
 				emitFinally(0);
 
-				lineNumber(getLineNumber(stat));
+				lineNumber(getLineNumber(stat, line));
 				Switch.type0(type,
 						(z) -> { method.visitInsn(Opcodes.IRETURN); },
 						(i) -> { method.visitInsn(Opcodes.IRETURN); },
@@ -1540,8 +1540,8 @@ public class ClassCompiler {
 			}
 		}
 
-		private IConstructor doStat(IConstructor exp) {
-			IConstructor type = expr(exp); 
+		private IConstructor doStat(IConstructor exp, int line) {
+			IConstructor type = expr(exp, line); 
 			Switch.type0(type, 
 					(z) -> pop(), 
 					(i) -> pop(), 
@@ -1567,8 +1567,18 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.POP2);
 		}
 
-		private IConstructor expr(IConstructor exp) {
-			int line = getLineNumber(exp);
+		/**
+		 * 
+		 * @param exp        the expression to compile
+		 * @param parentLine because the _first_ instruction of an expression must be annotated with the right line number, 
+		 *                   we have to push line annotations down the expression tree. Otherwise the people generating the code
+		 *                   can't simply annotate statements and expect the debugger to work; they'd have to understand which
+		 *                   operation will end up to be pushed first on the bytecode stack. This might be quite opaque if you
+		 *                   use library macros and other code generation techniques. 
+		 * @return
+		 */
+		private IConstructor expr(IConstructor exp, int parentLine) {
+			int line = getLineNumber(exp, parentLine);
 			
 			try {
 				switch (exp.getConstructorType().getName()) {
@@ -1687,13 +1697,13 @@ public class ClassCompiler {
 
 		private IConstructor cond(IConstructor cond, IConstructor thenExp, IConstructor elseExp, int line) {
 			LeveledLabel joinLabel = newLabel();
-			IConstructor res = ifThenElse(cond, () -> expr(thenExp), () -> expr(elseExp), null, null, joinLabel, line);
+			IConstructor res = ifThenElse(cond, () -> expr(thenExp, line), () -> expr(elseExp, line), null, null, joinLabel, line);
 			method.visitLabel(joinLabel);
 			return res;
 		}
 
 		private IConstructor shlExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareShiftArguments(lhs, rhs);
+			IConstructor type = prepareShiftArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.ISHL),
@@ -1712,16 +1722,16 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor prepareShiftArguments(IConstructor lhs, IConstructor rhs) {
-			IConstructor type = expr(lhs);
-			if (expr(rhs).getConstructorType() != Types.integerType().getConstructorType()) {
+		private IConstructor prepareShiftArguments(IConstructor lhs, IConstructor rhs, int parentLine) {
+			IConstructor type = expr(lhs, parentLine);
+			if (expr(rhs, parentLine).getConstructorType() != Types.integerType().getConstructorType()) {
 				throw new IllegalArgumentException("shift should get an integer as second parameter");
 			}
 			return type;
 		}
 
 		private IConstructor ushrExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareShiftArguments(lhs, rhs);
+			IConstructor type = prepareShiftArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IUSHR),
@@ -1741,7 +1751,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor shrExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareShiftArguments(lhs, rhs);
+			IConstructor type = prepareShiftArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.ISHR),
@@ -1768,7 +1778,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor addExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IOR),
@@ -1788,7 +1798,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor subExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> { throw new IllegalArgumentException("sub on bool"); },
@@ -1808,7 +1818,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor remExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> { throw new IllegalArgumentException("rem on bool"); },
@@ -1828,7 +1838,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor divExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> { throw new IllegalArgumentException("div on bool"); },
@@ -1848,7 +1858,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor mulExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IAND),
@@ -1868,7 +1878,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor andExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IAND),
@@ -1888,7 +1898,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor orExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IOR),
@@ -1908,7 +1918,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor xorExp(IConstructor lhs, IConstructor rhs, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> method.visitInsn(Opcodes.IXOR),
@@ -1928,7 +1938,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor negExp(IConstructor arg, int line) {
-			IConstructor type = expr(arg);
+			IConstructor type = expr(arg, line);
 			lineNumber(line);
 			Switch.type0(type, 
 					(z) -> { 
@@ -1960,17 +1970,16 @@ public class ClassCompiler {
 
 		private IConstructor invokeSuperStat(String superclass, IConstructor sig, IList args, int line) {
 			loadExp("this", line);
-			expressions(args);
+			expressions(args, line);
 			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, superclass, "<init>", Signature.constructor(sig), false);
 			return Types.voidType();
 		}
 
-		private void aastoreStat(IConstructor array, IConstructor index,
-				IConstructor arg) {
-			IConstructor type = expr(array);
-			expr(index);
-			expr(arg);
+		private void aastoreStat(IConstructor array, IConstructor index, IConstructor arg, int parentLine) {
+			IConstructor type = expr(array, parentLine);
+			expr(index, parentLine);
+			expr(arg, parentLine);
 			arrayStoreExpWithArrayIndexValueOnStack(AST.$getArg(type));
 		}
 
@@ -1994,7 +2003,7 @@ public class ClassCompiler {
 		private IConstructor checkCastExp(IConstructor arg, IConstructor type, int line) {
 			String cons = type.getConstructorType().getName();
 
-			expr(arg);
+			expr(arg, line);
 			// weird inconsistency in CHECKCAST instruction?
 			if (cons == "object") {
 				lineNumber(line);
@@ -2012,14 +2021,14 @@ public class ClassCompiler {
 		}
 
 		private IConstructor alengthExp(IConstructor arg, int line) {
-			expr(arg);
+			expr(arg, line);
 			lineNumber(line);
 			method.visitInsn(Opcodes.ARRAYLENGTH);
 			return Types.integerType();
 		}
 
 		private IConstructor newArrayExp(IConstructor type, IConstructor size, int line) {
-			expr(size);
+			expr(size, line);
 
 			if (!type.getConstructorType().getName().equals("array")) {
 				throw new IllegalArgumentException("arg should be an array type");
@@ -2043,7 +2052,7 @@ public class ClassCompiler {
 			for (IValue elem : elems) {
 				dup();
 				intConstant(i++);
-				expr((IConstructor) elem);
+				expr((IConstructor) elem, line);
 				arrayStoreExpWithArrayIndexValueOnStack(type);
 			}
 
@@ -2070,7 +2079,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor ltExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			return Switch.type(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel, line),
 					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGE, thenPart, elsePart, joinLabel, line), 
@@ -2088,7 +2097,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor leExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			return Switch.type(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel, line),
 					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPGT, thenPart, elsePart, joinLabel, line), 
@@ -2106,7 +2115,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor gtExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			return Switch.type(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel, line),
 					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLE, thenPart, elsePart, joinLabel, line), 
@@ -2124,7 +2133,7 @@ public class ClassCompiler {
 		}
 
 		private IConstructor geExp(IConstructor lhs, IConstructor rhs, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 			return Switch.type(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel, line),
 					(i) -> invertedConditionalFlow(0, Opcodes.IF_ICMPLT, thenPart, elsePart, joinLabel, line), 
@@ -2149,7 +2158,7 @@ public class ClassCompiler {
 				return isNullTest(lhs, thenPart, elsePart, joinLabel, line);
 			}
 
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 
 			return Switch.type(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPNE, thenPart, elsePart, joinLabel, line),
@@ -2167,9 +2176,9 @@ public class ClassCompiler {
 					);
 		}
 
-		private IConstructor prepareArguments(IConstructor lhs, IConstructor rhs) {
-			IConstructor type = expr(lhs);
-			if (type.getConstructorType() != expr(rhs).getConstructorType()) {
+		private IConstructor prepareArguments(IConstructor lhs, IConstructor rhs, int line) {
+			IConstructor type = expr(lhs, line);
+			if (type.getConstructorType() != expr(rhs, line).getConstructorType()) {
 				throw new IllegalArgumentException("incomparable types for operator");
 			}
 			
@@ -2216,6 +2225,7 @@ public class ClassCompiler {
 
 			if (joinLabel == null) {
 				method.visitLabel(next);
+				lineNumber(line, next);
 			}
 
 			return merge(res1, res2);
@@ -2238,12 +2248,12 @@ public class ClassCompiler {
 		}
 
 		private IConstructor isNullTest(IConstructor arg, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
-			expr(arg);
+			expr(arg, line);
 			return invertedConditionalFlow(0, Opcodes.IFNONNULL, thenPart, elsePart, joinLabel, line);
 		}
 
 		private IConstructor isNonNullTest(IConstructor arg, Builder<IConstructor> thenPart, Builder<IConstructor> elsePart, LeveledLabel joinLabel, int line) {
-			expr(arg);
+			expr(arg, line);
 			return invertedConditionalFlow(0, Opcodes.IFNULL, thenPart, elsePart, joinLabel, line);
 		}
 
@@ -2255,7 +2265,7 @@ public class ClassCompiler {
 				return isNonNullTest(lhs, thenPart, elsePart, joinLabel, line);
 			}
 
-			IConstructor type = prepareArguments(lhs, rhs);
+			IConstructor type = prepareArguments(lhs, rhs, line);
 
 			return Switch.type(type, 
 					(z) -> invertedConditionalFlow(0, Opcodes.IF_ICMPEQ, thenPart, elsePart, joinLabel, line),
@@ -2295,32 +2305,32 @@ public class ClassCompiler {
 			lineNumber(line);
 			Switch.type0(to, 
 					(z) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "parseBoolean", Signature.stringType, false);
 					}, 
 					(i) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Integer", "parseInt", "I", false);
 					}, 
 					(s) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Short", "parseShort", "S", false);
 					},
 					(b) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Byte", "parseByte", "B", false);
 					}, 
 					(c) -> failedCoercion("string", to), 
 					(f) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Float", "parseFloat", "F", false);
 					}, 
 					(d) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Double", "parseDouble", "D", false);
 					}, 
 					(j) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "parseLong", "J", false);
 					}, 
 					(v) -> failedCoercion("string", to), 
@@ -2375,7 +2385,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -2388,7 +2398,7 @@ public class ClassCompiler {
 			Switch.type0(to,
 					(z) -> {
 						if (cls.equals("java/lang/Boolean")) {
-							expr(from);
+							expr(from, line);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "booleanValue", "()Z", false);
 						}
 						else {
@@ -2397,7 +2407,7 @@ public class ClassCompiler {
 					},
 					(i) -> {
 						if (cls.equals("java/lang/Integer")) {
-							expr(from);
+							expr(from, line);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "intValue", "()I", false);
 						}
 						else {
@@ -2406,7 +2416,7 @@ public class ClassCompiler {
 					},
 					(s) -> {
 						if (cls.equals("java/lang/Integer")) {
-							expr(from);
+							expr(from, line);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "shortValue", "()S", false);
 						}
 						else {
@@ -2415,7 +2425,7 @@ public class ClassCompiler {
 					},
 					(b) -> {
 						if (cls.equals("java/lang/Integer")) {
-							expr(from);
+							expr(from, line);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Integer", "byteValue", "()B", false);
 						}
 						else {
@@ -2425,7 +2435,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion(cls, arg),
 					(f) -> {
 						if (cls.equals("java/lang/Float")) {
-							expr(from);
+							expr(from, line);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Float", "floatValue", "()F", false);
 						}
 						else {
@@ -2434,7 +2444,7 @@ public class ClassCompiler {
 					},
 					(d) -> {
 						if (cls.equals("java/lang/Double")) {
-							expr(from);
+							expr(from, line);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Double", "doubleValue", "()D", false);
 						}
 						else {
@@ -2443,7 +2453,7 @@ public class ClassCompiler {
 					},
 					(l) -> {
 						if (cls.equals("java/lang/Long")) {
-							expr(from);
+							expr(from, line);
 							method.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Long", "longValue", "()L", false);
 						}
 						else {
@@ -2461,7 +2471,7 @@ public class ClassCompiler {
 					},
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -2483,7 +2493,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -2504,7 +2514,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -2525,7 +2535,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -2546,7 +2556,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -2567,7 +2577,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -2588,7 +2598,7 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg);
+						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -2611,9 +2621,9 @@ public class ClassCompiler {
 
 		private IConstructor sblockExp(IList block, IConstructor arg, int line) {
 			LeveledLabel blockEnd = newLabel();
-			statements(block, null, null, blockEnd);
+			statements(block, null, null, blockEnd, line);
 			method.visitLabel(blockEnd);
-			IConstructor type = expr(arg);
+			IConstructor type = expr(arg, line);
 			return type;
 		}
 
@@ -2622,14 +2632,14 @@ public class ClassCompiler {
 		}
 
 		private IConstructor instanceofExp(IConstructor arg, String cls, int line) {
-			expr(arg);
+			expr(arg, line);
 			lineNumber(line);
 			method.visitTypeInsn(Opcodes.INSTANCEOF, cls);
 			return Types.booleanType();
 		}
 
 		private IConstructor getfieldExp(IConstructor receiver, String cls, IConstructor type, String name, int line) {
-			expr(receiver);
+			expr(receiver, line);
 			lineNumber(line);
 			method.visitFieldInsn(Opcodes.GETFIELD, cls, name, Signature.type(type));
 			return type;
@@ -2641,15 +2651,15 @@ public class ClassCompiler {
 			String desc = Signature.constructor(AST.$getDesc(exp));
 			method.visitTypeInsn(Opcodes.NEW, cls);
 			dup();
-			expressions(AST.$getArgs(exp));
+			expressions(AST.$getArgs(exp), line);
 			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", desc, false);
 			return type;
 		}
 
 		private IConstructor aaloadExp(IConstructor array, IConstructor index, int line) {
-			IConstructor type = expr(array);
-			expr(index);
+			IConstructor type = expr(array, line);
+			expr(index, line);
 			lineNumber(line);
 			Switch.type0(AST.$getArg(type), 
 					(b) -> method.visitInsn(Opcodes.BALOAD), 
@@ -2675,8 +2685,8 @@ public class ClassCompiler {
 		}
 
 		private IConstructor invokeSpecialExp(String cls, IConstructor sig, IConstructor receiver, IList args, int line) {
-			expr(receiver);
-			expressions(args);
+			expr(receiver, line);
+			expressions(args, line);
 			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, AST.$getName(sig), Signature.method(sig), false);
 			return AST.$getReturn(sig);
@@ -2688,7 +2698,7 @@ public class ClassCompiler {
 			Object[] bArgs = bootstrapArgs(handler);
 
 			// push arguments to the method on the stack, (including the receiver, if its not a static method)
-			expressions(args);
+			expressions(args, line);
 			
 			lineNumber(line);
 			
@@ -2778,8 +2788,8 @@ public class ClassCompiler {
 		}
 
 		private IConstructor invokeVirtualExp(String cls, IConstructor sig, IConstructor receiver, IList args, int line) {
-			expr(receiver);
-			expressions(args);
+			expr(receiver, line);
+			expressions(args, line);
 
 			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, cls, AST.$getName(sig), Signature.method(sig), false);
@@ -2787,26 +2797,26 @@ public class ClassCompiler {
 		}
 
 		private IConstructor invokeInterfaceExp(String interf, IConstructor sig, IConstructor receiver, IList args, int line) {
-			expr(receiver);
-			expressions(args);
+			expr(receiver, line);
+			expressions(args, line);
 			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKEINTERFACE, interf, AST.$getName(sig), Signature.method(sig), true);
 			return AST.$getReturn(sig);
 		}
 
-		private IConstructor expressions(IList args) {
+		private IConstructor expressions(IList args, int parentLine) {
 			if (args.length() == 0) {
 				return null;
 			}
 			else {
-				expr((IConstructor) args.get(0));
-				expressions(args.delete(0));
+				expr((IConstructor) args.get(0), parentLine);
+				expressions(args.delete(0), parentLine);
 			}
 			return null;
 		}
 
 		private IConstructor invokeStaticExp(String cls, IConstructor sig, IList args, int line) {
-			expressions(args);
+			expressions(args, line);
 			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKESTATIC, cls, AST.$getName(sig), Signature.method(sig), false);
 			return AST.$getReturn(sig);

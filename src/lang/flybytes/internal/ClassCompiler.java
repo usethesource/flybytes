@@ -68,9 +68,7 @@ public class ClassCompiler {
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES + ClassWriter.COMPUTE_MAXS);
 			ClassVisitor cv = cw;
-//			if (debugMode.getValue()) {
-//				cv = new CheckClassAdapter(new TraceClassVisitor(cw, out));
-//			}
+
 			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 
 			output.write(cw.toByteArray());
@@ -95,9 +93,6 @@ public class ClassCompiler {
 
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 			ClassVisitor cv = cw;
-//			if (debugMode.getValue()) {
-//				cv = new CheckClassAdapter(new TraceClassVisitor(cw, out));
-//			}
 
 			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 			byte[] bytes = cw.toByteArray();
@@ -137,9 +132,6 @@ public class ClassCompiler {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 			ClassVisitor cv = cw;
 
-//			if (debugMode.getValue()) {
-//				cv = new TraceClassVisitor(new CheckClassAdapter(cw), out);
-//			}
 			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 
 			Class<?> loaded = loadSingleClass(className, cw);
@@ -321,11 +313,11 @@ public class ClassCompiler {
 			}
 
 			if (kws.hasParameter("fields")) {
-				fields(classNode, AST.$getFieldsParameter(kws), isInterface);
+				fields(classNode, AST.$getFieldsParameter(kws), isInterface, getLineNumber(o, -1));
 			}
 
 			if (kws.hasParameter("methods")) {
-				methods(classNode, AST.$getMethodsParameter(kws));
+				methods(classNode, AST.$getMethodsParameter(kws), getLineNumber(o, -1));
 			}
 
 			if (!hasDefaultConstructor && !isInterface) {
@@ -333,7 +325,7 @@ public class ClassCompiler {
 			}
 
 			if (!hasStaticInitializer && !staticFieldInitializers.isEmpty()) {
-				staticInitializer(classNode, null);
+				staticInitializer(classNode, null, getLineNumber(o, -1));
 			}
 
 			if (kws.hasParameter("annotations")) {
@@ -348,10 +340,17 @@ public class ClassCompiler {
 				ISourceLocation loc = (ISourceLocation) o.asWithKeywordParameters().getParameter("src");
 
 				if (loc != null) {
+					if (!loc.hasLineColumn()) {
+						throw new IllegalArgumentException("debug mode requires line/column information on the src fields to weave in line number information.");
+					}
 					return loc.getPath();
 				}
 			}
 
+			if (debug) {
+				throw new IllegalArgumentException("debug mode is requires src annotation on the class to determine the source file name.");
+			}
+			
 			return null;
 		}
 
@@ -494,26 +493,26 @@ public class ClassCompiler {
 			classNode.methods.add(method);
 		}
 
-		private void fields(ClassNode classNode, IList fields, boolean interf) {
+		private void fields(ClassNode classNode, IList fields, boolean interf, int parentLine) {
 			for (IValue field : fields) {
 				IConstructor cons = (IConstructor) field;
-				field(classNode, cons, interf);
+				field(classNode, cons, interf, parentLine);
 			}
 		}
 
-		private void methods(ClassNode classNode, IList methods) {
+		private void methods(ClassNode classNode, IList methods, int parentLine) {
 			for (IValue field : methods) {
 				IConstructor cons = (IConstructor) field;
 				if (cons.getConstructorType().getName().equals("static")) {
-					staticInitializer(classNode, cons);
+					staticInitializer(classNode, cons, parentLine);
 				}
 				else {
-					method(classNode, cons);
+					method(classNode, cons, parentLine);
 				}
 			}
 		}
 
-		private void staticInitializer(ClassNode classNode, IConstructor cons) {
+		private void staticInitializer(ClassNode classNode, IConstructor cons, int parentLine) {
 			if (hasStaticInitializer) {
 				throw new IllegalArgumentException("can only have one static initializer per class");
 			}
@@ -534,11 +533,11 @@ public class ClassCompiler {
 			method.visitCode(); 
 			method.visitLabel(methodStartLabel);
 
-			staticFieldInitializers(classNode, method);
+			staticFieldInitializers(classNode, method, getLineNumber(cons, parentLine));
 
 			IList block = AST.$getBlock(cons);
 			if (block != null) {
-				statements(block, null, null, methodEndLabel, getLineNumber(cons, -1));
+				statements(block, null, null, methodEndLabel, getLineNumber(cons, parentLine));
 			}
 
 			method.visitLabel(methodEndLabel);
@@ -550,7 +549,7 @@ public class ClassCompiler {
 		}
 
 
-		private void method(ClassNode classNode, IConstructor cons) {
+		private void method(ClassNode classNode, IConstructor cons, int parentLine) {
 			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
 
 			boolean isAbstract = cons.getConstructorType().getArity() == 1; // only a signature
@@ -596,7 +595,7 @@ public class ClassCompiler {
 				variableAnnotations = new ArrayList<>();
 
 				if (!isStatic) {
-					declareVariable(classType, "this", null, false, null, getLineNumber(cons, -1));
+					declareVariable(classType, "this", null, false, null, getLineNumber(cons, parentLine));
 				}
 
 				methodStartLabel = new LeveledLabel(0);
@@ -612,7 +611,7 @@ public class ClassCompiler {
 					fieldInitializers(classNode, method);
 				}
 
-				statements(AST.$getBlock(cons), methodStartLabel, methodEndLabel, methodEndLabel, getLineNumber(cons, -1));
+				statements(AST.$getBlock(cons), methodStartLabel, methodEndLabel, methodEndLabel, getLineNumber(cons, parentLine));
 
 				method.visitLabel(methodEndLabel);
 
@@ -693,11 +692,11 @@ public class ClassCompiler {
 			}
 		}
 
-		private void staticFieldInitializers(ClassNode classNode, MethodNode method) {
+		private void staticFieldInitializers(ClassNode classNode, MethodNode method, int parentLine) {
 			for (String field : staticFieldInitializers.keySet()) {
 				IConstructor def = staticFieldInitializers.get(field);
 				IConstructor exp = (IConstructor) def.asWithKeywordParameters().getParameter("init");
-				expr(exp, -1);
+				expr(exp, parentLine);
 				method.visitFieldInsn(Opcodes.PUTSTATIC, classNode.name, field, Signature.type(AST.$getType(def)));
 			}
 		}
@@ -2990,7 +2989,7 @@ public class ClassCompiler {
 			method.visitInsn(Opcodes.DUP);
 		}
 
-		private void field(ClassNode classNode, IConstructor cons, boolean interf) {
+		private void field(ClassNode classNode, IConstructor cons, boolean interf, int parentLine) {
 			IWithKeywordParameters<? extends IConstructor> kws = cons.asWithKeywordParameters();
 			int access = 0;
 
@@ -3058,7 +3057,7 @@ public class ClassCompiler {
 			}
 
 			FieldNode fieldNode = new FieldNode(access, name, signature, null, value);
-
+			
 			if (kws.hasParameter("annotations")) {
 				annotations((a, b) -> fieldNode.visitAnnotation(a, b), (IList) kws.getParameter("annotations"));
 			}

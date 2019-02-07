@@ -9,14 +9,14 @@ import ParseTree;
 import String;
 
 void testProtol() {
-  //tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/fact.protol|).top;
-  //compileProgram(tree, "ProtolFactorial", |project://flybytes/generated|);
-  //
-  //tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/inheritance.protol|).top;
-  //compileProgram(tree, "ProtolInheritance", |project://flybytes/generated|);
-  //
-  //tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/missing.protol|).top;
-  //compileProgram(tree, "ProtolMissing", |project://flybytes/generated|);
+  tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/fact.protol|).top;
+  compileProgram(tree, "ProtolFactorial", |project://flybytes/generated|);
+  
+  tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/inheritance.protol|).top;
+  compileProgram(tree, "ProtolInheritance", |project://flybytes/generated|);
+  
+  tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/missing.protol|).top;
+  compileProgram(tree, "ProtolMissing", |project://flybytes/generated|);
   
   tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/protol/fields.protol|).top;
   compileProgram(tree, "ProtolFields", |project://flybytes/generated|);
@@ -71,43 +71,43 @@ list[Class] compile(Program p, str name) {
   return declareVariables(allClasses);  
 }    
 
-list[Stat] compile(Command* commands) = [compile(c) | c <- commands];
+list[Stat] compile(Command* commands) = [compile(c)[src=c@\loc] | c <- commands];
 
 Stat compile((Command) `<Id id> = <Expr v>;`)
-  = store("<id>", compile(v), src=id@\loc);
+  = store("<id>", compile(v));
   
 Stat compile((Command) `<Expr obj>.<Id name> = <Expr v>;`)
-  = \do(invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "$set_<name>", [Prototype]), [compile(obj), compile(v)], src=name@\loc)); 
+  = \do(invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "$set_<name>", [Prototype]), [compile(obj), compile(v)])); 
 
 Exp PROTO() = getStatic(Prototype, Prototype, "PROTO");
   
 Stat compile((Command) `<Expr array>[<Expr index>] = <Expr v>;`)
-  = astore(compile(array), getInt(compile(index)), compile(v), src=array@\loc);
+  = astore(compile(array), getInt(compile(index)), compile(v));
 
 Stat compile((Command) `if(<Expr cond >) { <Command* thenPart> } else { <Command* elsePart> }`)
-  = \if(compile(cond), compile(thenPart), compile(elsePart), src=cond@\loc);
+  = \if(compile(cond), compile(thenPart), compile(elsePart));
 
 Stat compile((Command) `while(<Expr cond>) { <Command* body> }`)
-  = \while(compile(cond), compile(body), src=cond@\loc);   
+  = \while(compile(cond), compile(body));   
 
 Stat compile((Command) `<Expr e>;`) = \do(compile(e));
 
-Stat compile(c:(Command) `return <Expr e>;`) = \return(compile(e))[src=c@\loc];
+Stat compile((Command) `return <Expr e>;`) = \return(compile(e));
 
-Stat compile(c:(Command) `print <Expr e>;`) = stdout(compile(e))[src=c@\loc];
+Stat compile((Command) `print <Expr e>;`) = stdout(compile(e));
  
 Exp compile(e:(Expr) `this`) = load("this", src=e@\loc);
   
 Exp compile((Expr) `<Expr rec>.<Id name>(<{Expr ","}* args>)`)
-  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype]/*receiver*/ + [Prototype | _ <- args] ), [compile(rec), *compile(args) ], src=name@\loc);
+  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype]/*receiver*/ + [Prototype | _ <- args] ), [compile(rec), *compile(args) ])[src=name@\loc];
   
-list[Exp] compile({Expr ","}* args) = [compile(a) | a <- args];
+list[Exp] compile({Expr ","}* args) = [compile(a)[src=a@\loc] | a <- args];
    
 Exp compile(x:(Expr) `[<{Expr ","}* elems>]`)
-  = new(Arr, [array(Prototype)[src=x@\loc]], [newArray(array(Prototype), [compile(e) | e <- elems])])[src=x@\loc]; 
+  = new(Arr, [array(Prototype)], [newArray(array(Prototype), [compile(e) | e <- elems])])[src=x@\loc]; 
 
 Exp compile((Expr) `<Expr receiver>.<Id name>`)
-  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "$get_<name>", []), [compile(receiver)], src=name@\loc);
+  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "$get_<name>", []), [compile(receiver)])[src=name@\loc];
   
 Exp compile(x:(Expr) `new`) = new(Prototype, [Prototype], [PROTO()])[src=x@\loc];
 
@@ -123,14 +123,14 @@ Exp compile((Expr) `(<Expr e>)`) = compile(e);
 
 Exp compile(x:(Expr) `<Id i>`) = load("<i>", src=x@\loc);
 
-Exp compile(x:(Expr) `<Int i>`) = newInt(iconst(toInt("<i>"))[src=x@\loc])[src=x@\loc];
+Exp compile(x:(Expr) `<Int i>`) = newInt(iconst(toInt("<i>")))[src=x@\loc];
  
-Exp compile(x:(Expr) `<String s>`) = new(Str, [string()], [sconst("<s>"[1..-1])[src=x@\loc]])[src=x@\loc];
+Exp compile(x:(Expr) `<String s>`) = new(Str, [string()], [sconst("<s>"[1..-1])])[src=x@\loc];
 
 Exp compile(x:(Expr) `<Expr a>[<Expr index>]`) 
-  = aload(getArray(compile(a))[src=x@\loc], getInt(compile(index)), src=x@\loc);
+  = aload(getArray(compile(a)), getInt(compile(index)))[src=x@\loc];
   
-Exp newInt(Exp e) = new(Int, [integer()], [e])[src=e@\loc];
+Exp newInt(Exp e) = new(Int, [integer()], [e]);
 
 Exp compile(Expr l, Expr r, Exp (Exp, Exp) op) 
   = op(getInt(compile(l)), getInt(compile(r)));
@@ -169,20 +169,20 @@ Exp compile(x:(Expr) `<Expr l> \>= <Expr r>`)
   = compile(l, r, ge)[src=x@\loc];    
 
 list[Method] methods(Definition* defs) 
-  = [ method("<name>", args, commands) 
+  = [ method("<name>", args, commands)[src=name@\loc] 
     | (Definition) `<Id name>(<{Id ","}* args>) { <Command* commands> }` <- defs]
     +
-    [ method("missing", missingArgs(name, args), commands)
-    | (Definition) `missing(<Id name>, <Id args>) { <Command* commands> }` <- defs]
+    [ method("missing", missingArgs(name, args), commands)[src=d@\loc]
+    | d:(Definition) `missing(<Id name>, <Id args>) { <Command* commands> }` <- defs]
     +
-    [ getter("<name>", name@\loc), setter("<name>", name@\loc) | (Definition) `<Id name> = <Expr val>` <- defs]
+    [ getter("<name>")[src=name@\loc], setter("<name>")[src=name@\loc] | (Definition) `<Id name> = <Expr val>` <- defs]
     ;
 
-Method getter(str name, loc src) 
-  = method(\public(), Prototype, "$get_<name>", [], [\return(getField(Prototype, "<name>")[src=src])]);
+Method getter(str name) 
+  = method(\public(), Prototype, "$get_<name>", [], [\return(getField(Prototype, "<name>"))]);
 
-Method setter(str name, loc src)
-  = method(\public(), \void(), "$set_<name>", [var(Prototype, "a")], [putField(Prototype, "<name>", load("a"))[src=src], \return()]);
+Method setter(str name)
+  = method(\public(), \void(), "$set_<name>", [var(Prototype, "a")], [putField(Prototype, "<name>", load("a")), \return()]);
    
 {Id ","}* missingArgs(Id name, Id args)
   = ((Definition) `dummy(<Id name>, <Id args>) { }`).args;

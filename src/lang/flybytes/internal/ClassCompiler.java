@@ -1333,15 +1333,31 @@ public class ClassCompiler {
 				}
 				method.visitLookupSwitchInsn(getOrCreateAsmLabel(AST.$getDefaultLabel(instr)), keys, lulabels);
 				break;
+			case "GETSTATIC":
+				method.visitFieldInsn(Opcodes.GETSTATIC, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.type(AST.$getType(instr)));
+				break;
+			case "PUTSTATIC":
+				method.visitFieldInsn(Opcodes.PUTSTATIC, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.type(AST.$getType(instr)));
+				break;
+			case "GETFIELD":
+				method.visitFieldInsn(Opcodes.GETFIELD, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.type(AST.$getType(instr)));
+				break;
+			case "PUTFIELD":
+				method.visitFieldInsn(Opcodes.PUTFIELD, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.type(AST.$getType(instr)));
+				break;
+			case "INVOKEVIRTUAL":
+				method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				break;
+			case "INVOKESPECIAL":
+				method.visitMethodInsn(Opcodes.INVOKESPECIAL, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				break;
+			case "INVOKESTATIC":
+				method.visitMethodInsn(Opcodes.INVOKESTATIC, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				break;
+			case "INVOKEINTERFACE":
+				method.visitMethodInsn(Opcodes.INVOKEINTERFACE, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				break;
 				/* TODO
-				 *  | GETSTATIC(Type owner, str name, Type \type)
-  | PUTSTATIC(Type owner, str name, Type \type)
-  | GETFIELD(Type owner, str name, Type \type)
-  | PUTFIELD(Type owner, str name, Type \type)
-  | INVOKEVIRTUAL(Type owner, str name, Signature descriptor, bool isInterface)
-  | INVOKESPECIAL(Type owner, str name, Signature descriptor, bool isInterface)
-  | INVOKESTATIC(Type owner, str name, Signature descriptor, bool isInterface)
-  | INVOKEINTERFACE(Type owner, str name, Signature descriptor, bool isInterface)
   | INVOKEDYNAMIC(str name, Signature descriptor, CallSiteInfo bootstrapMethodHandle, list[CallSiteInfo] bootstrapMethodArguments)
   | NEW(Type \type)
   | ANEWARRAY(Type \type)
@@ -3746,6 +3762,10 @@ public class ClassCompiler {
 			return (IList) stat.get("keys");
 		}
 
+		public static boolean $getIsInterface(IConstructor stat) {
+			return ((IBool) stat.get("isInterface")).getValue();
+		}
+		
 		public static IConstructor $getSpecial(IConstructor cons) {
 			return (IConstructor) cons.get("special");
 		}

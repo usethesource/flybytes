@@ -1334,28 +1334,28 @@ public class ClassCompiler {
 				method.visitLookupSwitchInsn(getOrCreateAsmLabel(AST.$getDefaultLabel(instr)), keys, lulabels);
 				break;
 			case "GETSTATIC":
-				method.visitFieldInsn(Opcodes.GETSTATIC, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.type(AST.$getType(instr)));
+				method.visitFieldInsn(Opcodes.GETSTATIC, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.type(AST.$getType(instr)));
 				break;
 			case "PUTSTATIC":
-				method.visitFieldInsn(Opcodes.PUTSTATIC, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.type(AST.$getType(instr)));
+				method.visitFieldInsn(Opcodes.PUTSTATIC, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.type(AST.$getType(instr)));
 				break;
 			case "GETFIELD":
-				method.visitFieldInsn(Opcodes.GETFIELD, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.type(AST.$getType(instr)));
+				method.visitFieldInsn(Opcodes.GETFIELD, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.type(AST.$getType(instr)));
 				break;
 			case "PUTFIELD":
-				method.visitFieldInsn(Opcodes.PUTFIELD, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.type(AST.$getType(instr)));
+				method.visitFieldInsn(Opcodes.PUTFIELD, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.type(AST.$getType(instr)));
 				break;
 			case "INVOKEVIRTUAL":
-				method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
 				break;
 			case "INVOKESPECIAL":
-				method.visitMethodInsn(Opcodes.INVOKESPECIAL, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				method.visitMethodInsn(Opcodes.INVOKESPECIAL, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
 				break;
 			case "INVOKESTATIC":
-				method.visitMethodInsn(Opcodes.INVOKESTATIC, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				method.visitMethodInsn(Opcodes.INVOKESTATIC, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
 				break;
 			case "INVOKEINTERFACE":
-				method.visitMethodInsn(Opcodes.INVOKEINTERFACE, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				method.visitMethodInsn(Opcodes.INVOKEINTERFACE,AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
 				break;
 			case "NEW":
 				method.visitTypeInsn(Opcodes.NEW, Signature.type(AST.$getType(instr)));
@@ -1368,10 +1368,10 @@ public class ClassCompiler {
 				break;	
 			case "INSTANCEOF":
 				method.visitTypeInsn(Opcodes.INSTANCEOF, Signature.type(AST.$getType(instr)));
-				break;	
-				/*
-				  | MULTIANEWARRAY(Type \type, int numDimensions)
-				  */
+				break;
+			case "MULTIANEWARRAY":
+				method.visitMultiANewArrayInsn(AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getNumDimensions(instr));
+				break;
 				/* TODO
   | INVOKEDYNAMIC(str name, Signature descriptor, CallSiteInfo bootstrapMethodHandle, list[CallSiteInfo] bootstrapMethodArguments)
  
@@ -3755,6 +3755,10 @@ public class ClassCompiler {
 		
 		public static int $getVar(IConstructor exp) {
 			return ((IInteger) exp.get("var")).intValue();
+		}
+		
+		public static int $getNumDimensions(IConstructor exp) {
+			return ((IInteger) exp.get("numDimensions")).intValue();
 		}
 		
 		public static int $getIntVal(IConstructor exp) {

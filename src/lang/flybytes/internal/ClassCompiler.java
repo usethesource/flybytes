@@ -1252,9 +1252,9 @@ public class ClassCompiler {
 				break;
 			case "IINC":
 				method.visitIincInsn(AST.$getVar(instr), AST.$getInc(instr));
+				break;
 			case "LABEL":
-				Label l = new Label();
-				asmLabels.put(AST.$getLabel(instr), l);
+				Label l = getOrCreateAsmLabel(AST.$getLabel(instr));
 				method.visitLabel(l);
 				break;
 			case "LINENUMBER":
@@ -4255,4 +4255,3 @@ public class ClassCompiler {
 		}
 	}
 }
-

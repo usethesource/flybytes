@@ -1357,13 +1357,24 @@ public class ClassCompiler {
 			case "INVOKEINTERFACE":
 				method.visitMethodInsn(Opcodes.INVOKEINTERFACE, AST.$getName(AST.$getClass(instr)), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
 				break;
+			case "NEW":
+				method.visitTypeInsn(Opcodes.NEW, Signature.type(AST.$getType(instr)));
+				break;
+			case "ANEWARRAY":
+				method.visitTypeInsn(Opcodes.ANEWARRAY, Signature.type(AST.$getType(instr)));
+				break;
+			case "CHECKCAST":
+				method.visitTypeInsn(Opcodes.CHECKCAST, Signature.type(AST.$getType(instr)));
+				break;	
+			case "INSTANCEOF":
+				method.visitTypeInsn(Opcodes.INSTANCEOF, Signature.type(AST.$getType(instr)));
+				break;	
+				/*
+				  | MULTIANEWARRAY(Type \type, int numDimensions)
+				  */
 				/* TODO
   | INVOKEDYNAMIC(str name, Signature descriptor, CallSiteInfo bootstrapMethodHandle, list[CallSiteInfo] bootstrapMethodArguments)
-  | NEW(Type \type)
-  | ANEWARRAY(Type \type)
-  | CHECKCAST(Type \type)
-  | INSTANCEOF(Type \type)
-  | MULTIANEWARRAY(Type \type, int numDimensions)
+ 
 				 */
 			}
 		}

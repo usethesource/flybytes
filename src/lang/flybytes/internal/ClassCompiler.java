@@ -263,6 +263,7 @@ public class ClassCompiler {
 		private final Builder<IConstructor> pushTrue = () -> trueExp();
 		private final Builder<IConstructor> pushFalse = () -> falseExp();
 		private Map<String, LeveledLabel> labels;
+		private Map<String, Label> asmLabels;
 		private int currentLine = 0;
 		private boolean emittingFinally = false;
 		private final boolean debug;
@@ -569,6 +570,9 @@ public class ClassCompiler {
 
 			// every method body has a fresh set of jump labels
 			labels = new HashMap<>(); 
+			
+			// for raw asm labels, we have a different map
+			asmLabels = new HashMap<>();
 
 			if (!isAbstract) {
 				if (isInterface && classNode.version < Opcodes.V1_8) {
@@ -866,7 +870,495 @@ public class ClassCompiler {
 				String option = stat.asWithKeywordParameters().hasParameter("option") ? ((IConstructor) stat.asWithKeywordParameters().getParameter("option")).getConstructorType().getName() : "lookup";
 				switchStat(option, AST.$getArg(stat), AST.$getCases(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
+			case "asm":
+				instructions(AST.$getInstructions(stat), line);
+				break;
 			}
+		}
+
+		private void instructions(IList instructions, int parentLine) {
+			for (IValue elem : instructions) {
+				instruction((IConstructor) elem, parentLine);
+			}
+		}
+
+		private void instruction(IConstructor instr, int parentLine) {
+			switch (instr.getName()) {
+			case "NOP": 
+				method.visitInsn(Opcodes.NOP);
+				break;
+			case "ACONST_NULL":
+				method.visitInsn(Opcodes.ACONST_NULL);
+				break;
+			case "ICONST_M1":
+				method.visitInsn(Opcodes.ICONST_M1);
+				break;
+			case "ICONST_0":
+				method.visitInsn(Opcodes.ICONST_0);
+				break;
+			case "ICONST_1":
+				method.visitInsn(Opcodes.ICONST_1);
+				break;
+			case "ICONST_2":
+				method.visitInsn(Opcodes.ICONST_2);
+				break;
+			case "ICONST_3":
+				method.visitInsn(Opcodes.ICONST_3);
+				break;
+			case "ICONST_4":
+				method.visitInsn(Opcodes.ICONST_4);
+				break;
+			case "ICONST_5":
+				method.visitInsn(Opcodes.ICONST_5);
+				break;
+			case "LCONST_0":
+				method.visitInsn(Opcodes.LCONST_0);
+				break;
+			case "LCONST_1":
+				method.visitInsn(Opcodes.LCONST_1);
+				break;
+			case "FCONST_0":
+				method.visitInsn(Opcodes.FCONST_0);
+				break;
+			case "FCONST_1":
+				method.visitInsn(Opcodes.FCONST_1);
+				break;
+			case "FCONST_2":
+				method.visitInsn(Opcodes.FCONST_2);
+				break;
+			case "DCONST_0":
+				method.visitInsn(Opcodes.DCONST_0);
+				break;
+			case "DCONST_1":
+				method.visitInsn(Opcodes.DCONST_1);
+				break;
+			case "IALOAD":
+				method.visitInsn(Opcodes.IALOAD);
+				break;
+			case "LALOAD":
+				method.visitInsn(Opcodes.LALOAD);
+				break;
+			case "FALOAD":
+				method.visitInsn(Opcodes.FALOAD);
+				break;
+			case "DALOAD":
+				method.visitInsn(Opcodes.DALOAD);
+				break;
+			case "AALOAD":
+				method.visitInsn(Opcodes.AALOAD);
+				break;
+			case "BALOAD":
+				method.visitInsn(Opcodes.BALOAD);
+				break;
+			case "CALOAD":
+				method.visitInsn(Opcodes.CALOAD);
+				break;
+			case "SALOAD":
+				method.visitInsn(Opcodes.SALOAD);
+				break;
+			case "IASTORE":
+				method.visitInsn(Opcodes.IASTORE);
+				break;
+			case "LASTORE":
+				method.visitInsn(Opcodes.LASTORE);
+				break;
+			case "FASTORE":
+				method.visitInsn(Opcodes.FASTORE);
+				break;
+			case "DASTORE":
+				method.visitInsn(Opcodes.DASTORE);
+				break;
+			case "AASTORE":
+				method.visitInsn(Opcodes.AASTORE);
+				break;
+			case "BASTORE":
+				method.visitInsn(Opcodes.BASTORE);
+				break;
+			case "CASTORE":
+				method.visitInsn(Opcodes.CASTORE);
+				break;
+			case "SASTORE":
+				method.visitInsn(Opcodes.SASTORE);
+				break;
+			case "POP":
+				method.visitInsn(Opcodes.POP);
+				break;
+			case "POP2":
+				method.visitInsn(Opcodes.POP2);
+				break;
+			case "DUP":
+				method.visitInsn(Opcodes.DUP);
+				break;
+			case "DUP_X1":
+				method.visitInsn(Opcodes.DUP_X1);
+				break;
+			case "DUP_X2":
+				method.visitInsn(Opcodes.DUP_X2);
+				break;
+			case "DUP2":
+				method.visitInsn(Opcodes.DUP2);
+				break;
+			case "DUP2_X1":
+				method.visitInsn(Opcodes.DUP2_X1);
+				break;
+			case "DUP2_X2":
+				method.visitInsn(Opcodes.DUP2_X2);
+				break;
+			case "SWAP":
+				method.visitInsn(Opcodes.SWAP);
+				break;
+			case "IADD":
+				method.visitInsn(Opcodes.IADD);
+				break;
+			case "LADD":
+				method.visitInsn(Opcodes.LADD);
+				break;
+			case "FADD":
+				method.visitInsn(Opcodes.FADD);
+				break;
+			case "DADD":
+				method.visitInsn(Opcodes.DADD);
+				break;
+			case "ISUB":
+				method.visitInsn(Opcodes.ISUB);
+				break;
+			case "LSUB":
+				method.visitInsn(Opcodes.LSUB);
+				break;
+			case "FSUB":
+				method.visitInsn(Opcodes.FSUB);
+				break;
+			case "DSUB":
+				method.visitInsn(Opcodes.DSUB);
+				break;
+			case "IMUL":
+				method.visitInsn(Opcodes.IMUL);
+				break;
+			case "LMUL":
+				method.visitInsn(Opcodes.LMUL);
+				break;
+			case "FMUL":
+				method.visitInsn(Opcodes.FMUL);
+				break;
+			case "DMUL":
+				method.visitInsn(Opcodes.DMUL);
+				break;
+			case "IDIV":
+				method.visitInsn(Opcodes.IDIV);
+				break;
+			case "LDIV":
+				method.visitInsn(Opcodes.LDIV);
+				break;
+			case "FDIV":
+				method.visitInsn(Opcodes.FDIV);
+				break;
+			case "DDIV":
+				method.visitInsn(Opcodes.DDIV);
+				break;
+			case "IREM":
+				method.visitInsn(Opcodes.IREM);
+				break;
+			case "LREM":
+				method.visitInsn(Opcodes.LREM);
+				break;
+			case "FREM":
+				method.visitInsn(Opcodes.FREM);
+				break;
+			case "DREM":
+				method.visitInsn(Opcodes.DREM);
+				break;
+			case "INEG":
+				method.visitInsn(Opcodes.INEG);
+				break;
+			case "LNEG":
+				method.visitInsn(Opcodes.LNEG);
+				break;
+			case "FNEG":
+				method.visitInsn(Opcodes.FNEG);
+				break;
+			case "DNEG":
+				method.visitInsn(Opcodes.DNEG);
+				break;
+			case "ISHL":
+				method.visitInsn(Opcodes.ISHL);
+				break;
+			case "LSHL":
+				method.visitInsn(Opcodes.LSHL);
+				break;
+			case "ISHR":
+				method.visitInsn(Opcodes.ISHR);
+				break;
+			case "LSHR":
+				method.visitInsn(Opcodes.LSHR);
+				break;
+			case "IUSHR":
+				method.visitInsn(Opcodes.IUSHR);
+				break;
+			case "LUSHR":
+				method.visitInsn(Opcodes.LUSHR);
+				break;
+			case "IAND":
+				method.visitInsn(Opcodes.IAND);
+				break;
+			case "LAND":
+				method.visitInsn(Opcodes.LAND);
+				break;
+			case "IOR":
+				method.visitInsn(Opcodes.IOR);
+				break;
+			case "LOR":
+				method.visitInsn(Opcodes.LOR);
+				break;
+			case "IXOR":
+				method.visitInsn(Opcodes.IXOR);
+				break;
+			case "LXOR":
+				method.visitInsn(Opcodes.LXOR);
+				break;
+			case "I2L":
+				method.visitInsn(Opcodes.I2L);
+				break;
+			case "I2F":
+				method.visitInsn(Opcodes.I2F);
+				break;
+			case "I2D":
+				method.visitInsn(Opcodes.I2D);
+				break;
+			case "L2I":
+				method.visitInsn(Opcodes.L2I);
+				break;
+			case "L2F":
+				method.visitInsn(Opcodes.L2F);
+				break;
+			case "L2D":
+				method.visitInsn(Opcodes.L2D);
+				break;
+			case "F2I":
+				method.visitInsn(Opcodes.F2I);
+				break;
+			case "F2L":
+				method.visitInsn(Opcodes.F2L);
+				break;
+			case "F2D":
+				method.visitInsn(Opcodes.F2D);
+				break;
+			case "D2I":
+				method.visitInsn(Opcodes.D2I);
+				break;
+			case "D2L":
+				method.visitInsn(Opcodes.D2L);
+				break;
+			case "D2F":
+				method.visitInsn(Opcodes.D2F);
+				break;
+			case "I2B":
+				method.visitInsn(Opcodes.I2B);
+				break;
+			case "I2C":
+				method.visitInsn(Opcodes.I2C);
+				break;
+			case "I2S":
+				method.visitInsn(Opcodes.I2S);
+				break;
+			case "LCMP":
+				method.visitInsn(Opcodes.LCMP);
+				break;
+			case "FCMPL":
+				method.visitInsn(Opcodes.FCMPL);
+				break;
+			case "FCMPG":
+				method.visitInsn(Opcodes.FCMPG);
+				break;
+			case "DCMPL":
+				method.visitInsn(Opcodes.DCMPL);
+				break;
+			case "DCMPG":
+				method.visitInsn(Opcodes.DCMPG);
+				break;
+			case "IRETURN":
+				method.visitInsn(Opcodes.IRETURN);
+				break;
+			case "LRETURN":
+				method.visitInsn(Opcodes.LRETURN);
+				break;
+			case "FRETURN":
+				method.visitInsn(Opcodes.FRETURN);
+				break;
+			case "DRETURN":
+				method.visitInsn(Opcodes.DRETURN);
+				break;
+			case "ARETURN":
+				method.visitInsn(Opcodes.ARETURN);
+				break;
+			case "RETURN":
+				method.visitInsn(Opcodes.RETURN);
+				break;
+			case "ARRAYLENGTH":
+				method.visitInsn(Opcodes.ARRAYLENGTH);
+				break;
+			case "ATHROW":
+				method.visitInsn(Opcodes.ATHROW);
+				break;
+			case "MONITORENTER":
+				method.visitInsn(Opcodes.MONITORENTER);
+				break;
+			case "MONITOREXIT":
+				method.visitInsn(Opcodes.MONITOREXIT);
+				break;
+			case "ILOAD":
+				method.visitVarInsn(Opcodes.ILOAD, AST.$getVar(instr));
+				break;
+			case "LLOAD":
+				method.visitVarInsn(Opcodes.LLOAD, AST.$getVar(instr));
+				break;
+			case "FLOAD":
+				method.visitVarInsn(Opcodes.FLOAD, AST.$getVar(instr));
+				break;
+			case "DLOAD":
+				method.visitVarInsn(Opcodes.DLOAD, AST.$getVar(instr));
+				break;
+			case "ALOAD":
+				method.visitVarInsn(Opcodes.ALOAD, AST.$getVar(instr));
+				break;
+			case "ISTORE":
+				method.visitVarInsn(Opcodes.ISTORE, AST.$getVar(instr));
+				break;
+			case "LSTORE":
+				method.visitVarInsn(Opcodes.LSTORE, AST.$getVar(instr));
+				break;
+			case "FSTORE":
+				method.visitVarInsn(Opcodes.FSTORE, AST.$getVar(instr));
+				break;
+			case "DSTORE":
+				method.visitVarInsn(Opcodes.DSTORE, AST.$getVar(instr));
+				break;
+			case "ASTORE":
+				method.visitVarInsn(Opcodes.ASTORE, AST.$getVar(instr));
+				break;
+			case "RET":
+				method.visitVarInsn(Opcodes.RET, AST.$getVar(instr));
+				break;
+			case "BIPUSH":
+				method.visitIntInsn(Opcodes.BIPUSH, AST.$getIntVal(instr));
+				break;
+			case "SIPUSH":
+				method.visitIntInsn(Opcodes.BIPUSH, AST.$getIntVal(instr));
+				break;
+			case "NEWARRAY":
+				newArrayWithSizeOnStack(AST.$getType(instr), parentLine);
+				break;
+			case "LDC":
+				constExp(AST.$getType(instr), AST.$getConstant(instr), parentLine);
+				break;
+			case "IINC":
+				method.visitIincInsn(AST.$getVar(instr), AST.$getInc(instr));
+			case "LABEL":
+				Label l = new Label();
+				asmLabels.put(AST.$getLabel(instr), l);
+				method.visitLabel(l);
+				break;
+			case "LINENUMBER":
+				Label start = getOrCreateAsmLabel(AST.$getLabel(instr));
+				method.visitLineNumber(AST.$getLine(instr), start);
+			case "IFEQ":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IFNE":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IFLT":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IFGE":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IFGT":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IFLE":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IF_ICMPEQ":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IF_ICMPNE":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IF_ICMPLT":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IF_ICMPGE":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IF_ICMPGT":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IF_ICMPLE":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IF_ACMPEQ":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IF_ACMPNE":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "GOTO":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "JSR":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IFNULL":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "IFNONNULL":
+				method.visitJumpInsn(Opcodes.IFEQ, getOrCreateAsmLabel(AST.$getLabel(instr)));
+				break;
+			case "TABLESWITCH": 
+				IList cases = AST.$getCaseLabels(instr);
+				Label[] labels = new Label[cases.length()];
+				for (int i = 0; i < labels.length; i++) {
+					labels[i] = getOrCreateAsmLabel(((IString) cases.get(i)).getValue());
+				}
+				method.visitTableSwitchInsn(AST.$getMin(instr), AST.$getMax(instr), getOrCreateAsmLabel(AST.$getDefaultLabel(instr)), labels);
+				break;
+			case "LOOKUPSWITCH":
+				IList lucases = AST.$getCaseLabels(instr);
+				IList lukeys = AST.$getCaseKeys(instr);
+				Label[] lulabels = new Label[lucases.length()];
+				int[] keys = new int[lucases.length()];
+				for (int i = 0; i < lulabels.length; i++) {
+					lulabels[i] = getOrCreateAsmLabel(((IString) lucases.get(i)).getValue());
+					keys[i] = ((IInteger) lukeys.get(i)).intValue();
+				}
+				method.visitLookupSwitchInsn(getOrCreateAsmLabel(AST.$getDefaultLabel(instr)), keys, lulabels);
+				break;
+				/* TODO
+				 *  | GETSTATIC(Type owner, str name, Type \type)
+  | PUTSTATIC(Type owner, str name, Type \type)
+  | GETFIELD(Type owner, str name, Type \type)
+  | PUTFIELD(Type owner, str name, Type \type)
+  | INVOKEVIRTUAL(Type owner, str name, Signature descriptor, bool isInterface)
+  | INVOKESPECIAL(Type owner, str name, Signature descriptor, bool isInterface)
+  | INVOKESTATIC(Type owner, str name, Signature descriptor, bool isInterface)
+  | INVOKEINTERFACE(Type owner, str name, Signature descriptor, bool isInterface)
+  | INVOKEDYNAMIC(str name, Signature descriptor, CallSiteInfo bootstrapMethodHandle, list[CallSiteInfo] bootstrapMethodArguments)
+  | NEW(Type \type)
+  | ANEWARRAY(Type \type)
+  | CHECKCAST(Type \type)
+  | INSTANCEOF(Type \type)
+  | MULTIANEWARRAY(Type \type, int numDimensions)
+				 */
+			}
+		}
+		
+		private Label getOrCreateAsmLabel(String label) {
+			Label result = asmLabels.get(label);
+			if (result == null) {
+				result = new Label();
+				asmLabels.put(label, result);
+			}
+			return result;
 		}
 
 		private void releaseStat(IConstructor arg, int parentLine) {
@@ -3221,6 +3713,38 @@ public class ClassCompiler {
 		public static int $getKey(IConstructor exp) {
 			return ((IInteger) exp.get("key")).intValue();
 		}
+		
+		public static int $getMin(IConstructor exp) {
+			return ((IInteger) exp.get("min")).intValue();
+		}
+		
+		public static int $getMax(IConstructor exp) {
+			return ((IInteger) exp.get("max")).intValue();
+		}
+		
+		public static String $getDefaultLabel(IConstructor instr) {
+			return ((IString) instr.get("defaultLabel")).getValue(); 
+		}
+		
+		public static int $getVar(IConstructor exp) {
+			return ((IInteger) exp.get("var")).intValue();
+		}
+		
+		public static int $getIntVal(IConstructor exp) {
+			return ((IInteger) exp.get("val")).intValue();
+		}
+
+		public static IList $getInstructions(IConstructor stat) {
+			return (IList) stat.get("instructions");
+		}
+		
+		public static IList $getCaseLabels(IConstructor stat) {
+			return (IList) stat.get("labels");
+		}
+		
+		public static IList $getCaseKeys(IConstructor stat) {
+			return (IList) stat.get("keys");
+		}
 
 		public static IConstructor $getSpecial(IConstructor cons) {
 			return (IConstructor) cons.get("special");
@@ -3498,6 +4022,10 @@ public class ClassCompiler {
 
 		public static int $getInc(IConstructor type) {
 			return ((IInteger) type.get("inc")).intValue();
+		}
+		
+		public static int $getLine(IConstructor instr) {
+			return ((IInteger) instr.get("line")).intValue();
 		}
 
 		public static int $getVersionCode(IConstructor version) {

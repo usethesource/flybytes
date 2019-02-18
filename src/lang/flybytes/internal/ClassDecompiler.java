@@ -18,12 +18,16 @@ import org.rascalmpl.objectweb.asm.tree.IincInsnNode;
 import org.rascalmpl.objectweb.asm.tree.InsnList;
 import org.rascalmpl.objectweb.asm.tree.IntInsnNode;
 import org.rascalmpl.objectweb.asm.tree.JumpInsnNode;
+import org.rascalmpl.objectweb.asm.tree.LabelNode;
 import org.rascalmpl.objectweb.asm.tree.LdcInsnNode;
+import org.rascalmpl.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.rascalmpl.objectweb.asm.tree.MethodInsnNode;
 import org.rascalmpl.objectweb.asm.tree.MethodNode;
 import org.rascalmpl.objectweb.asm.tree.ParameterNode;
+import org.rascalmpl.objectweb.asm.tree.TableSwitchInsnNode;
 import org.rascalmpl.objectweb.asm.tree.TypeInsnNode;
 import org.rascalmpl.objectweb.asm.tree.VarInsnNode;
+import org.rascalmpl.objectweb.asm.tree.MultiANewArrayInsnNode;
 import org.rascalmpl.uri.URIResolverRegistry;
 
 import io.usethesource.vallang.IConstructor;
@@ -453,12 +457,10 @@ public class ClassDecompiler {
 			return ast.Instruction_IFNULL((((JumpInsnNode) instr).label.getLabel().toString()));
 		case Opcodes.IFNONNULL:
 			return ast.Instruction_IFNONNULL((((JumpInsnNode) instr).label.getLabel().toString()));
-//		case Opcodes.TABLESWITCH: 
-//			tableSwitchInstruction(instr);
-//			break;
-//		case Opcodes.LOOKUPSWITCH:
-//			lookupSwitchInstruction(instr);
-//			break;
+		case Opcodes.TABLESWITCH:
+			return tableSwitchInstruction((TableSwitchInsnNode) instr);
+		case Opcodes.LOOKUPSWITCH:
+			return lookupSwitchInstruction((LookupSwitchInsnNode) instr);
 		case Opcodes.GETSTATIC:
 			return ast.Instruction_GETSTATIC(typeName(((FieldInsnNode) instr).owner),
 					((FieldInsnNode) instr).name,
@@ -509,9 +511,9 @@ public class ClassDecompiler {
 			return ast.Instruction_CHECKCAST(typeName(((TypeInsnNode) instr).desc));
 		case Opcodes.INSTANCEOF:
 			return ast.Instruction_INSTANCEOF(typeName(((TypeInsnNode) instr).desc));
-//		case Opcodes.MULTIANEWARRAY:
-//			multiNewArrayInstruction(instr);
-//			break;
+		case Opcodes.MULTIANEWARRAY:
+			return ast.Instruction_MULTIANEWARRAY(typeName(((MultiANewArrayInsnNode) instr).desc), 
+					((MultiANewArrayInsnNode) instr).dims); 
 //		case Opcodes.INVOKEDYNAMIC:
 //			invokeDynamicInstruction(instr);
 //			break;
@@ -523,10 +525,30 @@ public class ClassDecompiler {
 //		throw new IllegalArgumentException("unrecognized instruction: " + instr);
 	}
 
-	private IConstructor newArrayInstruction(TypeInsnNode instr) {
-		return ast.Instruction_NEWARRAY(type(instr.desc));
+	private IConstructor lookupSwitchInstruction(LookupSwitchInsnNode instr) {
+		IListWriter labels = VF.listWriter();
+		for (LabelNode l : instr.labels) {
+			labels.append(VF.string(l.getLabel().toString()));
+		}
+		
+		IListWriter keys = VF.listWriter();
+		for (int key : instr.keys) {
+			keys.append(VF.integer(key));
+		}
+		
+		return ast.Instruction_LOOKUPSWITCH(instr.dflt.getLabel().toString(), keys.done(), labels.done());
 	}
-	
+
+	private IConstructor tableSwitchInstruction(TableSwitchInsnNode instr) {
+		IListWriter labels = VF.listWriter();
+		
+		for (LabelNode l : instr.labels) {
+			labels.append(VF.string(l.getLabel().toString()));
+		}
+		
+		return ast.Instruction_TABLESWITCH(instr.min, instr.max, instr.dflt.getLabel().toString(), labels.done());
+	}
+
 	private IConstructor descriptor(String name, String desc) {
 		org.rascalmpl.objectweb.asm.Type d = Type.getType(desc);
 		

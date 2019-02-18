@@ -871,19 +871,25 @@ public class ClassCompiler {
 				switchStat(option, AST.$getArg(stat), AST.$getCases(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
 			case "asm":
-				instructions(AST.$getInstructions(stat), line);
+				instructions(AST.$getInstructions(stat), continueLabel, breakLabel, joinLabel, line);
 				break;
 			}
 		}
 
-		private void instructions(IList instructions, int parentLine) {
+		private void instructions(IList instructions, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int parentLine) {
 			for (IValue elem : instructions) {
-				instruction((IConstructor) elem, parentLine);
+				instruction((IConstructor) elem, continueLabel, breakLabel, joinLabel, parentLine);
 			}
 		}
 
-		private void instruction(IConstructor instr, int parentLine) {
+		private void instruction(IConstructor instr, LeveledLabel continueLabel, LeveledLabel breakLabel, LeveledLabel joinLabel, int parentLine) {
 			switch (instr.getName()) {
+			case "exp":
+				expr((IConstructor) instr.get("expression"), parentLine);
+				break;
+			case "stat":
+				statement((IConstructor) instr.get("statement"), continueLabel, breakLabel, joinLabel, parentLine);
+				break;
 			case "NOP": 
 				simpleInstruction(Opcodes.NOP);
 				break;

@@ -429,6 +429,8 @@ data Instruction
   | CHECKCAST(Type \type)
   | INSTANCEOF(Type \type)
   | MULTIANEWARRAY(Type \type, int numDimensions)
+  | exp(Exp expression)
+  | stat(Stat statement)
   ;
   
 Exp defVal(boolean()) = const(boolean(), false);

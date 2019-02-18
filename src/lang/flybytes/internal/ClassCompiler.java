@@ -1618,7 +1618,7 @@ public class ClassCompiler {
 		 * "fall-through" semantics by default.
 		 * 
 		 * tableSwitch is best to call if the case labels are consecutive integers and if there are not so many 
-		 * as to trigger a cache misses all the time.
+		 * as to trigger cache misses all the time.
 		 */
 		private void tableSwitch(IConstructor arg, IList cases, LeveledLabel continueLabel, LeveledLabel joinLabel, int line) {
 			int min = Integer.MAX_VALUE;

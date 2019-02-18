@@ -20,6 +20,7 @@ import org.rascalmpl.objectweb.asm.tree.IntInsnNode;
 import org.rascalmpl.objectweb.asm.tree.JumpInsnNode;
 import org.rascalmpl.objectweb.asm.tree.LabelNode;
 import org.rascalmpl.objectweb.asm.tree.LdcInsnNode;
+import org.rascalmpl.objectweb.asm.tree.LineNumberNode;
 import org.rascalmpl.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.rascalmpl.objectweb.asm.tree.MethodInsnNode;
 import org.rascalmpl.objectweb.asm.tree.MethodNode;
@@ -514,15 +515,20 @@ public class ClassDecompiler {
 		case Opcodes.MULTIANEWARRAY:
 			return ast.Instruction_MULTIANEWARRAY(typeName(((MultiANewArrayInsnNode) instr).desc), 
 					((MultiANewArrayInsnNode) instr).dims); 
-//		case Opcodes.INVOKEDYNAMIC:
-//			invokeDynamicInstruction(instr);
-//			break;
-			default:
-				// TODO remove
-				return ast.Instruction_NOP();
+		case Opcodes.INVOKEDYNAMIC:
+			// TODO
+			return ast.Instruction_NOP();
+		case -1: // LABELNODE & LINENUMBER NODE
+			if (instr instanceof LabelNode) {
+				return ast.Instruction_LABEL(((LabelNode) instr).getLabel().toString());
+			}
+			else if (instr instanceof LineNumberNode) {
+				return ast.Instruction_LINENUMBER(((LineNumberNode) instr).line, ((LineNumberNode) instr).start.getLabel().toString());
+			}
 		}
 		
-//		throw new IllegalArgumentException("unrecognized instruction: " + instr);
+		
+		throw new IllegalArgumentException("unrecognized instruction: " + instr);
 	}
 
 	private IConstructor lookupSwitchInstruction(LookupSwitchInsnNode instr) {

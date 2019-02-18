@@ -413,8 +413,6 @@ public class ClassDecompiler {
 			return ast.Instruction_BIPUSH(((IntInsnNode) instr).operand);
 		case Opcodes.SIPUSH:
 			return ast.Instruction_BIPUSH(((IntInsnNode) instr).operand);
-		case Opcodes.NEWARRAY:
-			return ast.Instruction_NEWARRAY(type(((TypeInsnNode) instr).desc));
 		case Opcodes.LDC:
 			return ast.Instruction_LDC(constType(((LdcInsnNode) instr).cst), initializer(((LdcInsnNode) instr).cst).get("constant"));
 		case Opcodes.IINC:
@@ -501,6 +499,8 @@ public class ClassDecompiler {
 							   ((MethodInsnNode) instr).desc),
 					((MethodInsnNode) instr).itf
 					);
+		case Opcodes.NEWARRAY:
+			return ast.Instruction_NEWARRAY(type(((TypeInsnNode) instr).desc));
 		case Opcodes.NEW:
 			return ast.Instruction_NEW(typeName(((TypeInsnNode) instr).desc));
 		case Opcodes.ANEWARRAY:

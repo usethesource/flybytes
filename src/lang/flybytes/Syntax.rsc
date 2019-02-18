@@ -419,11 +419,11 @@ data Instruction
   | PUTSTATIC(Type class, str name, Type \type)
   | GETFIELD(Type class, str name, Type \type)
   | PUTFIELD(Type class, str name, Type \type)
-  | INVOKEVIRTUAL(Type class, str name, Signature desc, bool isInterface)
-  | INVOKESPECIAL(Type class, str name, Signature desc, bool isInterface)
-  | INVOKESTATIC(Type class, str name, Signature desc, bool isInterface)
-  | INVOKEINTERFACE(Type class, str name, Signature desc, bool isInterface)
-  | INVOKEDYNAMIC(str name, Signature desc, CallSiteInfo bootstrapMethodHandle, list[CallSiteInfo] bootstrapMethodArguments)
+  | INVOKEVIRTUAL(Type class, Signature desc, bool isInterface)
+  | INVOKESPECIAL(Type class, Signature desc, bool isInterface)
+  | INVOKESTATIC(Type class, Signature desc, bool isInterface)
+  | INVOKEINTERFACE(Type class, Signature desc, bool isInterface)
+  | INVOKEDYNAMIC(Signature desc, BootstrapCall handle)
   | NEW(Type \type)
   | ANEWARRAY(Type \type)
   | CHECKCAST(Type \type)
@@ -546,10 +546,10 @@ It's advisable to use the convenience function below to create a `BootstrapCall`
 That function makes sure to line up the additional information in the extra arguments about 
 the call site with the static type of the static bootstrap method.
 } 
-data BootstrapCall = bootstrap(Type class, str name, Signature desc, list[CallSiteInfo] args);
+data BootstrapCall = bootstrap(Type class, Signature desc, list[CallSiteInfo] args);
  
 BootstrapCall bootstrap(Type class, str name, list[CallSiteInfo] args)
-  = bootstrap(class, name, 
+  = bootstrap(class,  
       methodDesc(object("java.lang.invoke.CallSite"),
                  name,
                  [

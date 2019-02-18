@@ -1346,16 +1346,16 @@ public class ClassCompiler {
 				method.visitFieldInsn(Opcodes.PUTFIELD, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.type(AST.$getType(instr)));
 				break;
 			case "INVOKEVIRTUAL":
-				method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(AST.$getDesc(instr)), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
 				break;
 			case "INVOKESPECIAL":
-				method.visitMethodInsn(Opcodes.INVOKESPECIAL, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				method.visitMethodInsn(Opcodes.INVOKESPECIAL, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(AST.$getDesc(instr)), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
 				break;
 			case "INVOKESTATIC":
-				method.visitMethodInsn(Opcodes.INVOKESTATIC, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				method.visitMethodInsn(Opcodes.INVOKESTATIC, AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(AST.$getDesc(instr)), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
 				break;
 			case "INVOKEINTERFACE":
-				method.visitMethodInsn(Opcodes.INVOKEINTERFACE,AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(instr), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
+				method.visitMethodInsn(Opcodes.INVOKEINTERFACE,AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getName(AST.$getDesc(instr)), Signature.method(AST.$getDesc(instr)), AST.$getIsInterface(instr));
 				break;
 			case "NEW":
 				method.visitTypeInsn(Opcodes.NEW, Signature.type(AST.$getType(instr)));
@@ -1372,10 +1372,11 @@ public class ClassCompiler {
 			case "MULTIANEWARRAY":
 				method.visitMultiANewArrayInsn(AST.$getRefClassFromType(AST.$getClass(instr), classNode.name), AST.$getNumDimensions(instr));
 				break;
-				/* TODO
-  | INVOKEDYNAMIC(str name, Signature descriptor, CallSiteInfo bootstrapMethodHandle, list[CallSiteInfo] bootstrapMethodArguments)
- 
-				 */
+			case "INVOKEDYNAMIC":
+				IConstructor handle = AST.$getHandle(instr);
+				IConstructor dynDesc = AST.$getDesc(instr);
+				method.visitInvokeDynamicInsn(AST.$getName(dynDesc), Signature.method(dynDesc), bootstrapHandler(handle), bootstrapArgs(handle));
+				break;
 			}
 		}
 		

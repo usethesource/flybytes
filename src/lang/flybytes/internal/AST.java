@@ -1704,7 +1704,7 @@ public class AST {
     return vf.constructor(_Instruction_FSTORE_1 , vf.integer($var));
   }
   
-  public IConstructor Instruction_LOCALVARIABLE(String $name, IConstructor $type, int $start, int $end, int $var) {
+  public IConstructor Instruction_LOCALVARIABLE(String $name, IConstructor $type, String $start, String $end, int $var) {
       
     if (!vf.string($name).getType().isSubtypeOf(tf.stringType())) {
       throw new IllegalArgumentException("Expected " + tf.stringType() + " but got " + vf.string($name).getType() + " for vf.string($name):" + vf.string($name));
@@ -1714,19 +1714,19 @@ public class AST {
       throw new IllegalArgumentException("Expected " + _Type + " but got " + $type.getType() + " for $type:" + $type);
     }
       
-    if (!vf.integer($start).getType().isSubtypeOf(tf.integerType())) {
-      throw new IllegalArgumentException("Expected " + tf.integerType() + " but got " + vf.integer($start).getType() + " for vf.integer($start):" + vf.integer($start));
+    if (!vf.string($start).getType().isSubtypeOf(tf.stringType())) {
+      throw new IllegalArgumentException("Expected " + tf.stringType() + " but got " + vf.string($start).getType() + " for vf.integer($start):" + vf.string($start));
     }
       
-    if (!vf.integer($end).getType().isSubtypeOf(tf.integerType())) {
-      throw new IllegalArgumentException("Expected " + tf.integerType() + " but got " + vf.integer($end).getType() + " for vf.integer($end):" + vf.integer($end));
+    if (!vf.string($end).getType().isSubtypeOf(tf.stringType())) {
+      throw new IllegalArgumentException("Expected " + tf.stringType() + " but got " + vf.string($end).getType() + " for vf.integer($end):" + vf.string($end));
     }
       
     if (!vf.integer($var).getType().isSubtypeOf(tf.integerType())) {
       throw new IllegalArgumentException("Expected " + tf.integerType() + " but got " + vf.integer($var).getType() + " for vf.integer($var):" + vf.integer($var));
     }
     
-    return vf.constructor(_Instruction_LOCALVARIABLE_5 , vf.string($name), $type, vf.integer($start), vf.integer($end), vf.integer($var));
+    return vf.constructor(_Instruction_LOCALVARIABLE_5 , vf.string($name), $type, vf.string($start), vf.string($end), vf.integer($var));
   }
   
   public IConstructor Instruction_SASTORE() {

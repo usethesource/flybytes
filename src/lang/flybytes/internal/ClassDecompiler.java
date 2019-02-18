@@ -21,6 +21,7 @@ import org.rascalmpl.objectweb.asm.tree.JumpInsnNode;
 import org.rascalmpl.objectweb.asm.tree.LabelNode;
 import org.rascalmpl.objectweb.asm.tree.LdcInsnNode;
 import org.rascalmpl.objectweb.asm.tree.LineNumberNode;
+import org.rascalmpl.objectweb.asm.tree.LocalVariableNode;
 import org.rascalmpl.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.rascalmpl.objectweb.asm.tree.MethodInsnNode;
 import org.rascalmpl.objectweb.asm.tree.MethodNode;
@@ -150,7 +151,13 @@ public class ClassDecompiler {
 
 	private IConstructor method(MethodNode fn) {
 		IConstructor desc = descriptor(fn.name, fn.desc);
-		return ast.Method_method(desc, formals(fn.parameters, (IList) desc.get("formals")), VF.list(ast.Stat_asm(instructions(fn.instructions))));
+		IList instructions = instructions(fn.instructions);
+		if (fn.localVariables != null) {
+			for (LocalVariableNode var : fn.localVariables) {
+				instructions = instructions.append(ast.Instruction_LOCALVARIABLE(var.name, type(var.desc), var.start.getLabel().toString(), var.end.getLabel().toString(), var.index));
+			}
+		}
+		return ast.Method_method(desc, formals(fn.parameters, (IList) desc.get("formals")), VF.list(ast.Stat_asm(instructions)));
 	}
 
 	private IList formals(List<ParameterNode> formals, IList types) {

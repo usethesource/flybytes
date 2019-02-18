@@ -271,7 +271,7 @@ data Exp(loc src = |unknown:///|)
 data Instruction
   = LABEL(str label)
   | LINENUMBER(int line, str label)
-  | LOCALVARIABLE(str name, Type \type, int \start, int end, int var)
+  | LOCALVARIABLE(str name, Type \type, str \start, str end, int var)
   | NOP()
   | ACONST_NULL()
   | ICONST_M1()

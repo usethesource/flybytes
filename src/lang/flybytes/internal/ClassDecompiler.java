@@ -45,8 +45,8 @@ import io.usethesource.vallang.IValueFactory;
 
 /**
  * Produces a Flybytes AST from a JVM class in bytecode format, with the limitation
- * that it does not recover Expressions and Statements of the method bodies, but rather lists of Instructions
- * to be processed later by a downstream de-compilation step. 
+ * that it does not recover Expressions and Statements of the method bodies, but rather lists of ASM-style Instructions.
+ * The instruction lists can be processed later by a downstream de-compilation step. 
  */
 public class ClassDecompiler {
 	private final IValueFactory VF;
@@ -60,14 +60,14 @@ public class ClassDecompiler {
 	public IConstructor decompile(ISourceLocation classLoc) {
 		try {
 			ClassReader reader = new ClassReader(URIResolverRegistry.getInstance().getInputStream(classLoc));
-			return decompile(reader);
+			return readClass(reader);
 		}
 		catch (IOException e) {
 			throw RuntimeExceptionFactory.io(VF.string(e.getMessage()), null, null);
 		}
 	}
 	
-	private IConstructor decompile(ClassReader reader) {
+	private IConstructor readClass(ClassReader reader) {
 		ClassNode cn = new ClassNode();
 		reader.accept(cn, ClassReader.SKIP_FRAMES);
 		Map<String, IValue> params = new HashMap<>();
@@ -75,10 +75,12 @@ public class ClassDecompiler {
 		params.put("fields", fields(cn.fields));
 		params.put("methods", methods(cn.methods));
 		params.put("modifiers", modifiers(cn.access));
-		params.put("super", objectType(cn.superName));
+		if (cn.superName != null) {
+			params.put("super", objectType(cn.superName));
+		}
 		params.put("interfaces", interfaces(cn.interfaces));
 		
-		if ((cn.access & Opcodes.ACC_INTERFACE) != 0) {
+		if (set(cn.access, Opcodes.ACC_INTERFACE)) {
 			return ast.Class_interface(objectType(cn.name)).asWithKeywordParameters().setParameters(params);
 		}
 		else {
@@ -156,7 +158,7 @@ public class ClassDecompiler {
 		
 		if (fn.tryCatchBlocks != null) {
 			for (TryCatchBlockNode tc : fn.tryCatchBlocks) {
-				instructions = instructions.append(ast.Instruction_TRYCATCH(type(tc.type), tc.start.getLabel().toString(), tc.end.getLabel().toString(), tc.handler.getLabel().toString()));
+				instructions = instructions.append(ast.Instruction_TRYCATCH(typeName(tc.type), tc.start.getLabel().toString(), tc.end.getLabel().toString(), tc.handler.getLabel().toString()));
 			}
 		}
 		

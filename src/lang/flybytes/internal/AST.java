@@ -155,7 +155,7 @@ public class AST {
     = tf.constructor(typestore,_Exp,"getField",_Type,"class",_Exp,"receiver",_Type,"type",tf.stringType(),"name");
   private static final Type _Exp_invokeDynamic_3 
     = tf.constructor(typestore,_Exp,"invokeDynamic",_BootstrapCall,"handle",_Signature,"desc",tf.listType(_Exp),"args");
-  private static final Type _Exp_newArray_size 
+  private static final Type _Exp_newArray_2_2 
     = tf.constructor(typestore,_Exp,"newArray",_Type,"type",_Exp,"size");
   private static final Type _Exp_or_2 
     = tf.constructor(typestore,_Exp,"or",_Exp,"lhs",_Exp,"rhs");
@@ -239,6 +239,8 @@ public class AST {
     = tf.constructor(typestore,_Instruction,"LUSHR");
   private static final Type _Instruction_DRETURN_0 
     = tf.constructor(typestore,_Instruction,"DRETURN");
+  private static final Type _Instruction_stat_1 
+    = tf.constructor(typestore,_Instruction,"stat",_Stat,"statement");
   private static final Type _Instruction_IF_ICMPGE_1 
     = tf.constructor(typestore,_Instruction,"IF_ICMPGE",tf.stringType(),"label");
   private static final Type _Instruction_LADD_0 
@@ -248,9 +250,7 @@ public class AST {
   private static final Type _Instruction_FSTORE_1 
     = tf.constructor(typestore,_Instruction,"FSTORE",tf.integerType(),"var");
   private static final Type _Instruction_LOCALVARIABLE_5 
-    = tf.constructor(typestore,_Instruction,"LOCALVARIABLE",tf.stringType(),"name",_Type,"type",tf.integerType(),"start",tf.integerType(),"end",tf.integerType(),"var");
-  private static final Type _Instruction_TRYCATCH 
-  = tf.constructor(typestore,_Instruction,"TRYCATCH",_Type,"type",tf.stringType(),"start",tf.stringType(),"end",tf.stringType(),"label");
+    = tf.constructor(typestore,_Instruction,"LOCALVARIABLE",tf.stringType(),"name",_Type,"type",tf.stringType(),"start",tf.stringType(),"end",tf.integerType(),"var");
   private static final Type _Instruction_SASTORE_0 
     = tf.constructor(typestore,_Instruction,"SASTORE");
   private static final Type _Instruction_IFGE_1 
@@ -363,6 +363,8 @@ public class AST {
     = tf.constructor(typestore,_Instruction,"MONITOREXIT");
   private static final Type _Instruction_D2F_0 
     = tf.constructor(typestore,_Instruction,"D2F");
+  private static final Type _Instruction_exp_1 
+    = tf.constructor(typestore,_Instruction,"exp",_Exp,"expression");
   private static final Type _Instruction_IRETURN_0 
     = tf.constructor(typestore,_Instruction,"IRETURN");
   private static final Type _Instruction_DUP_X1_0 
@@ -455,6 +457,8 @@ public class AST {
     = tf.constructor(typestore,_Instruction,"LREM");
   private static final Type _Instruction_IAND_0 
     = tf.constructor(typestore,_Instruction,"IAND");
+  private static final Type _Instruction_TRYCATCH_4 
+    = tf.constructor(typestore,_Instruction,"TRYCATCH",_Type,"type",tf.stringType(),"start",tf.stringType(),"end",tf.stringType(),"handler");
   private static final Type _Instruction_IF_ICMPLT_1 
     = tf.constructor(typestore,_Instruction,"IF_ICMPLT",tf.stringType(),"label");
   private static final Type _Instruction_NOP_0 
@@ -1246,7 +1250,7 @@ public class AST {
       throw new IllegalArgumentException("Expected " + _Exp + " but got " + $size.getType() + " for $size:" + $size);
     }
     
-    return vf.constructor(_Exp_newArray_size , $type, $size);
+    return vf.constructor(_Exp_newArray_2_2 , $type, $size);
   }
   
   public IConstructor Exp_or(IConstructor $lhs, IConstructor $rhs) {
@@ -1678,6 +1682,15 @@ public class AST {
     return vf.constructor(_Instruction_DRETURN_0 );
   }
   
+  public IConstructor Instruction_stat(IConstructor $statement) {
+      
+    if (!$statement.getType().isSubtypeOf(_Stat)) {
+      throw new IllegalArgumentException("Expected " + _Stat + " but got " + $statement.getType() + " for $statement:" + $statement);
+    }
+    
+    return vf.constructor(_Instruction_stat_1 , $statement);
+  }
+  
   public IConstructor Instruction_IF_ICMPGE(String $label) {
       
     if (!vf.string($label).getType().isSubtypeOf(tf.stringType())) {
@@ -1717,11 +1730,11 @@ public class AST {
     }
       
     if (!vf.string($start).getType().isSubtypeOf(tf.stringType())) {
-      throw new IllegalArgumentException("Expected " + tf.stringType() + " but got " + vf.string($start).getType() + " for vf.integer($start):" + vf.string($start));
+      throw new IllegalArgumentException("Expected " + tf.stringType() + " but got " + vf.string($start).getType() + " for vf.string($start):" + vf.string($start));
     }
       
     if (!vf.string($end).getType().isSubtypeOf(tf.stringType())) {
-      throw new IllegalArgumentException("Expected " + tf.stringType() + " but got " + vf.string($end).getType() + " for vf.integer($end):" + vf.string($end));
+      throw new IllegalArgumentException("Expected " + tf.stringType() + " but got " + vf.string($end).getType() + " for vf.string($end):" + vf.string($end));
     }
       
     if (!vf.integer($var).getType().isSubtypeOf(tf.integerType())) {
@@ -1730,11 +1743,6 @@ public class AST {
     
     return vf.constructor(_Instruction_LOCALVARIABLE_5 , vf.string($name), $type, vf.string($start), vf.string($end), vf.integer($var));
   }
-  
-  public IConstructor Instruction_TRYCATCH(IConstructor $type, String $start, String $end, String $label) {
-      
-	    return vf.constructor(_Instruction_TRYCATCH, $type, vf.string($start), $type, vf.string($end), vf.string($label));
-	  }
   
   public IConstructor Instruction_SASTORE() {
     
@@ -2124,6 +2132,15 @@ public class AST {
     return vf.constructor(_Instruction_D2F_0 );
   }
   
+  public IConstructor Instruction_exp(IConstructor $expression) {
+      
+    if (!$expression.getType().isSubtypeOf(_Exp)) {
+      throw new IllegalArgumentException("Expected " + _Exp + " but got " + $expression.getType() + " for $expression:" + $expression);
+    }
+    
+    return vf.constructor(_Instruction_exp_1 , $expression);
+  }
+  
   public IConstructor Instruction_IRETURN() {
     
     return vf.constructor(_Instruction_IRETURN_0 );
@@ -2420,6 +2437,27 @@ public class AST {
   public IConstructor Instruction_IAND() {
     
     return vf.constructor(_Instruction_IAND_0 );
+  }
+  
+  public IConstructor Instruction_TRYCATCH(IConstructor $type, String $start, String $end, String $handler) {
+      
+    if (!$type.getType().isSubtypeOf(_Type)) {
+      throw new IllegalArgumentException("Expected " + _Type + " but got " + $type.getType() + " for $type:" + $type);
+    }
+      
+    if (!vf.string($start).getType().isSubtypeOf(tf.stringType())) {
+      throw new IllegalArgumentException("Expected " + tf.stringType() + " but got " + vf.string($start).getType() + " for vf.string($start):" + vf.string($start));
+    }
+      
+    if (!vf.string($end).getType().isSubtypeOf(tf.stringType())) {
+      throw new IllegalArgumentException("Expected " + tf.stringType() + " but got " + vf.string($end).getType() + " for vf.string($end):" + vf.string($end));
+    }
+      
+    if (!vf.string($handler).getType().isSubtypeOf(tf.stringType())) {
+      throw new IllegalArgumentException("Expected " + tf.stringType() + " but got " + vf.string($handler).getType() + " for vf.string($handler):" + vf.string($handler));
+    }
+    
+    return vf.constructor(_Instruction_TRYCATCH_4 , $type, vf.string($start), vf.string($end), vf.string($handler));
   }
   
   public IConstructor Instruction_IF_ICMPLT(String $label) {

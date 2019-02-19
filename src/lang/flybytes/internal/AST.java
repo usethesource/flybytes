@@ -249,6 +249,8 @@ public class AST {
     = tf.constructor(typestore,_Instruction,"FSTORE",tf.integerType(),"var");
   private static final Type _Instruction_LOCALVARIABLE_5 
     = tf.constructor(typestore,_Instruction,"LOCALVARIABLE",tf.stringType(),"name",_Type,"type",tf.integerType(),"start",tf.integerType(),"end",tf.integerType(),"var");
+  private static final Type _Instruction_TRYCATCH 
+  = tf.constructor(typestore,_Instruction,"TRYCATCH",_Type,"type",tf.stringType(),"start",tf.stringType(),"end",tf.stringType(),"label");
   private static final Type _Instruction_SASTORE_0 
     = tf.constructor(typestore,_Instruction,"SASTORE");
   private static final Type _Instruction_IFGE_1 
@@ -1728,6 +1730,11 @@ public class AST {
     
     return vf.constructor(_Instruction_LOCALVARIABLE_5 , vf.string($name), $type, vf.string($start), vf.string($end), vf.integer($var));
   }
+  
+  public IConstructor Instruction_TRYCATCH(IConstructor $type, String $start, String $end, String $label) {
+      
+	    return vf.constructor(_Instruction_TRYCATCH, $type, vf.string($start), $type, vf.string($end), vf.string($label));
+	  }
   
   public IConstructor Instruction_SASTORE() {
     

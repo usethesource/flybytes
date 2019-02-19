@@ -27,6 +27,7 @@ import org.rascalmpl.objectweb.asm.tree.MethodInsnNode;
 import org.rascalmpl.objectweb.asm.tree.MethodNode;
 import org.rascalmpl.objectweb.asm.tree.ParameterNode;
 import org.rascalmpl.objectweb.asm.tree.TableSwitchInsnNode;
+import org.rascalmpl.objectweb.asm.tree.TryCatchBlockNode;
 import org.rascalmpl.objectweb.asm.tree.TypeInsnNode;
 import org.rascalmpl.objectweb.asm.tree.VarInsnNode;
 import org.rascalmpl.objectweb.asm.tree.MultiANewArrayInsnNode;
@@ -152,11 +153,19 @@ public class ClassDecompiler {
 	private IConstructor method(MethodNode fn) {
 		IConstructor desc = descriptor(fn.name, fn.desc);
 		IList instructions = instructions(fn.instructions);
+		
+		if (fn.tryCatchBlocks != null) {
+			for (TryCatchBlockNode tc : fn.tryCatchBlocks) {
+				instructions = instructions.append(ast.Instruction_TRYCATCH(type(tc.type), tc.start.getLabel().toString(), tc.end.getLabel().toString(), tc.handler.getLabel().toString()));
+			}
+		}
+		
 		if (fn.localVariables != null) {
 			for (LocalVariableNode var : fn.localVariables) {
 				instructions = instructions.append(ast.Instruction_LOCALVARIABLE(var.name, type(var.desc), var.start.getLabel().toString(), var.end.getLabel().toString(), var.index));
 			}
 		}
+		
 		return ast.Method_method(desc, formals(fn.parameters, (IList) desc.get("formals")), VF.list(ast.Stat_asm(instructions)));
 	}
 

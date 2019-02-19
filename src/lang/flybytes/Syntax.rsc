@@ -272,6 +272,7 @@ data Instruction
   = LABEL(str label)
   | LINENUMBER(int line, str label)
   | LOCALVARIABLE(str name, Type \type, str \start, str end, int var)
+  | TRYCATCH(Type \type, str \start, str end, str handler)
   | NOP()
   | ACONST_NULL()
   | ICONST_M1()

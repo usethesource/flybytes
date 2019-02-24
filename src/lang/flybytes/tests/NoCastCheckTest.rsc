@@ -4,8 +4,6 @@ import lang::flybytes::Syntax;
 import lang::flybytes::Compiler;
 import lang::flybytes::api::Vallang;
 import lang::flybytes::api::Object;
-import lang::flybytes::api::System;
-import IO;
 
 // do we need to downcast to call methods or not?
 

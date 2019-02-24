@@ -3,10 +3,7 @@ module lang::flybytes::tests::BranchingTests
 import lang::flybytes::Compiler;
 import lang::flybytes::Mirror;
 import lang::flybytes::api::JavaLang;
-import lang::flybytes::api::Object;
 import Node;
-import String;
-import IO;
 import util::Math;
 
 public Class ifClass(Exp cond) {

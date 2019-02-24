@@ -2,7 +2,6 @@ module lang::flybytes::tests::LoopTests
 
 import lang::flybytes::Syntax;
 import lang::flybytes::Compiler;
-import Node;
   
 Class forLoopClass() {
   rf = \return(\false());

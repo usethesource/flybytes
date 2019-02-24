@@ -3,9 +3,7 @@ module lang::flybytes::tests::ArithmeticTests
 import lang::flybytes::Compiler;
 import lang::flybytes::Mirror;
 import lang::flybytes::api::JavaLang;
-import lang::flybytes::api::Object;
 import Node;
-import String;
 import IO;
 import util::Math;
 
@@ -79,7 +77,6 @@ bool testUnOpRange(Class c, Type t, num arg, real answer) {
   real reply = val(t, m.invokeStatic(methodDesc(t, "op", [t]), [prim(t, arg)]));
   
   if (abs(answer - reply) > 0.1) {
-    println("op(<lhs>,<rhs>) == <answer> != <reply> (diff: <abs(answer - reply)>)");
     return false;
   }
   
@@ -160,7 +157,7 @@ private real fit(double(), real r) = fitDouble(r);
 
 private real round(float(),  real f) = precision(f, 0);
 private real round(double(), real f) = precision(f, 0);
-private default int round(Type t, int f) = f;
+private default int round(Type _, int f) = f;
 
 private real val(float(), Mirror r) = r.toValue(#real);
 private real val(double(), Mirror r) = r.toValue(#real);

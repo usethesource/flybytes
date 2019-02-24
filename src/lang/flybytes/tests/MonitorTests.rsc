@@ -2,7 +2,6 @@ module lang::flybytes::tests::MonitorTests
 
 import lang::flybytes::Syntax;
 import lang::flybytes::Compiler;
-import Node;
 
 // These test check if the monitor is properly closed in all kinds of situations; break, throw and return.
 // If not, than the bytecode verifier should throw a IllegalMonitorStateException.

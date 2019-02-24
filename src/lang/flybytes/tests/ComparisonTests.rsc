@@ -3,10 +3,7 @@ module lang::flybytes::tests::ComparisonTests
 import lang::flybytes::Compiler;
 import lang::flybytes::Mirror;
 import lang::flybytes::api::JavaLang;
-import lang::flybytes::api::Object;
 import Node;
-import String;
-import IO;
 import util::Math;
 
 alias CompOp = Exp (Exp, Exp);
@@ -137,10 +134,3 @@ private value make(array(integer()), int i) = array(integer(), [integer(i)]);
 private real fit(float(), real r) = fitFloat(r);
 private real fit(double(), real r) = fitDouble(r);
 
-private real round(float(),  real f) = precision(f, 0);
-private real round(double(), real f) = precision(f, 0);
-private default int round(Type t, int f) = f;
-
-private real val(float(), Mirror r) = r.toValue(#real);
-private real val(double(), Mirror r) = r.toValue(#real);
-private default int val(Type _, Mirror r) = r.toValue(#int);

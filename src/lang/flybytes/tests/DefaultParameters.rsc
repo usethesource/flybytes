@@ -22,6 +22,6 @@ bool testDefParamSet() {
 bool testDefParamUnSet() { 
   m = loadClass(defParamClass());
   // if you pass 'null' you get the default initializer expression for the parameter
-  return m.invokeStatic(methodDesc(t, "testMethod", [string]), [null()]).toValue(#str) == "hello!";
+  return m.invokeStatic(methodDesc(string(), "testMethod", [string]), [null()]).toValue(#str) == "hello!";
 }
 

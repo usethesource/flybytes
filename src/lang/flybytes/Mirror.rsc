@@ -49,9 +49,9 @@ java Mirror array(Type \type, list[Mirror] elems);
 java Mirror array(Type \type, int length);
 
 str toString(Mirror m:object(_, _, _, _)) = m.invoke(methodDesc(string(),"toString", []), []).toValue(#str);
-str toString(class(str name,_,_,_)) = name; 
-str toString(null()) = "<null>";
-str toString(Mirror m:array(_,_,_)) = "array[<m.length()>]";              
+str toString(class(str name, _, _, _, _)) = name;
+str toString(null()) = "\<null\>";
+str toString(Mirror m:array(_, _)) = "array[<m.length()>]";              
    
 Mirror integer(int v)
   = val(v).invoke(methodDesc(integer(), "intValue", []), []);
@@ -98,6 +98,6 @@ int short(Mirror s) = s.toValue(#int);
 str string(Mirror s) = s.toValue(#str);
 real double(Mirror d) = d.toValue(#real);
 real float(Mirror f) = f.toValue(#real);
-real character(Mirror f) = f.toValue(#int);
-real boolean(Mirror f) = f.toValue(#bool);
+int character(Mirror f) = f.toValue(#int);
+bool boolean(Mirror f) = f.toValue(#bool);
   

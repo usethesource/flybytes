@@ -3,12 +3,7 @@ module lang::flybytes::tests::ClassTests
 import lang::flybytes::Compiler;
 import lang::flybytes::Mirror;
 import lang::flybytes::api::JavaLang;
-import lang::flybytes::api::Object;
 import lang::flybytes::api::System;
-import Node;
-import String;
-import IO;
-import util::Math;
 
 public Class testClass() = 
   //public class TestClass {

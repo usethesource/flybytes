@@ -168,18 +168,38 @@ public class ClassDecompiler {
 			}
 		}
 		
-		return ast.Method_method(desc, formals(fn.parameters, (IList) desc.get("formals")), VF.list(ast.Stat_asm(instructions)));
+		IList formals = formals(fn.parameters, fn.localVariables, (IList) desc.get("formals"), set(fn.access, Opcodes.ACC_STATIC));
+		
+		return ast.Method_method(desc, formals, VF.list(ast.Stat_asm(instructions)));
 	}
 
-	private IList formals(List<ParameterNode> formals, IList types) {
+	private IList formals(List<ParameterNode> parameters, List<LocalVariableNode> locals, IList types, boolean isStatic) {
 		IListWriter lw = VF.listWriter();
 	
-		int i = 0;
-		for (IValue elem : types) {
-			lw.append(ast.Formal_var((IConstructor) elem, formals != null ? formals.get(i).name : ("arg_" + i)));
-			i++;
+		if (parameters != null && !parameters.isEmpty()) {
+			// only when class was compiled with javac -parameters
+			int i = 0;
+			for (IValue elem : types) {
+				lw.append(ast.Formal_var((IConstructor) elem, parameters.get(i++).name));
+			}
 		}
-		
+		else if (locals != null && locals.size() >= types.length() - (isStatic?0:1)) {
+			// only when class was compiled with javac -debug
+			int i = 0;
+			for (IValue elem : types) {
+				LocalVariableNode local = locals.get(i + (isStatic?0:1));
+				lw.append(ast.Formal_var((IConstructor) elem, local.name));
+				i++;
+			}
+		}
+		else {
+			// otherwise we "invent" the parameter names
+			int i = 0;
+			for (IValue elem : types) {
+				lw.append(ast.Formal_var((IConstructor) elem, "arg_" + i));
+			}
+		}
+
 		return lw.done();
 	}
 

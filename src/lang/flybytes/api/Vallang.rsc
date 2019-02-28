@@ -1,7 +1,6 @@
 module lang::flybytes::api::Vallang
 
 import lang::flybytes::Syntax;
-import lang::flybytes::Mirror;
 
 @doc{generate call ValueFactoryFactory.getInstance()}
 Exp getValueFactory() = invokeStatic(ValueFactoryFactory, methodDesc(IValueFactory, "getValueFactory", []), []);

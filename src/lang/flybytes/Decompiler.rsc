@@ -20,9 +20,9 @@ Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {
   withoutLabels = labels(withJumps);
   withExp = exprs(withoutLabels);
   withStat = stmts(withExp);
-  cleanStats = clean([asm(withStat)]);
+  //cleanStats = clean([asm(withStat)]);
 
-  return m[block=cleanStats];  
+  return m[block=[asm(withStat)]];  
 }
 
 // LINES
@@ -30,8 +30,9 @@ data Instruction(int line = -1);
 data Exp(int line = -1);
 data Stat(int line = -1);
 
-list[Instruction] lines([*Instruction pre, LINENUMBER(lin, lab), Instruction next:!LINENUMBER(_,_), *Instruction post])
-  = lines([*pre, next[line=lin], *lines([LINENUMBER(lin, lab), *post])]);
+list[Instruction] lines([*Instruction pre, LINENUMBER(lin, lab), Instruction next, *Instruction post])
+  = lines([*pre, next[line=lin], *lines([LINENUMBER(lin, lab), *post])])
+  when !(next is LINENUMBER);
 
 list[Instruction] lines([*Instruction pre, LINENUMBER(_, _), Instruction next:LINENUMBER(_,_), *Instruction post])
   = lines([*pre, *lines([next, *post])]);
@@ -132,7 +133,7 @@ list[Instruction] exprs([*Instruction pre, *Instruction args, INVOKESTATIC(cls, 
   when (args == [] && formals == []) || all(a <- args, a is exp), size(args) == size(formals);
     
 list[Instruction] exprs([*Instruction pre, exp(const(integer(), int arraySize)), ANEWARRAY(typ), *Instruction elems, *Instruction post]) 
-  = exprs([*pre, exp(newArray(typ, [e | [*_, DUP(), *l1, exp(const(integer(), _)), exp(e), AASTORE(), *_] := elems])), *post])
+  = exprs([*pre, exp(newArray(typ, [e | [*_, DUP(), exp(const(integer(), _)), exp(e), AASTORE(), *_] := elems])), *post])
   when size(elems) == 4 * arraySize;
 
 list[Instruction] exprs([*Instruction pre, GETSTATIC(cls, name, typ), *Instruction post]) 

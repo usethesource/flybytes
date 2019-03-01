@@ -48,16 +48,16 @@ import io.usethesource.vallang.IValueFactory;
  * that it does not recover Expressions and Statements of the method bodies, but rather lists of ASM-style Instructions.
  * The instruction lists can be processed later by a downstream de-compilation step. 
  */
-public class ClassDecompiler {
+public class ClassDisassembler {
 	private final IValueFactory VF;
 	private final AST ast;
 	
-	public ClassDecompiler(IValueFactory VF) {
+	public ClassDisassembler(IValueFactory VF) {
 		this.VF = VF;
 		this.ast = new AST(VF);
 	}
 	
-	public IConstructor decompile(ISourceLocation classLoc) {
+	public IConstructor disassemble(ISourceLocation classLoc) {
 		try {
 			ClassReader reader = new ClassReader(URIResolverRegistry.getInstance().getInputStream(classLoc));
 			return readClass(reader);

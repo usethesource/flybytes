@@ -1,64 +1,63 @@
 module lang::flybytes::Decompiler
 
-extend lang::flybytes::Syntax;
+extend lang::flybytes::Disassembler;
+
 import Exception;
 import String;
 import IO;
-import List;
+import List; 
 
-@synopsis{Decompile a JVM classfile to Flybytes ASTs, optionally recovering statement and expression structure.}
-Class decompiler(loc classFile, bool statements=true, bool expressions=statements, bool cleanup=true) throws IO {
-  cls = decompile(classFile);
+@synopsis{Decompile a JVM classfile to Flybytes ASTs, recovering statement and expression structures.}
+Class decompile(loc classFile) throws IO { 
+  cls = disassemble(classFile);
   
-  // statement recovery requires expression recovery.
-  if (statements || expressions) {
-    println("recovering expressions");
-    cls = recoverExpressions(cls);
-  }
-  
-  if (statements) {
-    cls = recoverStatements(cls);
-  }
-  
-  if (cleanup) {
-    cls = visit (cls) {
-      case list[Stat] s => clean(s) 
-    }
-  }
-  
-  return cls;
+  return cls[methods = [decompile(m) | m <- cls.methods]];
 }
 
-@javaClass{lang.flybytes.internal.ClassDecompiler}
-@synopsis{reverses the flybytes compiler, but recovers only lists of instructions from the methods' bodies.}
-java Class decompile(loc classFile) throws IO;
+Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {  
+  withoutLines = lines(instrs);
+  withJumps = jumps(withoutLines);
+  withoutLabels = labels(withJumps);
+  withExp = exprs(withoutLabels);
+  withStat = stmts(withExp);
+  cleanStats = clean([asm(withStat)]);
 
-Class recoverExpressions(Class class) = visit(class) {
-  case method(desc, formals, [asm(instrs)]) =>
-       method(desc, formals, [asm(exprs(instrs))])
-};
+  return m[block=cleanStats];  
+}
 
-Class recoverStatements(Class class) = visit(class) {
-  case method(desc, formals, [asm(instrs)]) =>
-       method(desc, formals, [asm(stmts(instrs))])
-};
+// LINES
+data Instruction(int line = -1);
+data Exp(int line = -1);
+data Stat(int line = -1);
 
-list[Stat] clean([*Stat pre, asm([*Instruction preI, LOCALVARIABLE(_,_,_,_,_), *Instruction postI]), *Stat post]) 
-  = clean([*pre, asm([*preI, *postI]), *post]);
+list[Instruction] lines([*Instruction pre, LINENUMBER(lin, lab), Instruction next:!LINENUMBER(_,_), *Instruction post])
+  = lines([*pre, next[line=lin], *lines([LINENUMBER(lin, lab), *post])]);
+
+list[Instruction] lines([*Instruction pre, LINENUMBER(_, _), Instruction next:LINENUMBER(_,_), *Instruction post])
+  = lines([*pre, *lines([next, *post])]);
   
-list[Stat] clean([*Stat pre, asm([*Instruction preI, LABEL(_), *Instruction postI]), *Stat post]) 
-  = clean([*pre, asm([*preI, *postI]), *post]);  
-
-list[Stat] clean([*Stat pre, asm([*Instruction preI, stat(s), *Instruction postI]), *Stat post])
-  = clean([*pre, asm(preI), s, asm(postI), *post]);
-
-list[Stat] clean([*Stat pre, asm([*Instruction preI, exp(a), *Instruction postI]), *Stat post])
-  = clean([*pre, asm(preI), do(a), asm(postI), *post]); 
+list[Instruction] lines([*Instruction pre, LINENUMBER(_, _)])
+  = pre;  
+ 
+default list[Instruction] lines(list[Instruction] l) = l;
   
-list[Stat] clean([*Stat pre, asm([]), *Stat post])
-  = clean([*pre, *post]);
-   
-default list[Stat] clean(list[Stat] x) = x; 
+// JUMP LABEL PROTECTION
+data Instruction(bool jumpTarget = false);
+
+list[Instruction] jumps([*Instruction pre, Instruction jump:/IF_|GOTO|IFNULL|IFNONNULL|JSR/(str l1), *Instruction mid, LABEL(l1, jumpTarget=false), *Instruction post]) 
+  = jumps([*pre, jump, *jumps([*mid, LABEL(l1, jumpTarget=true), *post])]);  
+  
+list[Instruction] jumps([*Instruction pre, LABEL(l1, jumpTarget=false), *Instruction mid, Instruction jump:/IF_|GOTO|IFNULL|IFNONNULL|JSR/(str l1), *Instruction post]) 
+  = labels([*pre, LABEL(l1, jumpTarget=true), *jumps([*mid, jump, *post])]);    
+
+default list[Instruction] jumps(list[Instruction] l) = l;
+ 
+// LABEL REMOVAL
+list[Instruction] labels([*Instruction pre,  LABEL(_, jumpTarget=false), *Instruction post]) 
+  = [*pre, *labels(post)];  
+
+default list[Instruction] labels(list[Instruction] l) = l;
+
   
 // STATEMENTS
   
@@ -133,8 +132,8 @@ list[Instruction] exprs([*Instruction pre, *Instruction args, INVOKESTATIC(cls, 
   when (args == [] && formals == []) || all(a <- args, a is exp), size(args) == size(formals);
     
 list[Instruction] exprs([*Instruction pre, exp(const(integer(), int arraySize)), ANEWARRAY(typ), *Instruction elems, *Instruction post]) 
-  = exprs([*pre, exp(newArray(typ, [e | [*_, DUP(), *l1, exp(const(integer(), _)), *l2, exp(e), *l3, AASTORE(), *_] := elems, isLabels(l1), isLabels(l2), isLabels(l3)])), *post])
-  when size(elems) == 4 * arraySize + countLabels(elems);
+  = exprs([*pre, exp(newArray(typ, [e | [*_, DUP(), *l1, exp(const(integer(), _)), exp(e), AASTORE(), *_] := elems])), *post])
+  when size(elems) == 4 * arraySize;
 
 list[Instruction] exprs([*Instruction pre, GETSTATIC(cls, name, typ), *Instruction post]) 
   = exprs([*pre, exp(getStatic(cls, typ, name)), *post]);
@@ -203,7 +202,21 @@ UnOp invertedCond("NONNULL") = null;
 Exp nonnull(Exp e) = ne(e, null());
 Exp null(Exp e)    = eq(e, null());
 
-// LABELS AND LINENUMBERS
+// CLEANING UP LEFT-OVER STRUCTURES
 
-bool isLabels(list[Instruction] l) = (l == []) || all(e <- l, e is LABEL || e is LINENUMBER);
-int countLabels(list[Instruction] l) = (0 | it + 1 | e <- l,  e is LABEL || e is LINENUMBER);
+list[Stat] clean([*Stat pre, asm([*Instruction preI, LOCALVARIABLE(_,_,_,_,_), *Instruction postI]), *Stat post]) 
+  = clean([*pre, asm([*preI, *postI]), *post]);
+  
+list[Stat] clean([*Stat pre, asm([*Instruction preI, LABEL(_), *Instruction postI]), *Stat post]) 
+  = clean([*pre, asm([*preI, *postI]), *post]);  
+
+list[Stat] clean([*Stat pre, asm([*Instruction preI, stat(s), *Instruction postI]), *Stat post])
+  = clean([*pre, asm(preI), s, asm(postI), *post]);
+
+list[Stat] clean([*Stat pre, asm([*Instruction preI, exp(a), *Instruction postI]), *Stat post])
+  = clean([*pre, asm(preI), do(a), asm(postI), *post]); 
+  
+list[Stat] clean([*Stat pre, asm([]), *Stat post])
+  = clean([*pre, *post]);
+   
+default list[Stat] clean(list[Stat] x) = x; 

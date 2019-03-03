@@ -170,7 +170,12 @@ public class ClassDisassembler {
 		
 		IList formals = formals(fn.parameters, fn.localVariables, (IList) desc.get("formals"), set(fn.access, Opcodes.ACC_STATIC));
 		
-		return ast.Method_method(desc, formals, VF.list(ast.Stat_asm(instructions)));
+		if (fn.name.equals("<clinit>")) {
+			return ast.Method_static(VF.list(ast.Stat_asm(instructions)));
+		}
+		else {
+			return ast.Method_method(desc, formals, VF.list(ast.Stat_asm(instructions)));
+		}
 	}
 
 	private IList formals(List<ParameterNode> parameters, List<LocalVariableNode> locals, IList types, boolean isStatic) {

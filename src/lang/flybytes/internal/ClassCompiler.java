@@ -2202,8 +2202,6 @@ public class ClassCompiler {
 					return invokeInterfaceExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp), line);
 				case "invokeSpecial" : 
 					return invokeSpecialExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getReceiver(exp), AST.$getArgs(exp), line);
-				case "invokeSuper" : 
-					return invokeSuperStat(classNode.superName, AST.$getDesc(exp), AST.$getArgs(exp), line);
 				case "invokeStatic" : 
 					return invokeStaticExp(AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getDesc(exp), AST.$getArgs(exp), line);
 				case "invokeDynamic" : 
@@ -2212,6 +2210,8 @@ public class ClassCompiler {
 					return getfieldExp(AST.$getReceiver(exp), AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp), line);
 				case "instanceof":
 					return instanceofExp(AST.$getArg(exp), AST.$getRefClassFromType(exp, classNode.name), line);
+				case "invokeSuper" : 
+					return invokeSuper(classNode.superName, AST.$getDesc(exp), AST.$getArgs(exp), line);
 				case "sblock":
 					return sblockExp(AST.$getStatements(exp), AST.$getArg(exp), line);
 				case "null":
@@ -2560,8 +2560,7 @@ public class ClassCompiler {
 			return type;
 		}
 
-
-		private IConstructor invokeSuperStat(String superclass, IConstructor sig, IList args, int line) {
+		private IConstructor invokeSuper(String superclass, IConstructor sig, IList args, int line) {
 			loadExp("this", line);
 			expressions(args, line);
 			lineNumber(line);

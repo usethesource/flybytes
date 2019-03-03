@@ -179,6 +179,10 @@ data Stat(loc src = |unknown:///|)
   | \try(list[Stat] block, list[Handler] \catch) 
   | \switch(Exp arg, list[Case] cases, SwitchOption option = lookup(/*for best performance on current JVMs*/))
   // raw bytecode instruction lists can be inlined directly
+  | 
+  // Invoke a super constructor, typically only used in constructor method bodies 
+    invokeSuper(Signature desc, list[Exp] args)
+  
   | \asm(list[Instruction] instructions) 
   ;
 
@@ -229,9 +233,6 @@ data Exp(loc src = |unknown:///|)
      */
     invokeInterface(Type class, Exp receiver, Signature desc, list[Exp] args)
   
-  | /* Invoke a super constructor, typically only used in constructor method bodies */
-    invokeSuper(Signature desc, list[Exp] args)
-    
   | /* Generate a call site using a static "bootstrap" method, cache it and invoke it */
     /* NB: the first type in `desc` must be the receiver type if the method is not static,
      * and the first argument in `args` is then also the receiver itself */
@@ -452,7 +453,7 @@ Exp defVal(string()) = null();
 Type object() = object("java.lang.Object");
 
 Stat invokeSuper(list[Type] formals, list[Exp] args)
-  = do(invokeSuper(constructorDesc(formals), args));
+  = invokeSuper(constructorDesc(formals), args);
   
 Stat invokeSuper() = invokeSuper([], []);
   

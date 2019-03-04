@@ -47,4 +47,22 @@ public class RoundtripTestClass {
 		return l;
 	}
 	
+	int m5(int x) {
+		int l = 0;
+		for (int i = 0, j = 0; i < x || j < x; i++, j++) {
+			l += i + j;
+			System.err.println(l);
+		}
+	
+		return l;
+	}
+	
+	int m6(int x) {
+		boolean y = true && false || true;
+		if (!y) {
+			System.err.println("ja!");
+		}
+		return 0;
+	}
+	
 }

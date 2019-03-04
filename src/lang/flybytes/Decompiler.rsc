@@ -56,10 +56,10 @@ default list[Instruction] lines(list[Instruction] l) = l;
 // JUMP LABEL PROTECTION
 data Instruction(bool jumpTarget = false);
 
-list[Instruction] jumps([*Instruction pre, Instruction jump:/IF_|GOTO|IFNULL|IFNONNULL|JSR/(str l1), *Instruction mid, LABEL(l1, jumpTarget=false), *Instruction post]) 
+list[Instruction] jumps([*Instruction pre, Instruction jump:/IF|GOTO|IFNULL|IFNONNULL|JSR/(str l1), *Instruction mid, LABEL(l1, jumpTarget=false), *Instruction post]) 
   = jumps([*pre, jump, *jumps([*mid, LABEL(l1, jumpTarget=true), *post])]);  
   
-list[Instruction] jumps([*Instruction pre, LABEL(str l1, jumpTarget=false), *Instruction mid, Instruction jump:/IF_|GOTO|IFNULL|IFNONNULL|JSR/(l1), *Instruction post]) 
+list[Instruction] jumps([*Instruction pre, LABEL(str l1, jumpTarget=false), *Instruction mid, Instruction jump:/IF|GOTO|IFNULL|IFNONNULL|JSR/(l1), *Instruction post]) 
   = labels([*pre, LABEL(l1, jumpTarget=true), *jumps([*mid, jump, *post])]);    
 
 default list[Instruction] jumps(list[Instruction] l) = l;
@@ -92,11 +92,11 @@ list[Instruction] stmts([*Instruction pre, exp(rec), exp(arg), PUTFIELD(cls, nam
 list[Instruction] stmts([*Instruction pre, RETURN(), *Instruction post]) 
   = stmts([*pre, stat(\return()), *post]);
 
-list[Instruction] stmts([*Instruction pre, exp(a), exp(b), /IF_<op:EQ|NE|LT|GE|GT|LE|ICMP(EQ|NE|LT|GE|LE)|ACMP(EQ|NE)>/(str l1), *Instruction thenPart, LABEL(l1), *Instruction post]) 
+list[Instruction] stmts([*Instruction pre, exp(a), exp(b), /IF_[IA]CMP<op:EQ|NE|LT|GE|LE>/(str l1), *Instruction thenPart, LABEL(l1), *Instruction post]) 
   = stmts([*pre, stat(\if(invertedCond(op)(a, b), [asm(stmts(thenPart))])), LABEL(l1), *post]);
 
-list[Instruction] stmts([*Instruction pre, exp(a), /IF_<op:NULL|NONNULL>/(l1), *Instruction thenPart, LABEL(l1), *Instruction post]) 
-  = stmts([*pre, stat(\if(invertedCond(op)(a), [asm(stmts(thenPart))])), *post]);
+list[Instruction] stmts([*Instruction pre, exp(a), /IF<op:NULL|NONNULL|EQ|NE|LT|GT|LE>/(l1), *Instruction thenPart, LABEL(l1), *Instruction post]) 
+  = stmts([*pre, stat(\if(invertedCond(op)(a, const(byte(), 0)), [asm(stmts(thenPart))])), *post]);
   
 list[Instruction] stmts([*Instruction pre, stat(\if(c ,[asm([*Instruction thenPart, GOTO(l1)])])), LABEL(_), *Instruction elsePart, LABEL(l1), *Instruction post]) 
   = stmts([*pre, stat(\if(c, [asm(stmts(thenPart))],[asm(stmts(elsePart))])), LABEL(l1), *post]);
@@ -107,6 +107,26 @@ list[Instruction] stmts([*Instruction pre, stat(\return(Exp e)), NOP(), *Instruc
 list[Instruction] stmts([*Instruction pre, stat(\return(Exp e)), ATHROW(), *Instruction post]) 
   = stmts([*pre, stat(\return(e)), *post]);
   
+// recover boolean conditions  
+list[Instruction] stmts([*Instruction pre, stat(\if(eq(Exp a, const(Type _, 0)), thenPart, elsePart)), *Instruction post]) 
+  = stmts([*pre, stat(\if(neg(a), thenPart, elsePart)), *post]);
+  
+list[Instruction] stmts([*Instruction pre, stat(\if(eq(Exp a, const(Type _, 0)), thenPart)), *Instruction post]) 
+  = stmts([*pre, stat(\if(neg(a), thenPart)), *post]);
+  
+list[Instruction] stmts([*Instruction pre, stat(\for(init, eq(Exp a, const(Type _, 0)), next, block)), *Instruction post]) 
+  = stmts([*pre, stat(\for(init, neg(a), next, block)), *post]);  
+  
+list[Instruction] stmts([*Instruction pre, stat(\if(ne(Exp a, const(Type _, 0)), thenPart, elsePart)), *Instruction post]) 
+  = stmts([*pre, stat(\if(a, thenPart, elsePart)), *post]);
+  
+list[Instruction] stmts([*Instruction pre, stat(\if(ne(Exp a, const(Type _, 0)), thenPart)), *Instruction post]) 
+  = stmts([*pre, stat(\if(a, thenPart)), *post]);   
+
+list[Instruction] stmts([*Instruction pre, stat(\for(init, ne(Exp a, const(Type _, 0)), next, block)), *Instruction post]) 
+  = stmts([*pre, stat(\for(init, a, next, block)), *post]);  
+   
+  
 // expressions which will not be consumed are expression statements:
 list[Instruction] stmts([*Instruction pre, exp(e), stat(s), *Instruction post]) 
   = stmts([*pre, stat(do(e)), stat(s), *post]);
@@ -114,33 +134,24 @@ list[Instruction] stmts([*Instruction pre, exp(e), stat(s), *Instruction post])
 list[Instruction] stmts([*Instruction pre, exp(e)]) 
   = stmts([*pre, stat(do(e))]);  
 
-list[Instruction] stmts([*Instruction pre, GOTO(str body), LABEL(str cond), *Instruction c, LABEL(body), exp(a), exp(b), /IF_<op:EQ|NE|LT|GE|GT|LE|ICMP(EQ|NE|LT|GE|LE)|ACMP(EQ|NE)>/(cond), *Instruction post]) 
+list[Instruction] stmts([*Instruction pre, GOTO(str body), LABEL(str cond), *Instruction c, LABEL(body), exp(a), exp(b), /IF_[IA]CMP<op:EQ|NE|LT|GE|LE>/(cond), *Instruction post]) 
   = stmts([*pre, stat(\while(condOp(op)(a,b),[asm(stmts(c))])), *post]);
+  
+list[Instruction] stmts([*Instruction pre, GOTO(str body), LABEL(str cond), *Instruction c, LABEL(body), exp(a), /IF<op:NULL|NONNULL|EQ|NE|LT|GT|LE>/(cond), *Instruction post]) 
+  = stmts([*pre, stat(\while(condOp(op)(a, const(byte(), 0)),[asm(stmts(c))])), *post]);  
 
-list[Instruction] stmts([*Instruction pre, LABEL(str body), *Instruction c, exp(a), exp(b), /IF_<op:EQ|NE|LT|GE|GT|LE|ICMP(EQ|NE|LT|GE|LE)|ACMP(EQ|NE)>/(body), *Instruction post]) 
+list[Instruction] stmts([*Instruction pre, LABEL(str body), *Instruction c, exp(a), exp(b), /IF_[IA]CMP<op:EQ|NE|LT|GE|LE>/(body), *Instruction post]) 
   = stmts([*pre, stat(\doWhile([asm(stmts(c))], condOp(op)(a,b))), *post]);
-        
-/*
- stat(store(
-                "i",
-                const(
-                  integer(),
-                  0))),
-            stat(while(
-                lt(
-                  load("i"),
-                  load("x")),
-                [asm([
-                      stat(store(
-                          "l",
-                          add(
-                            load("l"),
-                            load("i")))),
-                      stat(incr("i",1))
-                    ])])),
-*/
-list[Instruction] stmts([*Instruction pre, stat(first), stat(\while(c, [asm([*Instruction b, stat(next)])])), *Instruction post]) 
-  = stmts([*pre, stat(\for([first], c, [next], [asm(stmts(b))])), *post]);  
+
+list[Instruction] stmts([*Instruction pre, LABEL(str body), *Instruction c, exp(a), /IF<op:NULL|NONNULL|EQ|NE|LT|GT|LE>/(body), *Instruction post]) 
+  = stmts([*pre, stat(\doWhile([asm(stmts(c))], condOp(op)(a, const(byte(), 0)))), *post]);
+          
+list[Instruction] stmts([*Instruction pre, stat(first:store(str name,_)), stat(\while(c, [asm([*Instruction b, stat(next:/store|incr/(name,_))])])), *Instruction post]) 
+  = stmts([*pre, stat(\for([first], c, [next], [asm(stmts(b))])), *post]);
+  
+// fold in multiple inits and nexts in for loop  
+list[Instruction] stmts([*Instruction pre, stat(first:store(str name, _)), stat(\for(firsts, c, nexts, [asm([*Instruction b, stat(next:/store|incr/(name,_))])])), *Instruction post]) 
+  = stmts([*pre, stat(\for([first,*firsts], c, [next, *nexts], [asm(stmts(b))])), *post]);     
                                               
 default list[Instruction] stmts(list[Instruction] st) = st;
 
@@ -210,12 +221,38 @@ list[Instruction] exprs([*Instruction pre, LDC(typ, constant), *Instruction post
 list[Instruction] exprs([*Instruction pre, BIPUSH(int i), *Instruction post]) 
   = exprs([*pre, exp(const(byte(), i)), *post]);          
 
-list[Instruction] exprs([*Instruction pre, exp(a), exp(b), /IF_<op:EQ|NE|LT|GE|GT|LE|ICMP(EQ|NE|LT|GE|LE)|ACMP(EQ|NE)>/(l1), LABEL(_), LINENUMBER(_,_), exp(ifBranch), GOTO(l2), LABEL(l1), LINENUMBER(_,_), exp(elseBranch), LABEL(l2), LINENUMBER(_,_), *Instruction post]) 
-  = exprs([*pre, exp(cond(invertedCond(op)(a, b), ifBranch, elseBranch)), *post]);
+list[Instruction] exprs([*Instruction pre, exp(a), exp(b), /IF_[IA]CMP<op:EQ|NE|LT|GE|LE>/(str l1), exp(ifBranch), GOTO(str l2), LABEL(l1), exp(elseBranch), LABEL(l2), *Instruction post]) 
+  = exprs([*pre, exp(cond(invertedCond(op)(a, b), ifBranch, elseBranch)), LABEL(l2), *post]);
 
-list[Instruction] exprs([*Instruction pre, exp(a), /IF_<op:NULL|NONNULL>/(l1), LABEL(_), LINENUMBER(_,_), exp(ifBranch), GOTO(l2), LABEL(l1), LINENUMBER(_,_), exp(elseBranch), LABEL(l2), LINENUMBER(_,_), *Instruction post]) 
-  = exprs([*pre, exp(cond(invertedCond(op)(a), ifBranch, elseBranch)), *post]);
+list[Instruction] exprs([*Instruction pre, exp(a), /IF<op:NULL|NONNULL|EQ|NE|LT|GT|LE>/(str l1), exp(ifBranch), GOTO(str l2), LABEL(l1), exp(elseBranch), LABEL(l2), *Instruction post]) 
+  = exprs([*pre, exp(cond(invertedCond(op)(a, const(byte(), 0)), ifBranch, elseBranch)), LABEL(l2), *post]);
 
+// short-circuit AND(a,b) 
+list[Instruction] exprs(
+   [*Instruction pre, 
+    exp(a), 
+    exp(b), 
+    /IF_<op1:[IA]CMP(EQ|NE|LT|GE|LE)>/(str short), 
+    exp(c),
+    exp(d),
+    /IF_<op2:[IA]CMP(EQ|NE|LT|GE|LE)>/(str long),
+    LABEL(short),
+    *Instruction post
+   ]) 
+  = exprs([*pre, exp(sand(invertedCond(op1)(a,b), condOp(op2)(c,d))), IFNE(long), LABEL(short), *post]);
+
+// short-circuit OR(a,b) 
+list[Instruction] exprs(
+   [*Instruction pre, 
+    exp(a), 
+    exp(b), 
+    /IF_<op1:[IA]CMP(EQ|NE|LT|GE|LE)>/(str long), 
+    exp(c),
+    exp(d),
+    /IF_<op2:[IA]CMP(EQ|NE|LT|GE|LE)>/(long),
+    *Instruction post
+   ]) 
+  = exprs([*pre, exp(sor(condOp(op1)(a,b), condOp(op2)(c,d))), IFNE(long), *post]);              
 default list[Instruction] exprs(list[Instruction] instr) = instr;
 
 

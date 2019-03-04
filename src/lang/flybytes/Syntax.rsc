@@ -257,7 +257,9 @@ data Exp(loc src = |unknown:///|)
   | shl(Exp lhs, Exp shift)
   | ushr(Exp lhs, Exp shift)
   | and(Exp lhs, Exp rhs)
+  | sand(Exp lhs, Exp rhs) // short-circuit and
   | or(Exp lhs, Exp rhs)
+  | sor(Exp lhs, Exp rhs) // short-circuit or
   | xor(Exp lhs, Exp rhs)
   | add(Exp lhs, Exp rhs)
   | sub(Exp lhs, Exp rhs)

@@ -2261,8 +2261,12 @@ public class ClassCompiler {
 					return mulExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
 				case "and":
 					return andExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "sand":
+					return cond(AST.$getLhs(exp), AST.$getRhs(exp), falseExp(), line);
 				case "or":
 					return orExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
+				case "sor":
+					return cond(AST.$getLhs(exp), trueExp(), AST.$getRhs(exp), line);
 				case "xor":
 					return xorExp(AST.$getLhs(exp), AST.$getRhs(exp), line);
 				case "neg":

@@ -20,9 +20,11 @@ Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {
   withoutLabels = labels(withJumps);
   withExp = exprs(withoutLabels);
   withStat = stmts(withExp);
-  done = clean([asm(withStat)]);
-  return m[block=[asm(withStat)]];
-  //return m[block=done];  
+  done = visit ([asm(withStat)]) {
+    case list[Stat] l => clean(l)
+  }
+  //return m[block=[asm(withStat)]];
+  return m[block=done];  
 }
 
 Method decompile(Method m:static([asm(list[Instruction] instrs)])) {  
@@ -75,15 +77,7 @@ default list[Instruction] labels(list[Instruction] l) = l;
 
 // STATEMENTS
 
-@synopsis{recovers structures statements}  
-list[Instruction] stmts([*Instruction pre, exp(a), /[ILFDA]RETURN/(), *Instruction post]) 
-  = stmts([*pre, stat(\return(a)), *post]);
-
-list[Instruction] stmts([*Instruction pre, exp(rec), exp(arg), PUTFIELD(cls, name, typ), *Instruction post]) 
-  = stmts([*pre, stat(putField(cls, rec, typ, name, arg)), *post]);
-              
-list[Instruction] stmts([*Instruction pre, RETURN(), *Instruction post]) 
-  = stmts([*pre, stat(\return()), *post]);
+@synopsis{recovers structured statements}  
 
 list[Instruction] stmts([*Instruction pre, exp(a), exp(b), /IF_[IA]CMP<op:EQ|NE|LT|GE|LE>/(str l1), *Instruction thenPart, LABEL(l1), *Instruction post]) 
   = stmts([*pre, stat(\if(invertedCond(op)(a, b), [asm(stmts(thenPart))])), LABEL(l1), *post]);
@@ -161,6 +155,15 @@ list[Instruction] exprs([*Instruction pre, /[AIFL]LOAD/(int var), *Instruction m
   = exprs([*pre, exp(load(name)), *mid, lv, *post]);
   
 // EXPRESSIONS
+
+list[Instruction] exprs([*Instruction pre, exp(a), /[ILFDA]RETURN/(), *Instruction post]) 
+  = exprs([*pre, stat(\return(a)), *post]);
+
+list[Instruction] exprs([*Instruction pre, exp(rec), exp(arg), PUTFIELD(cls, name, typ), *Instruction post]) 
+  = exprs([*pre, stat(putField(cls, rec, typ, name, arg)), *post]);
+              
+list[Instruction] exprs([*Instruction pre, RETURN(), *Instruction post]) 
+  = exprs([*pre, stat(\return()), *post]);
 
 list[Instruction] exprs([*Instruction pre, NOP(), *Instruction post]) 
   = exprs([*pre, *exprs(post)]);

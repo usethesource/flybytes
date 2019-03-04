@@ -36,11 +36,12 @@ Method decompile(Method m:static([asm(list[Instruction] instrs)])) {
   return m[block=[asm(withStat)]];  
 }
 
-// LINES
+// LINES: 
 data Instruction(int line = -1);
 data Exp(int line = -1);
 data Stat(int line = -1);
 
+@synopsis{set the information from LINENUMBER instructions to all following instructions as a field, and removes the instruction}
 list[Instruction] lines([*Instruction pre, LINENUMBER(lin, lab), Instruction next, *Instruction post])
   = lines([*pre, next[line=lin], *lines([LINENUMBER(lin, lab), *post])])
   when !(next is LINENUMBER);
@@ -56,6 +57,7 @@ default list[Instruction] lines(list[Instruction] l) = l;
 // JUMP LABEL PROTECTION
 data Instruction(bool jumpTarget = false);
 
+@synopsis{marks jump targets with the jumpTarget=true field, for later use by label removal and detection of structured statements}
 list[Instruction] jumps([*Instruction pre, Instruction jump:/IF|GOTO|IFNULL|IFNONNULL|JSR/(str l1), *Instruction mid, LABEL(l1, jumpTarget=false), *Instruction post]) 
   = jumps([*pre, jump, *jumps([*mid, LABEL(l1, jumpTarget=true), *post])]);  
   
@@ -65,24 +67,15 @@ list[Instruction] jumps([*Instruction pre, LABEL(str l1, jumpTarget=false), *Ins
 default list[Instruction] jumps(list[Instruction] l) = l;
  
 // LABEL REMOVAL
+@synopsis{removes all labels which are not jump targets}
 list[Instruction] labels([*Instruction pre,  LABEL(_, jumpTarget=false), *Instruction post]) 
   = [*pre, *labels(post)];  
 
 default list[Instruction] labels(list[Instruction] l) = l;
 
-// VARIABLES
-
-list[Instruction] exprs([*Instruction pre, exp(e), /[AIFL]STORE/(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
-  = exprs([*pre, stat(store(name, e)), *mid, lv, *post]);
-  
-list[Instruction] exprs([*Instruction pre, IINC(int var, int i), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
-  = exprs([*pre, stat(incr(name, i)), *mid, lv, *post]);
-    
-list[Instruction] exprs([*Instruction pre, /[AIFL]LOAD/(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
-  = exprs([*pre, exp(load(name)), *mid, lv, *post]);
-  
 // STATEMENTS
-  
+
+@synopsis{recovers structures statements}  
 list[Instruction] stmts([*Instruction pre, exp(a), /[ILFDA]RETURN/(), *Instruction post]) 
   = stmts([*pre, stat(\return(a)), *post]);
 
@@ -155,6 +148,18 @@ list[Instruction] stmts([*Instruction pre, stat(first:store(str name, _)), stat(
                                               
 default list[Instruction] stmts(list[Instruction] st) = st;
 
+// VARIABLES
+
+@synopsis{recovers the structure of expressions and very basic statements}
+list[Instruction] exprs([*Instruction pre, exp(e), /[AIFL]STORE/(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
+  = exprs([*pre, stat(store(name, e)), *mid, lv, *post]);
+  
+list[Instruction] exprs([*Instruction pre, IINC(int var, int i), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
+  = exprs([*pre, stat(incr(name, i)), *mid, lv, *post]);
+    
+list[Instruction] exprs([*Instruction pre, /[AIFL]LOAD/(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
+  = exprs([*pre, exp(load(name)), *mid, lv, *post]);
+  
 // EXPRESSIONS
 
 list[Instruction] exprs([*Instruction pre, NOP(), *Instruction post]) 
@@ -318,6 +323,7 @@ Exp null(Exp e)    = eq(e, null());
 
 // CLEANING UP LEFT-OVER STRUCTURES
 
+@synopsis{removes local variables, labels, embedded assembly blocks which only contain statements, and lifts left-over expressions to expression-statements}
 list[Stat] clean([*Stat pre, asm([*Instruction preI, LOCALVARIABLE(_,_,_,_,_), *Instruction postI]), *Stat post]) 
   = clean([*pre, asm([*preI, *postI]), *post]);
   

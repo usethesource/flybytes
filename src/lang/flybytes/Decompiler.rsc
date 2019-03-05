@@ -14,6 +14,15 @@ Class decompile(loc classFile) throws IO {
   return cls[methods = [decompile(m) | m <- cls.methods]];
 }
 
+Method decompile(loc classFile, str methodName) {
+  cls = decompile(classFile);
+  if (Method m <- cls.methods, m.desc?, m.desc.name?, m.desc.name == methodName) {
+    return m;
+  }
+  
+  throw "no method named <methodName> exists in this class: <for (m <- cls.methods, m.desc?, m.desc.name?) {><m.desc.name> <}>";
+}
+
 Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {  
   withoutLines = lines(instrs);
   withJumps = jumps(withoutLines);
@@ -23,8 +32,8 @@ Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {
   done = visit ([asm(withStat)]) {
     case list[Stat] l => clean(l)
   }
-  //return m[block=[asm(withStat)]];
-  return m[block=done];  
+  return m[block=[asm(withStat)]];
+  //return m[block=done];  
 }
 
 Method decompile(Method m:static([asm(list[Instruction] instrs)])) {  
@@ -33,9 +42,11 @@ Method decompile(Method m:static([asm(list[Instruction] instrs)])) {
   withoutLabels = labels(withJumps);
   withExp = exprs(withoutLabels);
   withStat = stmts(withExp);
-  //done = clean([asm(withStat)]);
-
+  done = visit ([asm(withStat)]) {
+    case list[Stat] l => clean(l)
+  }
   return m[block=[asm(withStat)]];  
+  //return m[block=done];
 }
 
 // LINES: 
@@ -61,10 +72,17 @@ data Instruction(bool jumpTarget = false);
 
 @synopsis{marks jump targets with the jumpTarget=true field, for later use by label removal and detection of structured statements}
 list[Instruction] jumps([*Instruction pre, Instruction jump:/IF|GOTO|IFNULL|IFNONNULL|JSR/(str l1), *Instruction mid, LABEL(l1, jumpTarget=false), *Instruction post]) 
-  = jumps([*pre, jump, *jumps([*mid, LABEL(l1, jumpTarget=true), *post])]);  
+  = jumps([*pre, jump, *mid, LABEL(l1, jumpTarget=true), *post]);  
   
 list[Instruction] jumps([*Instruction pre, LABEL(str l1, jumpTarget=false), *Instruction mid, Instruction jump:/IF|GOTO|IFNULL|IFNONNULL|JSR/(l1), *Instruction post]) 
-  = labels([*pre, LABEL(l1, jumpTarget=true), *jumps([*mid, jump, *post])]);    
+  = jumps([*pre, LABEL(l1, jumpTarget=true), *mid, jump, *post]);    
+
+list[Instruction] jumps(ll:[*Instruction pre, Instruction s:TABLESWITCH(_,_,str def,_), *Instruction mid, LABEL(def, jumpTarget=false), *Instruction post]) 
+  = jumps([*pre, s, *mid, LABEL(def, jumpTarget=true), *post]);              
+
+// This one breaks the interpreter's list matcher if `cl` is introduces in the nested list under the TABLESWITCH node before it is used in the LABEL:
+list[Instruction] jumps(ll:[*Instruction pre, Instruction s:TABLESWITCH(_,_,_,[*_, cl, *_]), *Instruction mid, LABEL(str cl, jumpTarget=false), *Instruction post]) 
+  = jumps([*pre, s, *mid, LABEL(cl, jumpTarget=true), *post]);
 
 default list[Instruction] jumps(list[Instruction] l) = l;
  
@@ -93,6 +111,51 @@ list[Instruction] stmts([*Instruction pre, stat(\return(Exp e)), NOP(), *Instruc
 
 list[Instruction] stmts([*Instruction pre, stat(\return(Exp e)), ATHROW(), *Instruction post]) 
   = stmts([*pre, stat(\return(e)), *post]);
+  
+// SWITCH; this  complex statement is parsed in a number of recursive steps.  
+data Instruction = \caseBlock(Case c, str label);
+
+// first lift default case, and rewrite the nested GOTO's which are break() statements from the switch
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, cases), *Instruction other, LABEL(def), *Instruction defC, LABEL(str brk), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from, to, def, cases), *breaks(other, brk), \caseBlock(\default([asm(breaks(defC, brk))]), def), LABEL(brk), *post])
+  when !(caseBlock(_, _) <- defC), /GOTO(brk) := other
+  ;
+
+// or, if there is no default case, the def label points to the statement after the switch
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, [*str cases, str last:!def]), *Instruction other, LABEL(last), *Instruction lastC, LABEL(def), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from, to, def, cases), *breaks(other, def), \caseBlock(\case(size(cases) + from, [asm(breaks(lastC, def))]),last), LABEL(def), *post])
+  when !(caseBlock(_, _) <- lastC), /GOTO(def) := other
+  ;
+  
+// or, if there is this special case, where the last label is actually an empty block, the jump label coincides with the default label in that case:
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, [*str cases, def]), *Instruction other, LABEL(def), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from, to, def, cases), *breaks(other, def), \caseBlock(\case(size(cases) + from, []), def), LABEL(def), *post])
+  ;
+  
+
+// now we can fold-in the intermediate cases, as bracketed by the default case or the last case we matched above
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, [*str preL, str midL]), *Instruction other, LABEL(midL), *Instruction midC, cb:caseBlock(_,_), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from, to, def, preL), *other, \caseBlock(\case(size(preL) + from, [asm(midC)]), midL), cb, *post])
+  when !(caseBlock(_, _) <- midC)
+  ;
+  
+// empty cases with fall through require special attention, they jump to an existing label which was previously contracted:
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, [*str preL, str midL]), *Instruction other, cb:caseBlock(_, midL), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from, to, def, preL), *other, \caseBlock(\case(size(preL) + from, []), midL), cb, *post]);
+  
+
+  
+// finally we reconstruct the entire switch from the TABLESWITCH, for the case with DEFAULT block
+list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(_, _, str def, []), *Instruction cases, last:caseBlock(_, def), LABEL(str brk), *Instruction post]) 
+  = stmts([*pre, stat(\switch(a, [c | caseBlock(c, _) <- [*cases, last]])), LABEL(brk), *post])
+  when all(c <- cases, c is caseBlock)
+  ;
+
+// and the same for the case without DEFAULT block:
+list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(_, _, str brk, []), *Instruction cases, last:caseBlock(_, _), LABEL(str brk), *Instruction post]) 
+  = stmts([*pre, stat(\switch(a, [c | caseBlock(c, _) <- [*cases, last]])), LABEL(brk), *post])
+  when all(c <- cases, c is caseBlock)
+  ;
   
 // recover boolean conditions  
 list[Instruction] stmts([*Instruction pre, stat(\if(eq(Exp a, const(Type _, 0)), thenPart, elsePart)), *Instruction post]) 
@@ -158,6 +221,9 @@ list[Instruction] exprs([*Instruction pre, /[AIFL]LOAD/(int var), *Instruction m
 
 list[Instruction] exprs([*Instruction pre, exp(a), /[ILFDA]RETURN/(), *Instruction post]) 
   = exprs([*pre, stat(\return(a)), *post]);
+  
+list[Instruction] exprs([*Instruction pre, exp(a), ATHROW(), *Instruction post]) 
+  = exprs([*pre, stat(\throw(a)), *post]);  
 
 list[Instruction] exprs([*Instruction pre, exp(rec), exp(arg), PUTFIELD(cls, name, typ), *Instruction post]) 
   = exprs([*pre, stat(putField(cls, rec, typ, name, arg)), *post]);
@@ -343,3 +409,13 @@ list[Stat] clean([*Stat pre, asm([]), *Stat post])
   = clean([*pre, *post]);
    
 default list[Stat] clean(list[Stat] x) = x; 
+
+// BREAK AND CONTINUE HELPERS
+
+list[Instruction] breaks(list[Instruction] l, str breakLabel) = visit(l) {
+  case GOTO(breakLabel) => stat(\break())
+};  
+
+list[Instruction] continues(list[Instruction] l, str breakLabel) = visit(l) {
+  case GOTO(breakLabel) => stat(\continue())
+}; 

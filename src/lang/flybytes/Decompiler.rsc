@@ -32,8 +32,8 @@ Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {
   done = visit ([asm(withStat)]) {
     case list[Stat] l => clean(l)
   }
-  return m[block=[asm(withStat)]];
-  //return m[block=done];  
+  //return m[block=[asm(withStat)]];
+  return m[block=done];  
 }
 
 Method decompile(Method m:static([asm(list[Instruction] instrs)])) {  
@@ -45,8 +45,8 @@ Method decompile(Method m:static([asm(list[Instruction] instrs)])) {
   done = visit ([asm(withStat)]) {
     case list[Stat] l => clean(l)
   }
-  return m[block=[asm(withStat)]];  
-  //return m[block=done];
+  //return m[block=[asm(withStat)]];  
+  return m[block=done];
 }
 
 // LINES: 
@@ -112,50 +112,52 @@ list[Instruction] stmts([*Instruction pre, stat(\return(Exp e)), NOP(), *Instruc
 list[Instruction] stmts([*Instruction pre, stat(\return(Exp e)), ATHROW(), *Instruction post]) 
   = stmts([*pre, stat(\return(e)), *post]);
   
-// SWITCH; this  complex statement is parsed in a number of recursive steps.  
-data Instruction = \caseBlock(Case c, str label);
+// SWITCH; this  complex statement is parsed in a number of recursive (data-dependent) steps. 
 
-// first lift default case, and rewrite the nested GOTO's which are break() statements from the switch
-list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, cases), *Instruction other, LABEL(def), *Instruction defC, LABEL(str brk), *Instruction post]) 
-  = stmts([*pre, TABLESWITCH(from, to, def, cases), *breaks(other, brk), \caseBlock(\default([asm(breaks(defC, brk))]), def), LABEL(brk), *post])
-  when !(caseBlock(_, _) <- defC), /GOTO(brk) := other
-  ;
+ // to store intermediately recognized case blocks we augment the TABLESWITCH with this information:
+data Instruction(lrel[Case, str] cases = []); 
 
-// or, if there is no default case, the def label points to the statement after the switch
-list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, [*str cases, str last:!def]), *Instruction other, LABEL(last), *Instruction lastC, LABEL(def), *Instruction post]) 
-  = stmts([*pre, TABLESWITCH(from, to, def, cases), *breaks(other, def), \caseBlock(\case(size(cases) + from, [asm(breaks(lastC, def))]),last), LABEL(def), *post])
-  when !(caseBlock(_, _) <- lastC), /GOTO(def) := other
+// we first fold in pairwise each case, using their labels to "bracket" their instructions 
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, cases, cases=lrel[Case,str] cl), LABEL(str c1), *Instruction case1, LABEL(str c2), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from + 1, to, def, [c2, *rest],cases=cl+[<\case(from, [asm(case1)]), c1>]), LABEL(c2), *post]) 
+  when [c1, c2, *rest] := cases
   ;
   
-// or, if there is this special case, where the last label is actually an empty block, the jump label coincides with the default label in that case:
-list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, [*str cases, def]), *Instruction other, LABEL(def), *Instruction post]) 
-  = stmts([*pre, TABLESWITCH(from, to, def, cases), *breaks(other, def), \caseBlock(\case(size(cases) + from, []), def), LABEL(def), *post])
-  ;
+// there exist empty labels, which is signified by repeated jump labels in the case list, without a body:
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, cases, cases=lrel[Case,str] cl), LABEL(str c2), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from + 1, to, def, [c2, *rest],cases=cl+[<\case(from, []), c1>]), LABEL(c2), *post]) 
+  when [c1, c1, *rest] := cases
+  ; 
   
+// if the last case is empty, it would link to the default label  
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, cases, cases=lrel[Case,str] cl), LABEL(def), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from + 1, to, def, [], cases=cl+[<\case(from, []), def>]), LABEL(def), *post]) 
+  when [def] := cases
+  ;   
 
-// now we can fold-in the intermediate cases, as bracketed by the default case or the last case we matched above
-list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, [*str preL, str midL]), *Instruction other, LABEL(midL), *Instruction midC, cb:caseBlock(_,_), *Instruction post]) 
-  = stmts([*pre, TABLESWITCH(from, to, def, preL), *other, \caseBlock(\case(size(preL) + from, [asm(midC)]), midL), cb, *post])
-  when !(caseBlock(_, _) <- midC)
-  ;
+// when the number of cases is odd, we have a single final case to fold in, which is always bracketed by the default label:  
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, cases, cases=lrel[Case,str] cl), LABEL(str c1), *Instruction case1, LABEL(def), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from + 1, to, def, [], cases=cl+[<\case(from, [asm(case1)]), c1>]), LABEL(def), *post]) 
+  when [c1] := cases;
   
-// empty cases with fall through require special attention, they jump to an existing label which was previously contracted:
-list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, [*str preL, str midL]), *Instruction other, cb:caseBlock(_, midL), *Instruction post]) 
-  = stmts([*pre, TABLESWITCH(from, to, def, preL), *other, \caseBlock(\case(size(preL) + from, []), midL), cb, *post]);
-  
-
-  
-// finally we reconstruct the entire switch from the TABLESWITCH, for the case with DEFAULT block
-list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(_, _, str def, []), *Instruction cases, last:caseBlock(_, def), LABEL(str brk), *Instruction post]) 
-  = stmts([*pre, stat(\switch(a, [c | caseBlock(c, _) <- [*cases, last]])), LABEL(brk), *post])
-  when all(c <- cases, c is caseBlock)
+// now we can lift the TABLESWITCH statement to the switch statement (signalled by the empty case list and the immediate following of the def label)
+// Note this case only works if there is at least one break label to bracket the default case with:  
+list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(_, _, str def, [], cases=lrel[Case,str] cl), LABEL(def), *Instruction defCase, LABEL(str brk), *Instruction post]) 
+  = stmts([*pre, stat(\switch(a, breaks([c | <c,_> <- cl] + [\default([asm(defCase)])], brk))), LABEL(def), *post])
+  when /GOTO(brk) := cl
   ;
 
-// and the same for the case without DEFAULT block:
-list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(_, _, str brk, []), *Instruction cases, last:caseBlock(_, _), LABEL(str brk), *Instruction post]) 
-  = stmts([*pre, stat(\switch(a, [c | caseBlock(c, _) <- [*cases, last]])), LABEL(brk), *post])
-  when all(c <- cases, c is caseBlock)
-  ;
+// or there is no default block, but we do break() to the def label, which marks the end of the switch instructions: 
+list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(_, _, str def, [], cases=lrel[Case,str] cl), LABEL(def), *Instruction post]) 
+  = stmts([*pre, stat(\switch(a, breaks([c | <c,_> <- cl], def))), LABEL(def), *post])
+  when /GOTO(def) := cl
+  ;  
+
+// or its a switch with no break statements at all, a corner case: 
+list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(_, _, str def, [], cases=lrel[Case,str] cl), LABEL(def), *Instruction post]) 
+  = stmts([*pre, stat(\switch(a, [c | <c,_> <- cl])), LABEL(def), *post])
+  when /GOTO(def) !:= cl
+  ;   
   
 // recover boolean conditions  
 list[Instruction] stmts([*Instruction pre, stat(\if(eq(Exp a, const(Type _, 0)), thenPart, elsePart)), *Instruction post]) 
@@ -412,10 +414,7 @@ default list[Stat] clean(list[Stat] x) = x;
 
 // BREAK AND CONTINUE HELPERS
 
-list[Instruction] breaks(list[Instruction] l, str breakLabel) = visit(l) {
+&T breaks(&T l, str breakLabel) = visit(l) {
   case GOTO(breakLabel) => stat(\break())
 };  
 
-list[Instruction] continues(list[Instruction] l, str breakLabel) = visit(l) {
-  case GOTO(breakLabel) => stat(\continue())
-}; 

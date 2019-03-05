@@ -91,7 +91,6 @@ public class RoundtripTestClass {
 		case 1:
 			x = 2;
 			break;
-			// fallthrough
 		case 2:
 			x = 3;
 			break;

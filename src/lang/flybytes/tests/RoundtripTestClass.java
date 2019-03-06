@@ -38,10 +38,29 @@ public class RoundtripTestClass {
 		return x;
 	}
 	
+	int lotsOfDecls() {
+		int x = 1;
+		int y = x + 1;
+		int z = y + 1;
+		return x + y + z;
+	}
+	
 	int simpleForLoop(int x) {
 		int l = 0;
 		for (int i = 0; i < x; i++) {
 			l += i;
+		}
+	
+		return l;
+	}
+	
+	int nestedForLoop(int x, int y) {
+		int l = 0;
+		
+		for (int i = 0; i < x; i++) {
+			for (int j = 0; j < y; j++) {
+				l += i + j;
+			}
 		}
 	
 		return l;

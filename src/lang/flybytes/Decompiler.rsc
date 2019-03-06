@@ -106,8 +106,14 @@ list[Instruction] decls([*Instruction pre, LOCALVARIABLE(str name, Type typ, _, 
   = decls([*pre, *post], [*pref, *postf]);
   
 // for everything else introduce a declaration:
-list[Instruction] decls([*Instruction pre, LOCALVARIABLE(str name, Type typ, _, _, _)], [])  
-  = [stat(decl(typ, name)), *decls(pre, [])];
+list[Instruction] decls([*Instruction pre, LOCALVARIABLE(str name, Type typ, _, _, _), *Instruction post], [])  
+  = decls([stat(decl(typ, name)), *decls([*pre, *post], [])], []);
+
+// clean up by inlining initial expressions
+list[Instruction] decls([*Instruction pre, stat(decl(typ, name)), *Instruction mid, stat(store(name, e)), *Instruction post], [])
+  = decls([*pre, stat(decl(typ, name, init=e)), *mid, *post], [])
+  when mid == [] || all(i <- mid, stat(decl(_,_)) := i)
+  ;
 
 default list[Instruction] decls(list[Instruction] l, list[Formal] _) = l;
 
@@ -399,10 +405,7 @@ Exp null(Exp e)    = eq(e, null());
 
 // CLEANING UP LEFT-OVER STRUCTURES
 
-@synopsis{removes local variables, labels, embedded assembly blocks which only contain statements, and lifts left-over expressions to expression-statements}
-list[Stat] clean([*Stat pre, asm([*Instruction preI, LOCALVARIABLE(_,_,_,_,_), *Instruction postI]), *Stat post]) 
-  = clean([*pre, asm([*preI, *postI]), *post]);
-  
+@synopsis{removes left-over labels, embedded assembly blocks which only contain statements, and lifts left-over expressions to expression-statements}
 list[Stat] clean([*Stat pre, asm([*Instruction preI, LABEL(_), *Instruction postI]), *Stat post]) 
   = clean([*pre, asm([*preI, *postI]), *post]);  
 

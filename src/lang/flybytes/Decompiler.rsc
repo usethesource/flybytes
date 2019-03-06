@@ -6,6 +6,7 @@ import Exception;
 import String;
 import IO;
 import List; 
+import util::ValueUI;
 
 @synopsis{Decompile a JVM classfile to Flybytes ASTs, recovering statement and expression structures.}
 Class decompile(loc classFile) throws IO { 
@@ -15,9 +16,9 @@ Class decompile(loc classFile) throws IO {
 }
 
 Method decompile(loc classFile, str methodName) {
-  cls = decompile(classFile);
+  cls = disassemble(classFile);
   if (Method m <- cls.methods, m.desc?, m.desc.name?, m.desc.name == methodName) {
-    return m;
+    return decompile(m);
   }
   
   throw "no method named <methodName> exists in this class: <for (m <- cls.methods, m.desc?, m.desc.name?) {><m.desc.name> <}>";
@@ -32,8 +33,8 @@ Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {
   done = visit ([asm(withStat)]) {
     case list[Stat] l => clean(l)
   }
-  //return m[block=[asm(withStat)]];
-  return m[block=done];  
+  return m[block=[asm(withStat)]];
+  //return m[block=done];  
 }
 
 Method decompile(Method m:static([asm(list[Instruction] instrs)])) {  
@@ -45,8 +46,8 @@ Method decompile(Method m:static([asm(list[Instruction] instrs)])) {
   done = visit ([asm(withStat)]) {
     case list[Stat] l => clean(l)
   }
-  //return m[block=[asm(withStat)]];  
-  return m[block=done];
+  return m[block=[asm(withStat)]];  
+  //return m[block=done];
 }
 
 // LINES: 
@@ -117,48 +118,35 @@ list[Instruction] stmts([*Instruction pre, stat(\return(Exp e)), ATHROW(), *Inst
  // to store intermediately recognized case blocks we augment the TABLESWITCH with this information:
 data Instruction(lrel[Case, str] cases = []); 
 
-// we first fold in pairwise each case, using their labels to "bracket" their instructions 
-list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, cases, cases=lrel[Case,str] cl), LABEL(str c1), *Instruction case1, LABEL(str c2), *Instruction post]) 
-  = stmts([*pre, TABLESWITCH(from + 1, to, def, [c2, *rest],cases=cl+[<\case(from, [asm(case1)]), c1>]), LABEL(c2), *post]) 
-  when [c1, c2, *rest] := cases
+// we first fold in pairwise each case, using their labels to "bracket" their instructions, this depend on list matching being lazy (non-eager). 
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, list[str] keys, cases=cl), LABEL(str c1), *Instruction case1, LABEL(str c2), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from, to, def, keys, cases=cl+[<\case(size(before) + from, [asm(case1)]), c1>]), LABEL(c2), *post]) 
+  when [*before, c1, *_] := keys, c2 in keys
   ;
   
-// there exist empty labels, which is signified by repeated jump labels in the case list, without a body:
-list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, cases, cases=lrel[Case,str] cl), LABEL(str c2), *Instruction post]) 
-  = stmts([*pre, TABLESWITCH(from + 1, to, def, [c2, *rest],cases=cl+[<\case(from, []), c1>]), LABEL(c2), *post]) 
-  when [c1, c1, *rest] := cases
-  ; 
-  
-// if the last case is empty, it would link to the default label  
-list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, cases, cases=lrel[Case,str] cl), LABEL(def), *Instruction post]) 
-  = stmts([*pre, TABLESWITCH(from + 1, to, def, [], cases=cl+[<\case(from, []), def>]), LABEL(def), *post]) 
-  when [def] := cases
-  ;   
-
 // when the number of cases is odd, we have a single final case to fold in, which is always bracketed by the default label:  
-list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, cases, cases=lrel[Case,str] cl), LABEL(str c1), *Instruction case1, LABEL(def), *Instruction post]) 
-  = stmts([*pre, TABLESWITCH(from + 1, to, def, [], cases=cl+[<\case(from, [asm(case1)]), c1>]), LABEL(def), *post]) 
-  when [c1] := cases;
+list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, list[str] keys, cases=cl), LABEL(str c1), *Instruction case1, LABEL(def), *Instruction post]) 
+  = stmts([*pre, TABLESWITCH(from, to, def, keys, cases=cl+[<\case(size(before) + from, [asm(case1)]), c1>]), LABEL(def), *post]) 
+  when  [*before, c1, *after] := keys;
   
 // now we can lift the TABLESWITCH statement to the switch statement (signalled by the empty case list and the immediate following of the def label)
 // Note this case only works if there is at least one break label to bracket the default case with:  
-list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(_, _, str def, [], cases=lrel[Case,str] cl), LABEL(def), *Instruction defCase, LABEL(str brk), *Instruction post]) 
-  = stmts([*pre, stat(\switch(a, breaks([c | <c,_> <- cl] + [\default([asm(defCase)])], brk))), LABEL(def), *post])
+list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(int from, _, str def, list[str] keys, cases=cl), LABEL(def), *Instruction defCase, LABEL(str brk), *Instruction post]) 
+  = stmts([*pre, stat(\switch(a, breaks([*sharedCases(c.key, lab, keys, from), c | <c, lab> <- cl] + sharedDefaults(def, keys, from) + [\default([asm(defCase)])], brk))), LABEL(def), *post])
   when /GOTO(brk) := cl
   ;
 
-// or there is no default block, but we do break() to the def label, which marks the end of the switch instructions: 
-list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(_, _, str def, [], cases=lrel[Case,str] cl), LABEL(def), *Instruction post]) 
-  = stmts([*pre, stat(\switch(a, breaks([c | <c,_> <- cl], def))), LABEL(def), *post])
-  when /GOTO(def) := cl
-  ;  
+// or there is no default case, in which case the breaks go to the def label
+list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(int from, _, str def, list[str] keys, cases=cl), LABEL(def), *Instruction post]) 
+  = stmts([*pre, stat(\switch(a, breaks([*sharedCases(c.key, lab, keys, from) , c | <c,lab> <- cl], def))), LABEL(def), *post]);  
 
-// or its a switch with no break statements at all, a corner case: 
-list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(_, _, str def, [], cases=lrel[Case,str] cl), LABEL(def), *Instruction post]) 
-  = stmts([*pre, stat(\switch(a, [c | <c,_> <- cl])), LABEL(def), *post])
-  when /GOTO(def) !:= cl
-  ;   
+// shared cases are keys which do not have a corresponding unique block in the list of statements after the SWITCH jump: `case 1: case 2: block`  
+list[Case] sharedCases(int key, str lab, list[str] keys, int offset)
+  = [\case(pos,[]) | [*before, lab, *_] := keys, int pos := size(before) + offset, pos != key];
   
+list[Case] sharedDefaults(str lab, list[str] keys, int offset)
+  = [\case(pos,[]) | [*before, lab, *_] := keys, int pos := size(before) + offset];  
+    
 // recover boolean conditions  
 list[Instruction] stmts([*Instruction pre, stat(\if(eq(Exp a, const(Type _, 0)), thenPart, elsePart)), *Instruction post]) 
   = stmts([*pre, stat(\if(neg(a), thenPart, elsePart)), *post]);

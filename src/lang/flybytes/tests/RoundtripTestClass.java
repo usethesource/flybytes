@@ -69,7 +69,6 @@ public class RoundtripTestClass {
 		case 1:
 			x = 2;
 			break;
-			// fallthrough
 		case 2:
 			x = 3;
 			break;
@@ -173,6 +172,36 @@ public class RoundtripTestClass {
 		case 2:
 			x++;
 		case 3:
+			x++;
+		}
+		
+		return x;
+	}
+	
+	int switchWithReverseFallThroughs(int x) throws Exception {
+		switch(x) {
+		case 3:
+			x++;
+		case 2:
+			x++;
+		case 1:
+			x++;
+		case 0:
+			x++;
+		}
+		
+		return x;
+	}
+	
+	int switchWithReverseFallThroughsWithHoles(int x) throws Exception {
+		switch(x) {
+		case 5:
+			x++;
+		case 3:
+			x++;
+		case 1:
+			x++;
+		case 0:
 			x++;
 		}
 		

@@ -4,9 +4,7 @@ extend lang::flybytes::Disassembler;
 
 import Exception;
 import String;
-import IO;
 import List; 
-import util::ValueUI;
 
 @synopsis{Decompile a JVM classfile to Flybytes ASTs, recovering statement and expression structures.}
 Class decompile(loc classFile) throws IO { 
@@ -30,11 +28,12 @@ Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {
   withoutLabels = labels(withJumps);
   withExp = exprs(withoutLabels);
   withStat = stmts(withExp);
-  done = visit ([asm(withStat)]) {
+  withDecls = decls(withStat, m.formals);
+  done = visit ([asm(withDecls)]) {
     case list[Stat] l => clean(l)
   }
-  return m[block=[asm(withStat)]];
-  //return m[block=done];  
+  //return m[block=[asm(withDecls)]];
+  return m[block=done];  
 }
 
 Method decompile(Method m:static([asm(list[Instruction] instrs)])) {  
@@ -46,9 +45,11 @@ Method decompile(Method m:static([asm(list[Instruction] instrs)])) {
   done = visit ([asm(withStat)]) {
     case list[Stat] l => clean(l)
   }
-  return m[block=[asm(withStat)]];  
-  //return m[block=done];
+  //return m[block=[asm(withStat)]];  
+  return m[block=done];
 }
+
+Method decompile(Method m) = m when \abstract in m.modifiers; 
 
 // LINES: 
 data Instruction(int line = -1);
@@ -65,7 +66,7 @@ list[Instruction] lines([*Instruction pre, LINENUMBER(_, _), Instruction next:LI
   
 list[Instruction] lines([*Instruction pre, LINENUMBER(_, _)])
   = pre;  
- 
+
 default list[Instruction] lines(list[Instruction] l) = l;
   
 // JUMP LABEL PROTECTION
@@ -93,6 +94,22 @@ list[Instruction] labels([*Instruction pre,  LABEL(_, jumpTarget=false), *Instru
   = [*pre, *labels(post)];  
 
 default list[Instruction] labels(list[Instruction] l) = l;
+
+// LOCAL VARIABLES DECLARATIONS
+
+// remove the implicit "this"
+list[Instruction] decls([*Instruction pre, LOCALVARIABLE("this", _, _, _, _), *Instruction post], list[Formal] formals)
+  = decls([*pre, *post], formals);
+  
+// remove the duplicate declaration of the method formal parameters  
+list[Instruction] decls([*Instruction pre, LOCALVARIABLE(str name, Type typ, _, _, _), *Instruction post], [*pref,  var(\typ, name), *postf])
+  = decls([*pre, *post], [*pref, *postf]);
+  
+// for everything else introduce a declaration:
+list[Instruction] decls([*Instruction pre, LOCALVARIABLE(str name, Type typ, _, _, _)], [])  
+  = [stat(decl(typ, name)), *decls(pre, [])];
+
+default list[Instruction] decls(list[Instruction] l, list[Formal] _) = l;
 
 // STATEMENTS
 

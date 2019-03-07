@@ -5,14 +5,14 @@ extend lang::flybytes::Disassembler;
 import Exception;
 import String;
 import List; 
-
+ 
 @synopsis{Decompile a JVM classfile to Flybytes ASTs, recovering statement and expression structures.}
 Class decompile(loc classFile) throws IO { 
   cls = disassemble(classFile);
   
   return cls[methods = [decompile(m) | m <- cls.methods]];
 }
-
+ 
 Method decompile(loc classFile, str methodName) {
   cls = disassemble(classFile);
   if (Method m <- cls.methods, m.desc?, m.desc.name?, m.desc.name == methodName) {
@@ -32,8 +32,8 @@ Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {
   done = visit ([asm(withDecls)]) {
     case list[Stat] l => clean(l)
   }
-  //return m[block=[asm(withDecls)]];
-  return m[block=done];  
+  return m[block=[asm(withDecls)]];
+  //return m[block=done];  
 }
 
 Method decompile(Method m:static([asm(list[Instruction] instrs)])) {  
@@ -79,12 +79,15 @@ list[Instruction] jumps([*Instruction pre, Instruction jump:/IF|GOTO|IFNULL|IFNO
 list[Instruction] jumps([*Instruction pre, LABEL(str l1, jumpTarget=false), *Instruction mid, Instruction jump:/IF|GOTO|IFNULL|IFNONNULL|JSR/(l1), *Instruction post]) 
   = jumps([*pre, LABEL(l1, jumpTarget=true), *mid, jump, *post]);    
 
-list[Instruction] jumps(ll:[*Instruction pre, Instruction s:TABLESWITCH(_,_,str def,_), *Instruction mid, LABEL(def, jumpTarget=false), *Instruction post]) 
+list[Instruction] jumps([*Instruction pre, Instruction s:TABLESWITCH(_,_,str def,_), *Instruction mid, LABEL(def, jumpTarget=false), *Instruction post]) 
   = jumps([*pre, s, *mid, LABEL(def, jumpTarget=true), *post]);              
 
 // This one breaks the interpreter's list matcher if `cl` is introduces in the nested list under the TABLESWITCH node before it is used in the LABEL:
-list[Instruction] jumps(ll:[*Instruction pre, Instruction s:TABLESWITCH(_,_,_,[*_, cl, *_]), *Instruction mid, LABEL(str cl, jumpTarget=false), *Instruction post]) 
+list[Instruction] jumps([*Instruction pre, Instruction s:TABLESWITCH(_,_,_,[*_, cl, *_]), *Instruction mid, LABEL(str cl, jumpTarget=false), *Instruction post]) 
   = jumps([*pre, s, *mid, LABEL(cl, jumpTarget=true), *post]);
+
+list[Instruction] jumps([*Instruction pre, LABEL(str \start), *Instruction block, LABEL(str \end), *Instruction mid1, LABEL(str handler), *Instruction mid2, TRYCATCH(Type typ, \start, end, handler), *Instruction post]) 
+  = jumps([*pre, TRYCATCH(typ, \start, end, handler), LABEL(\start, jumpTarget=true), *block, LABEL(\end, jumpTarget=true), *mid1, LABEL(handler, jumpTarget=true), *mid2, *post]);
 
 default list[Instruction] jumps(list[Instruction] l) = l;
  
@@ -154,7 +157,7 @@ list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def
   
 // now we can lift the TABLESWITCH statement to the switch statement (signalled by the empty case list and the immediate following of the def label)
 // Note this case only works if there is at least one break label to bracket the default case with:  
-list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(int from, _, str def, list[str] keys, cases=cl), LABEL(def), *Instruction defCase, LABEL(str brk), *Instruction post]) 
+list[Instruction] stmts([*Instruction pre, exp(a), TABLESWITCH(int from, _, str def, list[str] keys, cases=lrel[Case, str] cl), LABEL(def), *Instruction defCase, LABEL(str brk), *Instruction post]) 
   = stmts([*pre, stat(\switch(a, breaks([*sharedCases(c.key, lab, keys, from), c | <c, lab> <- cl] + sharedDefaults(def, keys, from) + [\default([asm(defCase)])], brk))), LABEL(def), *post])
   when /GOTO(brk) := cl
   ;
@@ -169,6 +172,116 @@ list[Case] sharedCases(int key, str lab, list[str] keys, int offset)
   
 list[Case] sharedDefaults(str lab, list[str] keys, int offset)
   = [\case(pos,[]) | [*before, lab, *_] := keys, int pos := size(before) + offset];  
+ 
+// Try/catch statements are also complex. They are recovered in a similar fashion as SWITCH,
+// since the generated code for the catch blocks is laid out similarly to a set of case statements.
+// Pre-work has been done by the `jumps` function, which moved every TRYCATCH Instruction next to 
+// the start label of the block that is guarded by the TRYCATCH
+
+data Instruction(list[Handler] handlers=[]);
+
+// first we fold in catch blocks, starting from the left and using the next block as a bracket:
+list[Instruction] stmts(
+  [
+   *Instruction pre, 
+   TRYCATCH(Type \typ1, str from, str to, str handler1, handlers=hs),  
+   TRYCATCH(Type \typ2, from, to, str handler2), 
+   *Instruction block,
+   LABEL(to),
+   Instruction jump, // RETURN GOTO OR BREAK
+   LABEL(handler1),
+   exp(load(str var)), // This was rewritten from a ASTORE(ind) earlier by the `jump` function
+   *Instruction catch1,
+   LABEL(handler2),
+   *Instruction post
+  ]) 
+  = stmts([*pre, TRYCATCH(\typ2, from, to, handler2, handlers=hs+[\catch(\typ1, var, [asm(catch1)])]), *block, LABEL(to), jump, LABEL(handler2), *post]);  
+
+// multi-catch does not exist in Flybytes, so we have to duplicate the handlers.
+// this temporary constructor encodes the instruction to make the duplication later
+data Stat = multiCatchHandler();
+
+list[Instruction] stmts(
+  [
+   *Instruction pre, 
+   TRYCATCH(Type \typ1, str from, str to, str handler1, handlers=hs),  
+   TRYCATCH(Type \typ2, from, to, handler1), 
+   *Instruction block,
+   LABEL(to),
+   Instruction jump, 
+   LABEL(handler1),
+   exp(load(str var)), // This was rewritten from a ASTORE(ind) earlier by the `jump` function
+   *Instruction post
+  ]) 
+  = stmts([ 
+   *pre, 
+   TRYCATCH(\typ2, from, to, handler1, handlers=hs+[\catch(typ1, var, [multiCatchHandler()])]),  
+   *block,
+   LABEL(to),
+   jump, 
+   LABEL(handler1),
+   exp(load(var)),
+   *post
+   ]);  
+
+// we detect the end of the final handler by seeing if anybody inside the try block or the 
+// previous handlers GOTO's to the label just after the final handler.   
+list[Instruction] stmts(
+  [*Instruction pre, 
+   TRYCATCH(Type \typ1, str from, str to, str handler1, handlers=hs),
+   LABEL(from),
+   *Instruction block,  
+   LABEL(to),
+   GOTO(\join), // jump to after the final handler
+   LABEL(handler1),
+   exp(load(str var)), // This was rewritten from a ASTORE(ind) earlier by the `jump` function
+   *Instruction catch1,
+   LABEL(\join),
+   *Instruction post
+  ]) 
+  = stmts([*pre, stat(\try([asm(stmts(exprs(tryJoins(block, \join))))],tryJoins([*hs,\catch(\typ1, var, [asm(stmts(catch1))])], \join))), LABEL(\join), *post])
+  ; 
+  
+list[Instruction] stmts(
+  [*Instruction pre, 
+   TRYCATCH(Type \typ1, str from, str to, str handler1, handlers=hs),
+   LABEL(from),
+   *Instruction block,  
+   LABEL(to),
+   Instruction jump, // no jump to after the final handler, look elsewhere
+   LABEL(handler1),
+   exp(load(str var)),
+   *Instruction catch1,
+   LABEL(str \join),
+   *Instruction post
+  ]) 
+  = stmts([*pre, stat(\try([asm(stmts(exprs(tryJoins([*block, jump], \join))))],tryJoins([*hs,\catch(\typ1, var, [asm(stmts(catch1))])], \join))), LABEL(\join), *post])
+  // find any GOTO jump to after the final handler:
+  when GOTO(_) !:= jump, /GOTO(\join) := block || /GOTO(\join) := hs || /GOTO(\join) := catch1
+  ;  
+    
+ // but if there is no such GOTO, then we do not know where the final catch block ends.
+// however, the theory is that if no such GOTO exists, then the code after the try would only 
+// be reachable by falling through the final catch block anyway.
+list[Instruction] stmts(
+  [
+   *Instruction pre, 
+   TRYCATCH(Type \typ1, str from, str to, str handler1, handlers=hs),
+   LABEL(from),
+   *Instruction block,  
+   LABEL(to),
+   Instruction jump, // RETURN OR BREAK
+   LABEL(handler1),
+   exp(load(str var)),
+   *Instruction post
+  ]) 
+  = stmts([*pre, stat(\try([asm(stmts(exprs([*block, jump])))],[*hs,\catch(\typ1, var, [/*temp empty*/])])), *post])
+  when /GOTO(_) !:= hs, /GOTO(_) !:= block, GOTO(_) !:= jump
+  ;    
+  
+// duplicate the multi-handler blocks now    
+list[Instruction] stmts([*Instruction pre, stat(\try(list[Stat] block, [*Handler preh, \catch(Type typ1, str var, [multiCatchHandler()]), \catch(Type typ2, var, list[Stat] catch1), *Handler posth])), *Instruction post])
+  = stmts([*pre, stat(\try(block, [*preh, \catch(typ1, var, catch1), \catch(typ2, var, catch1), *posth])), *post]);
     
 // recover boolean conditions  
 list[Instruction] stmts([*Instruction pre, stat(\if(eq(Exp a, const(Type _, 0)), thenPart, elsePart)), *Instruction post]) 
@@ -221,13 +334,17 @@ default list[Instruction] stmts(list[Instruction] st) = st;
 // VARIABLES
 
 @synopsis{recovers the structure of expressions and very basic statements}
-list[Instruction] exprs([*Instruction pre, exp(e), /[AIFL]STORE/(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
+list[Instruction] exprs([*Instruction pre, exp(e), /[AIFLD]STORE/(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
   = exprs([*pre, stat(store(name, e)), *mid, lv, *post]);
+  
+// stores the name of catch clause variables at the position of the handler:  
+list[Instruction] exprs([*Instruction pre, tc:TRYCATCH(_,  _, _, handler), *Instruction other, LABEL(str handler), ASTORE(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
+  = exprs([*pre, tc, *other, LABEL(handler), exp(load(name)) /* temporary */, *mid, lv, *post]);  
   
 list[Instruction] exprs([*Instruction pre, IINC(int var, int i), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
   = exprs([*pre, stat(incr(name, i)), *mid, lv, *post]);
     
-list[Instruction] exprs([*Instruction pre, /[AIFL]LOAD/(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
+list[Instruction] exprs([*Instruction pre, /[AIFLD]LOAD/(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
   = exprs([*pre, exp(load(name)), *mid, lv, *post]);
   
 // EXPRESSIONS
@@ -424,5 +541,9 @@ default list[Stat] clean(list[Stat] x) = x;
 
 &T breaks(&T l, str breakLabel) = visit(l) {
   case GOTO(breakLabel) => stat(\break())
-};  
+}; 
+
+&T tryJoins(&T l, str joinLabel) = visit(l) {
+  case [*Instruction pre, GOTO(joinLabel), *Instruction post] => [*pre, *post]
+}; 
 

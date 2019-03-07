@@ -227,5 +227,52 @@ public class RoundtripTestClass {
 		return x;
 	}
 
+	int tryCatch(int x) {
+		try {
+			return x / 0;
+		}
+		catch (ArithmeticException e) {
+			x += 1;
+		}
+		catch (Throwable y) {
+			System.err.println(x);
+		}
+		
+		return x;
+	}
 	
+	int tryMultiCatch(int x) {
+		try {
+			x =  x / 0;
+		}
+		catch (ArithmeticException | IllegalArgumentException e) {
+			x += 1;
+		}
+		
+		return x;
+	}
+	
+	int tryMultiCatchReturnFromBlock(int x) {
+		try {
+			return  x / 0;
+		}
+		catch (ArithmeticException | IllegalArgumentException e) {
+			x += 1;
+		}
+		
+		return x;
+	}
+
+	int tryCatchFinally(int x) {
+		try {
+			return x / 0;
+		}
+		catch (ArithmeticException e) {
+			return 0;
+		}
+		finally {
+			System.err.println("watch out!");
+		}
+	}
+
 }

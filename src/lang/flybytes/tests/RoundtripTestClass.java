@@ -267,12 +267,14 @@ public class RoundtripTestClass {
 		try {
 			return x / 0;
 		}
-		catch (ArithmeticException e) {
+		catch (Throwable e) {
 			return 0;
 		}
 		finally {
 			System.err.println("watch out!");
 		}
 	}
+	
+	
 
 }

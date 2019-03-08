@@ -279,6 +279,50 @@ list[Instruction] stmts(
   when /GOTO(_) !:= hs, /GOTO(_) !:= block, GOTO(_) !:= jump
   ;    
   
+/*
+
+*/  
+
+
+          
+// In the case of a finally block, things are different. This pattern heavily relies on backtracking to identify repetitions of the finally block:  
+list[Instruction] stmts(
+  [ *Instruction pre,
+ 	TRYCATCH(Type typ, str from, str to, str handler, handlers=hs),
+	TRYCATCH(_, from, to, str finallyHandler),
+	LABEL(from),
+	*Instruction tryBlock,
+	LABEL(to),
+	*Instruction finallyHandlerBlock,
+	*Instruction endTryBlock,
+	TRYCATCH(_, handler, str endHandler, finallyHandler),
+	LABEL(handler),
+	exp(load(str var)),
+	*Instruction handlerBlock,
+	LABEL(endHandler),
+	*finallyHandlerBlock,
+	*Instruction endHandlerBlock,
+	LABEL(finallyHandler),
+	ASTORE(int eTmp),
+	*finallyHandlerBlock, // this is the piece which identifies the finally handler (due to the ASTORE, ALOAD, ATHROW "brackets")
+	ALOAD(eTmp),
+	ATHROW(),
+	*Instruction post
+  ]) 
+  = stmts([*pre, 
+           stat(\try([asm(stmts(exprs([*tryBlock, *endTryBlock])))],
+                     [*hs, 
+                      \catch(\typ, var, [asm(stmts([*handlerBlock, *endHandlerBlock]))]),
+                      \finally([asm(stmts(finallyHandlerBlock))])
+                     ])
+               ), 
+           *post])
+  ;      
+  
+// clean up temporaries used to jump over finally blocks
+list[Instruction] stmts([*Instruction pre, /[IFLDA]STORE/(int tmp), /[IFLDA]LOAD/(tmp), *Instruction post])
+  = stmts(exprs([*pre, *post]));
+    
 // duplicate the multi-handler blocks now    
 list[Instruction] stmts([*Instruction pre, stat(\try(list[Stat] block, [*Handler preh, \catch(Type typ1, str var, [multiCatchHandler()]), \catch(Type typ2, var, list[Stat] catch1), *Handler posth])), *Instruction post])
   = stmts([*pre, stat(\try(block, [*preh, \catch(typ1, var, catch1), \catch(typ2, var, catch1), *posth])), *post]);

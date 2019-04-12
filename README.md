@@ -7,7 +7,8 @@ Flybytes is an intermediate language towards JVM bytecode generation for Rascal-
 * you are implementing a textual or graphical DSL or a programming language (using Rascal)
 * and, you want to target the JVM because of its general availability and the JIT compiler, 
 * or you want to target the JVM to interact with other JVM languages and libraries,
-* and, you do not have time or want to spend time to get into JVM bytecode generation, 
+* or you need to analyze and rewrite bytecode,
+* and, you do not have time or want to spend time to get into JVM bytecode analysis or generation, 
 * and, you do want to profit from the Just In Time (JIT) compiler,
 * and, you understand the Java programming language pretty well
 * and, you could generate Java code as well 
@@ -21,6 +22,7 @@ Flybytes is an intermediate language towards JVM bytecode generation for Rascal-
 1. The Flybytes compiler use the [ASM framework](https://asm.ow2.io/) to generate bytecode in a single pass of the Flybytes AST
    * either the code is directly streamed to a class file (and optionally loaded)
    * or a reasonably clear error message is produced due to an error in the FlyBytes AST.
+1. Also it can deconpile JVM bytecode back to statememts and expressions (almost done)
 1. Flybytes does not require a JDK as a dependency. It uses only ASM to generate JVM bytecode, very quickly.
    
 ### Presumptions:

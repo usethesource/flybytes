@@ -84,6 +84,7 @@ data Class(list[Annotation] annotations = [], loc src = |unknown:///|)
       //list[Class] children = [],
     )
   | interface(Type \type /* object(str name) */,
+      list[Type]   interfaces = [],
       list[Field]  fields  = [],
       list[Method] methods = []
     )  

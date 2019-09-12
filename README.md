@@ -1,6 +1,6 @@
-# Flybytes - intermediate abstract programming language for fast generation of JVM bytecode
+# Flybytes - intermediate abstract programming language for JVM bytecode analysis, manipulation and generation
 
-Flybytes is an intermediate language towards JVM bytecode generation for Rascal-based compilers of Domain Specific Languages and Programming Languages.
+Flybytes is an intermediate language towards JVM bytecode generation for Rascal-based compilers of Domain Specific Languages and Programming Languages. It is has forward and reverse engineering features, such that analyzing JVM bytecode can be done symbolically.
 
 ### Context:
 
@@ -70,13 +70,6 @@ Flybytes is an intermediate language towards JVM bytecode generation for Rascal-
 * Expect renamings and API changes
 * The language is fully implemented, with the noted exception of nested classes
 * The language is fully tested, with the noted exception of the invokedynamic feature
-
-### TODO:
-
-* add support for the JVM debugger (line and symbol information)
-* add support for error nodes (to support partial compilation and running partially compiled classes)
-* refactor compiler exceptions to Rascal exceptions (to help debugging Flybytes AST generators)
-* add support for nested classes (helps in generating code for lambda expressions)
 
 ### Citations
 

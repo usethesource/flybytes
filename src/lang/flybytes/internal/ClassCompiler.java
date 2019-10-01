@@ -795,6 +795,9 @@ public class ClassCompiler {
 			case "incr":
 				incStat(AST.$getName(stat), AST.$getInc(stat));
 				break;
+			case "invokeSuper" : 
+                invokeSuper(classNode.superName, AST.$getDesc(stat), AST.$getArgs(stat), line);
+                break;
 			case "decl":
 				declStat(stat, joinLabel, line);
 				break;
@@ -2210,8 +2213,6 @@ public class ClassCompiler {
 					return getfieldExp(AST.$getReceiver(exp), AST.$getRefClassFromType(AST.$getClass(exp), classNode.name), AST.$getType(exp), AST.$getName(exp), line);
 				case "instanceof":
 					return instanceofExp(AST.$getArg(exp), AST.$getRefClassFromType(exp, classNode.name), line);
-				case "invokeSuper" : 
-					return invokeSuper(classNode.superName, AST.$getDesc(exp), AST.$getArgs(exp), line);
 				case "sblock":
 					return sblockExp(AST.$getStatements(exp), AST.$getArg(exp), line);
 				case "null":
@@ -2564,12 +2565,12 @@ public class ClassCompiler {
 			return type;
 		}
 
-		private IConstructor invokeSuper(String superclass, IConstructor sig, IList args, int line) {
+		private void invokeSuper(String superclass, IConstructor sig, IList args, int line) {
 			loadExp("this", line);
 			expressions(args, line);
 			lineNumber(line);
 			method.visitMethodInsn(Opcodes.INVOKESPECIAL, superclass, "<init>", Signature.constructor(sig), false);
-			return Types.voidType();
+			return;
 		}
 
 		private void aastoreStat(IConstructor array, IConstructor index, IConstructor arg, int parentLine) {

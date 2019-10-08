@@ -385,6 +385,9 @@ default list[Instruction] stmts(list[Instruction] st) = st;
 list[Instruction] exprs([*Instruction pre, exp(e), /[AIFLD]STORE/(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
   = exprs([*pre, stat(store(name, e)), *mid, lv, *post]);
   
+list[Instruction] exprs([*Instruction pre, exp(arr), exp(ind), exp(arg), /[AIFLDCSB]ASTORE/(), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
+  = exprs([*pre, stat(astore(arr, ind, arg)), *mid, lv, *post]);  
+  
 // stores the name of catch clause variables at the position of the handler:  
 list[Instruction] exprs([*Instruction pre, tc:TRYCATCH(_,  _, _, handler), *Instruction other, LABEL(str handler), ASTORE(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
   = exprs([*pre, tc, *other, LABEL(handler), exp(load(name)) /* temporary */, *mid, lv, *post]);  

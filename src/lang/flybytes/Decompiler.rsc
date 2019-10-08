@@ -7,22 +7,22 @@ import String;
 import List; 
  
 @synopsis{Decompile a JVM classfile to Flybytes ASTs, recovering statement and expression structures.}
-Class decompile(loc classFile) throws IO { 
+Class decompile(loc classFile, bool cleanup=true) throws IO { 
   cls = disassemble(classFile);
   
-  return cls[methods = [decompile(m) | m <- cls.methods]];
+  return cls[methods = [decompile(m, cleanup=cleanup) | m <- cls.methods]];
 }
  
-Method decompile(loc classFile, str methodName) {
+Method decompile(loc classFile, str methodName, bool cleanup=true) {
   cls = disassemble(classFile);
   if (Method m <- cls.methods, m.desc?, m.desc.name?, m.desc.name == methodName) {
-    return decompile(m);
+    return decompile(m, cleanup=cleanup);
   }
   
   throw "no method named <methodName> exists in this class: <for (m <- cls.methods, m.desc?, m.desc.name?) {><m.desc.name> <}>";
 }
 
-Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {  
+Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)]), bool cleanup=true) {  
   withoutLines = lines(instrs);
   withJumps = jumps(withoutLines);
   withoutLabels = labels(withJumps);
@@ -32,8 +32,7 @@ Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)])) {
   done = visit ([asm(withDecls)]) {
     case list[Stat] l => clean(l)
   }
-  return m[block=[asm(withDecls)]];
-  //return m[block=done];  
+  return cleanup? m[block=done] : m[block=[asm(withDecls)]];  
 }
 
 Method decompile(Method m:static([asm(list[Instruction] instrs)])) {  
@@ -45,8 +44,7 @@ Method decompile(Method m:static([asm(list[Instruction] instrs)])) {
   done = visit ([asm(withStat)]) {
     case list[Stat] l => clean(l)
   }
-  //return m[block=[asm(withStat)]];  
-  return m[block=done];
+  return cleanup? m[block=done] : m[block=[asm(withStat)]]; 
 }
 
 Method decompile(Method m) = m when \abstract in m.modifiers; 
@@ -127,7 +125,13 @@ default list[Instruction] decls(list[Instruction] l, list[Formal] _) = l;
 list[Instruction] stmts([*Instruction pre, exp(a), exp(b), /IF_[IA]CMP<op:EQ|NE|LT|GE|LE>/(str l1), *Instruction thenPart, LABEL(l1), *Instruction post]) 
   = stmts([*pre, stat(\if(invertedCond(op)(a, b), [asm(stmts(thenPart))])), LABEL(l1), *post]);
 
-list[Instruction] stmts([*Instruction pre, exp(a), /IF<op:NULL|NONNULL|EQ|NE|LT|GT|LE>/(l1), *Instruction thenPart, LABEL(l1), *Instruction post]) 
+list[Instruction] stmts([*Instruction pre, exp(a), IFNULL(l1), *Instruction thenPart, LABEL(l1), *Instruction post]) 
+  = stmts([*pre, stat(\if(ne(a, null()), [asm(stmts(thenPart))])), *post]);
+  
+  list[Instruction] stmts([*Instruction pre, exp(a), IFNONNULL(l1), *Instruction thenPart, LABEL(l1), *Instruction post]) 
+  = stmts([*pre, stat(\if(eq(a, null()), [asm(stmts(thenPart))])), *post]);
+
+list[Instruction] stmts([*Instruction pre, exp(a), /IF<op:EQ|NE|LT|GT|LE>/(l1), *Instruction thenPart, LABEL(l1), *Instruction post]) 
   = stmts([*pre, stat(\if(invertedCond(op)(a, const(byte(), 0)), [asm(stmts(thenPart))])), *post]);
   
 list[Instruction] stmts([*Instruction pre, stat(\if(c ,[asm([*Instruction thenPart, GOTO(l1)])])), LABEL(_), *Instruction elsePart, LABEL(l1), *Instruction post]) 
@@ -472,8 +476,14 @@ list[Instruction] exprs([*Instruction pre, BIPUSH(int i), *Instruction post])
 list[Instruction] exprs([*Instruction pre, exp(a), exp(b), /IF_[IA]CMP<op:EQ|NE|LT|GE|LE>/(str l1), exp(ifBranch), GOTO(str l2), LABEL(l1), exp(elseBranch), LABEL(l2), *Instruction post]) 
   = exprs([*pre, exp(cond(invertedCond(op)(a, b), ifBranch, elseBranch)), LABEL(l2), *post]);
 
-list[Instruction] exprs([*Instruction pre, exp(a), /IF<op:NULL|NONNULL|EQ|NE|LT|GT|LE>/(str l1), exp(ifBranch), GOTO(str l2), LABEL(l1), exp(elseBranch), LABEL(l2), *Instruction post]) 
+list[Instruction] exprs([*Instruction pre, exp(a), /IF<op:EQ|NE|LT|GT|LE>/(str l1), exp(ifBranch), GOTO(str l2), LABEL(l1), exp(elseBranch), LABEL(l2), *Instruction post]) 
   = exprs([*pre, exp(cond(invertedCond(op)(a, const(byte(), 0)), ifBranch, elseBranch)), LABEL(l2), *post]);
+
+list[Instruction] exprs([*Instruction pre, exp(a), IFNULL(str l1), exp(ifBranch), GOTO(str l2), LABEL(l1), exp(elseBranch), LABEL(l2), *Instruction post]) 
+  = exprs([*pre, exp(cond(ne(a, null()), ifBranch, elseBranch)), LABEL(l2), *post]);
+  
+list[Instruction] exprs([*Instruction pre, exp(a), IFNONNULL(str l1), exp(ifBranch), GOTO(str l2), LABEL(l1), exp(elseBranch), LABEL(l2), *Instruction post]) 
+  = exprs([*pre, exp(cond(eq(a, null()), ifBranch, elseBranch)), LABEL(l2), *post]);
 
 // short-circuit AND(a,b) 
 list[Instruction] exprs(

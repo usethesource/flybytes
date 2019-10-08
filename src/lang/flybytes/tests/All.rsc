@@ -16,3 +16,4 @@ extend lang::flybytes::tests::OtherExpressionTests;
 extend lang::flybytes::tests::CatchTests;
 extend lang::flybytes::tests::MonitorTests;
 extend lang::flybytes::tests::AnnotationTests;
+extend lang::flybytes::tests::DecompileTests;

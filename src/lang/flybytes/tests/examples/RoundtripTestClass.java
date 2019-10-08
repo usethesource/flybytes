@@ -1,4 +1,4 @@
-package lang.flybytes.tests;
+package lang.flybytes.tests.examples;
 
 public class RoundtripTestClass {
 	int ofield1 = 1;
@@ -22,7 +22,7 @@ public class RoundtripTestClass {
 	}
 	
 	int simpleWhileLoop(int x) {
-		while (x < 10) {
+		while (x < 10) { 
 			x++;
 		}
 		

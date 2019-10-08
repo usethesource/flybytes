@@ -451,9 +451,12 @@ list[Instruction] exprs([*Instruction pre, *Instruction args, INVOKESTATIC(cls, 
   = exprs([*pre, exp(invokeStatic(cls, methodDesc(ret, name, formals), [e | exp(e) <- args])), *post])
   when (args == [] && formals == []) || all(a <- args, a is exp), size(args) == size(formals);
     
-list[Instruction] exprs([*Instruction pre, exp(const(integer(), int arraySize)), ANEWARRAY(typ), *Instruction elems, *Instruction post]) 
-  = exprs([*pre, exp(newArray(typ, [e | [*_, DUP(), exp(const(integer(), _)), exp(e), AASTORE(), *_] := elems])), *post])
+list[Instruction] exprs([*Instruction pre, exp(const(Type intType, int arraySize)), ANEWARRAY(typ), *Instruction elems, *Instruction post]) 
+  = exprs([*pre, exp(newArray(typ, [e | [*_, DUP(), exp(const(intType, _)), exp(e), AASTORE(), *_] := elems])), *post])
   when size(elems) == 4 * arraySize;
+  
+default list[Instruction] exprs([*Instruction pre, exp(Exp sizeExp:const(Type intType, int arraySize)), ANEWARRAY(typ), *Instruction post]) 
+  = exprs([*pre, exp(newArray(typ, sizeExp)), *post]);
 
 list[Instruction] exprs([*Instruction pre, GETSTATIC(cls, name, typ), *Instruction post]) 
   = exprs([*pre, exp(getStatic(cls, typ, name)), *post]);
@@ -588,6 +591,9 @@ list[Stat] clean([*Stat pre, asm([*Instruction preI, exp(a), *Instruction postI]
   
 list[Stat] clean([*Stat pre, asm([]), *Stat post])
   = clean([*pre, *post]);
+  
+list[Stat] clean([*Stat pre, \do(cond(Exp c, Exp i, Exp t)), *Stat post])
+  = clean([*pre, \if(c, [\do(i)], [\do(t)]), *post]);
    
 default list[Stat] clean(list[Stat] x) = x; 
 

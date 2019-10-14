@@ -2,6 +2,7 @@ module lang::flybytes::tests::MirrorTests
 
 import lang::flybytes::Mirror;
 import lang::flybytes::api::JavaLang;
+import lang::flybytes::Syntax;
 
 test bool intId(int v) = v % maxValue(integer()) == integer(integer(v % maxValue(integer())));
 test bool longId(int v) = v % maxValue(long()) == long(long(v % maxValue(long())));

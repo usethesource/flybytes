@@ -62,7 +62,7 @@ test bool testGt(int i, int j)
          J := (j % maxValue(t)),
          testCmpOp(cmpOpClass(t, gt), t, prim(t, I), prim(t, J), I > J)); 
          
-test bool testGe(int i, int j) 
+test bool testGeInt(int i, int j) 
   = all (t <- intTypes, 
          I := (i % maxValue(t)),
          J := (j % maxValue(t)),
@@ -104,7 +104,7 @@ test bool testGt(real i, real j)
          J := fit(t, 1. / (j + .1)),
          testCmpOp(cmpOpClass(t, gt), t, prim(t, I), prim(t, J), I > J));
 
-test bool testGe(real i, real j) 
+test bool testGeReal(real i, real j) 
   = all (t <- floatTypes, 
          I := fit(t, 1. / (i + .1)),
          J := fit(t, 1. / (j + .1)),

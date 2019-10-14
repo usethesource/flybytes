@@ -107,7 +107,7 @@ test bool testSub(int i, int j)
          J := ((j % maxValue(t)) / 2),
          testBinOp(binOpClass(t, sub), t, I, J, I - J));
          
-test bool testDiv(int i, int j) 
+test bool testDivInt(int i, int j) 
   = all (t <- exactArithmeticTypes,
          I := (i % maxValue(t)),
          J := abs(((j % maxValue(t)) / 2)) + 1, // never 0, 
@@ -139,7 +139,7 @@ test bool testSub(real i, real j)
          J := fit(t, 1. / (j + .1)), // stick with numbers in +/-[0,1] we can manage
          testBinOpRange(binOpClass(t, sub), t, I, J, fit(t, I - J)));
          
-test bool testDiv(real i, real j) 
+test bool testDivReal(real i, real j) 
   = all (t <- floatingPointTypes,
          I := fit(t, 1. / (i + .1)), // stick with numbers in [0,1] we can manage,
          J := abs(fit(t, (1. / (j + .1)) + 1.)), // // stick with numbers in [1,2] we can manage 

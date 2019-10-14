@@ -366,7 +366,7 @@ list[Instruction] stmts([*Instruction pre, exp(a), exp(b), /IF<op:EQ|NE|LT|GE|LE
   = stmts([*pre, stat(\if(condOp(op)(a,b),[asm([GOTO(label)])])), *post]);  
   
 list[Instruction] stmts([*Instruction pre, GOTO(str cond), LABEL(str body), *Instruction b, LABEL(cond), stat(\if(Exp c, [asm([GOTO(body)])])), *Instruction post]) 
-  = stmts([*pre, stat(\while(c,[asm(stmts(b))])), *post]);  
+  = stmts([*pre, stat(\while(c,[asm(fixContinues(stmts(b), cond))], label=cond)), *post]);  
   
 list[Instruction] stmts([*Instruction pre, LABEL(str body), *Instruction c, stat(\if(Exp co, [asm([GOTO(body)])])), *Instruction post]) 
   = stmts([*pre, stat(\doWhile([asm(stmts(c))], co)), *post]);
@@ -618,6 +618,10 @@ default list[Stat] clean(list[Stat] x) = x;
   case [*Instruction pre, GOTO(joinLabel), *Instruction post] => [*pre, *post]
 }; 
 
+&T fixContinues(&T input, str label) = visit(input) {
+  case GOTO(label) => \stat(\continue(label=label))
+};
+
 // HELPER predicates
 
 bool isSideEffectFree(\true()) = true;
@@ -632,6 +636,7 @@ default bool isSideEffectFree(Exp _) = false;
 Exp recover(const(Type _, 0), \boolean()) = \false();
 Exp recover(const(Type _, 1), \boolean()) = \true();
 default Exp recover(Exp e, Type t) = e;
+
 
 // GENERAL normalization/simplification rules
 

@@ -371,12 +371,16 @@ list[Instruction] stmts([*Instruction pre, GOTO(str cond), LABEL(str body), *Ins
 list[Instruction] stmts([*Instruction pre, LABEL(str body), *Instruction c, stat(\if(Exp co, [asm([GOTO(body)])])), *Instruction post]) 
   = stmts([*pre, stat(\doWhile([asm(stmts(c))], co)), *post]);
 
-list[Instruction] stmts([*Instruction pre, stat(first:store(str name,_)), stat(\while(c, [asm([*Instruction b, stat(next:/store|incr/(name,_))])])), *Instruction post]) 
-  = stmts([*pre, stat(\for([first], c, [next], [asm(stmts(b))])), *post]);
+list[Instruction] stmts([*Instruction pre, stat(first:store(str name,_)), stat(\while(c, [asm([*Instruction b, stat(next)])])), *Instruction post]) 
+  = stmts([*pre, stat(\for([first], c, [next], [asm(stmts(b))])), *post])
+  when store(name,_) := next || do(inc(name, _)) := next
+  ;
   
 // fold in multiple inits and nexts in for loop  
-list[Instruction] stmts([*Instruction pre, stat(first:store(str name, _)), stat(\for(firsts, c, nexts, [asm([*Instruction b, stat(next:/store|incr/(name,_))])])), *Instruction post]) 
-  = stmts([*pre, stat(\for([first,*firsts], c, [next, *nexts], [asm(stmts(b))])), *post]);     
+list[Instruction] stmts([*Instruction pre, stat(first:store(str name, _)), stat(\for(firsts, c, nexts, [asm([*Instruction b, stat(next)])])), *Instruction post]) 
+  = stmts([*pre, stat(\for([first,*firsts], c, [next, *nexts], [asm(stmts(b))])), *post])
+  when store(name,_) := next || do(inc(name, _)) := next
+  ;     
                                               
 default list[Instruction] stmts(list[Instruction] st) = st;
 
@@ -398,7 +402,7 @@ list[Instruction] exprs([*Instruction pre, tc:TRYCATCH(_,  _, _, handler), *Inst
   = exprs([*pre, tc, *other, LABEL(handler), exp(load(name)) /* temporary */, *mid, lv, *post]);  
   
 list[Instruction] exprs([*Instruction pre, IINC(int var, int i), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
-  = exprs([*pre, stat(incr(name, i)), *mid, lv, *post]);
+  = exprs([*pre, exp(inc(name, i)), *mid, lv, *post]);
     
 list[Instruction] exprs([*Instruction pre, /[AIFLD]LOAD/(int var), *Instruction mid, Instruction lv:LOCALVARIABLE(str name, _, _, _, var), *Instruction post]) 
   = exprs([*pre, exp(load(name)), *mid, lv, *post]);

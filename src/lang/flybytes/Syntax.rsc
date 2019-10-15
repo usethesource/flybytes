@@ -155,7 +155,6 @@ data Stat(loc src = |unknown:///|)
   | \decl(Type \type, str name, Exp init = defVal(\type))
   | \astore(Exp array, Exp index, Exp arg)
   | \do(Exp exp) 
-  | \incr(str name, int inc)
   | \return()
   | \return(Exp arg)
   | \putField(Type class, Exp receiver, Type \type, str name, Exp arg)
@@ -454,6 +453,8 @@ Exp defVal(string()) = null();
  // generating methods and constructors:
  
 Type object() = object("java.lang.Object");
+
+Stat incr(str name, int i) = \do(inc(name, i));
 
 Stat invokeSuper(list[Type] formals, list[Exp] args)
   = invokeSuper(constructorDesc(formals), args);

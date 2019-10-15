@@ -13,12 +13,14 @@ Class defParamClass() {
     );
 }
 
+@ignore{this feature is not fully implemented}
 test bool testDefParamSet() { 
   m = loadClass(defParamClass());
   // if you pass a string, you get the string back
   return m.invokeStatic(methodDesc(string(), "testMethod", [string()]), [prim(string(), "bye!")]).toValue(#str) == "bye!";
 }
 
+@ignore{this feature is not fully implemented yet}
 test bool testDefParamUnSet() { 
   m = loadClass(defParamClass());
   // if you pass 'null' you get the default initializer expression for the parameter

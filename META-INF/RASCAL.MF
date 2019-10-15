@@ -1,6 +1,8 @@
 Manifest-Version: 0.0.1
+Project-Name: flybytes
 Main-Function: main
 Courses: courses
 Main-Module: Plugin
 Source: src
+Require-Libraries: lib/rascal-asm-7.0-beta.jar,lib/rascal-asm-analysis-7.0-beta.jar,lib/rascal-asm-commons-7.0-beta.jar,lib/rascal-asm-tree-7.0-beta.jar,lib/rascal-asm-util-7.0-beta.jar 
 

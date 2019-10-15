@@ -483,7 +483,7 @@ Method staticMethod(Modifier access, Type ret, str name, list[Formal] args, list
            modifiers={static(), access});
 
 // constructor shorthand with arguments and code 
-//   NB: don't forget to generate super call in the block!    
+//   NB: don't forget to generate a super call in the block!    
 Method constructor(Modifier access, list[Formal] formals, list[Stat] block)
   = method(constructorDesc([ var.\type | var <- formals]), formals, block, modifiers={access});
   

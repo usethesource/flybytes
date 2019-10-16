@@ -442,6 +442,10 @@ list[Instruction] exprs([*Instruction pre, exp(a), /[IFLD]NEG/(), *Instruction p
 list[Instruction] exprs([*Instruction pre, exp(Exp a), exp(Exp b), /[LFDI]<op:(ADD|SUB|MUL|DIV|REM|SHL|SHR|AND|OR|XOR|ALOAD)>/(), *Instruction post]) 
   = exprs([*pre, exp(binOp(op)(a,b)), *exprs(post)]);
 
+list[Instruction] exprs([*Instruction pre, *Instruction args, INVOKEDYNAMIC(methodDesc(ret, name, formals), BootstrapCall handle), *Instruction post]) 
+  = exprs([*pre, exp(invokeDynamic(handle, methodDesc(ret, name, formals), [e | exp(Exp e) <- args])), *post])
+  when (args == [] && formals == []) || all(a <- args, a is exp), size(args) == size(formals);
+  
 list[Instruction] exprs([*Instruction pre, exp(Exp r), *Instruction args, INVOKEVIRTUAL(cls, methodDesc(ret, name, formals), _), *Instruction post]) 
   = exprs([*pre, exp(invokeVirtual(cls, r, methodDesc(ret, name, formals), [e | exp(Exp e) <- args])), *post])
   when (args == [] && formals == []) || all(a <- args, a is exp), size(args) == size(formals);

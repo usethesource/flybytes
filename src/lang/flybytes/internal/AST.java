@@ -813,13 +813,8 @@ public class AST {
     return vf.constructor(_CallSiteInfo_virtualHandle_3 , $class, vf.string($name), $desc);
   }
   
-  public IConstructor CallSiteInfo_doubleInfo(int $d) {
-      
-    if (!vf.integer($d).getType().isSubtypeOf(tf.integerType())) {
-      throw new IllegalArgumentException("Expected " + tf.integerType() + " but got " + vf.integer($d).getType() + " for vf.integer($d):" + vf.integer($d));
-    }
-    
-    return vf.constructor(_CallSiteInfo_doubleInfo_1 , vf.integer($d));
+  public IConstructor CallSiteInfo_doubleInfo(double $d) {
+    return vf.constructor(_CallSiteInfo_doubleInfo_1 , vf.real($d));
   }
   
   public IConstructor CallSiteInfo_classInfo(String $name) {
@@ -866,21 +861,11 @@ public class AST {
     return vf.constructor(_CallSiteInfo_stringInfo_1 , vf.string($s));
   }
   
-  public IConstructor CallSiteInfo_floatInfo(int $f) {
-      
-    if (!vf.integer($f).getType().isSubtypeOf(tf.integerType())) {
-      throw new IllegalArgumentException("Expected " + tf.integerType() + " but got " + vf.integer($f).getType() + " for vf.integer($f):" + vf.integer($f));
-    }
-    
-    return vf.constructor(_CallSiteInfo_floatInfo_1 , vf.integer($f));
+  public IConstructor CallSiteInfo_floatInfo(float $f) {
+    return vf.constructor(_CallSiteInfo_floatInfo_1 , vf.real($f));
   }
   
-  public IConstructor CallSiteInfo_longInfo(int $l) {
-      
-    if (!vf.integer($l).getType().isSubtypeOf(tf.integerType())) {
-      throw new IllegalArgumentException("Expected " + tf.integerType() + " but got " + vf.integer($l).getType() + " for vf.integer($l):" + vf.integer($l));
-    }
-    
+  public IConstructor CallSiteInfo_longInfo(long $l) {
     return vf.constructor(_CallSiteInfo_longInfo_1 , vf.integer($l));
   }
   

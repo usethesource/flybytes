@@ -8,6 +8,7 @@ import java.util.Map;
 
 import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
 import org.rascalmpl.objectweb.asm.ClassReader;
+import org.rascalmpl.objectweb.asm.Handle;
 import org.rascalmpl.objectweb.asm.Opcodes;
 import org.rascalmpl.objectweb.asm.Type;
 import org.rascalmpl.objectweb.asm.tree.AbstractInsnNode;
@@ -17,6 +18,7 @@ import org.rascalmpl.objectweb.asm.tree.FieldNode;
 import org.rascalmpl.objectweb.asm.tree.IincInsnNode;
 import org.rascalmpl.objectweb.asm.tree.InsnList;
 import org.rascalmpl.objectweb.asm.tree.IntInsnNode;
+import org.rascalmpl.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.rascalmpl.objectweb.asm.tree.JumpInsnNode;
 import org.rascalmpl.objectweb.asm.tree.LabelNode;
 import org.rascalmpl.objectweb.asm.tree.LdcInsnNode;
@@ -545,6 +547,11 @@ public class ClassDisassembler {
 							   ((MethodInsnNode) instr).desc),
 					((MethodInsnNode) instr).itf
 					);
+		case Opcodes.INVOKEDYNAMIC:
+		    InvokeDynamicInsnNode invokeDynamicNode = (InvokeDynamicInsnNode) instr;
+            return ast.Instruction_INVOKEDYNAMIC(
+		            descriptor(invokeDynamicNode.name, invokeDynamicNode.desc),
+		            handle(invokeDynamicNode.bsm, invokeDynamicNode.bsmArgs));
 		case Opcodes.NEWARRAY:
 			return ast.Instruction_NEWARRAY(type(((TypeInsnNode) instr).desc));
 		case Opcodes.NEW:
@@ -558,9 +565,6 @@ public class ClassDisassembler {
 		case Opcodes.MULTIANEWARRAY:
 			return ast.Instruction_MULTIANEWARRAY(typeName(((MultiANewArrayInsnNode) instr).desc), 
 					((MultiANewArrayInsnNode) instr).dims); 
-		case Opcodes.INVOKEDYNAMIC:
-			// TODO
-			return ast.Instruction_NOP();
 		case -1: // LABELNODE & LINENUMBER NODE
 			if (instr instanceof LabelNode) {
 				return ast.Instruction_LABEL(((LabelNode) instr).getLabel().toString());
@@ -574,7 +578,55 @@ public class ClassDisassembler {
 		throw new IllegalArgumentException("unrecognized instruction: " + instr);
 	}
 
-	private IConstructor lookupSwitchInstruction(LookupSwitchInsnNode instr) {
+	private IConstructor handle(Handle bootstrapMethod, Object[] bootstrapMethodArgs) {
+	    IConstructor cls = typeName(bootstrapMethod.getOwner());
+	    IConstructor descriptor = descriptor(bootstrapMethod.getName(), bootstrapMethod.getDesc());
+	    
+	    return ast.BootstrapCall_bootstrap(cls, descriptor, bootstrapArgs(bootstrapMethodArgs));
+    }
+
+    private IList bootstrapArgs(Object[] bootstrapMethodArgs) {
+        IListWriter w = VF.listWriter();
+        
+        for (Object arg : bootstrapMethodArgs) {
+            w.append(bootstrapArg(arg));
+        }
+        
+        return w.done();
+    }
+
+    private IValue bootstrapArg(Object arg) {
+        if (arg instanceof String) {
+            return ast.CallSiteInfo_stringInfo((String) arg);
+        }
+        else if (arg instanceof Integer) {
+            return ast.CallSiteInfo_integerInfo((int) arg);
+        }
+        else if (arg instanceof Double) {
+            return ast.CallSiteInfo_doubleInfo((double) arg);
+        }
+        else if (arg instanceof Long) {
+            return ast.CallSiteInfo_longInfo((long) arg);
+        }
+        else if (arg instanceof Class<?>) {
+            return ast.CallSiteInfo_classInfo(((Class<?>) arg).getName());
+        }
+        else if (arg instanceof Type) {
+            Type t = (Type) arg;
+            switch (t.getSort()) {
+            case Type.METHOD:
+                return ast.CallSiteInfo_methodTypeInfo(descriptor("$anonymous", t.getDescriptor()));
+            }
+        }
+        else if (arg instanceof Handle) {
+            Handle h = (Handle) arg;
+            return ast.CallSiteInfo_virtualHandle(typeName(h.getOwner()), h.getName(), descriptor(h.getName(), h.getDesc()));
+        }
+        
+        throw new IllegalArgumentException("no support for this bootstrap argument yet: " + arg);
+    }
+
+    private IConstructor lookupSwitchInstruction(LookupSwitchInsnNode instr) {
 		IListWriter labels = VF.listWriter();
 		for (LabelNode l : instr.labels) {
 			labels.append(VF.string(l.getLabel().toString()));

@@ -591,8 +591,8 @@ data CallSiteInfo
   | classInfo(str name)
   | integerInfo(int i)
   | longInfo(int l)
-  | floatInfo(int f)
-  | doubleInfo(int d)
+  | floatInfo(real f)
+  | doubleInfo(real d)
   | methodTypeInfo(Signature desc)
   | // see MethodHandles.lookup().findVirtual for more information
     virtualHandle(Type class, str name, Signature desc)

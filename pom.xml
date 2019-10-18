@@ -1,0 +1,134 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>io.usethesource</groupId>
+		<artifactId>pom-parent</artifactId>
+		<version>0.2.0-SNAPSHOT</version>
+	</parent>
+
+	<groupId>org.rascalmpl</groupId>
+	<artifactId>flybytes</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>eclipse-plugin</packaging>
+
+	<scm>
+		<developerConnection>scm:git:ssh://git@github.com/cwi-swat/flybytes.git</developerConnection>
+	</scm>
+
+	<build>
+		<sourceDirectory>src</sourceDirectory>
+		<resources>
+			<resource>
+				<directory>src</directory>
+				<excludes>
+					<exclude>**/*.java</exclude>
+					<exclude>**/*.class</exclude>
+				</excludes>
+			</resource>
+			<resource>
+				<directory>.</directory>
+				<filtering>false</filtering>
+				<includes>
+					<include>META-INF/RASCAL.MF</include>
+					<include>src/**/*.rsc</include>
+				</includes>
+			</resource>
+		</resources>
+		<testSourceDirectory>src</testSourceDirectory>
+
+		<plugins>
+			<plugin>
+				<groupId>org.rascalmpl</groupId>
+				<artifactId>rascal-maven-plugin</artifactId>
+				<version>0.0.1-SNAPSHOT</version>
+				<configuration>
+					<bin>${project.build.outputDirectory}</bin>
+					<srcs>
+						<src>${project.basedir}/src</src>
+					</srcs>
+					<errorsAsWarnings>true</errorsAsWarnings>
+				</configuration>
+				<executions>
+					<execution>
+						<id>flybytes-compile</id>
+						<phase>compile</phase>
+						<goals>
+							<goal>compile-rascal</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.0.0-M3</version>
+				<executions>
+					<execution>
+						<id>test</id>
+						<phase>test</phase>
+						<configuration>
+							<argLine>
+								-ea
+								-Xmx2G
+								-Xss128m
+								-Dfile.encoding=UTF-8
+							</argLine>
+							<includes>
+								<include>**/RunTests.java</include>
+							</includes>
+							<testSourceDirectory>${basedir}/src/</testSourceDirectory>
+							<testClassesDirectory>${project.build.directory}/classes/</testClassesDirectory>
+						</configuration>
+						<goals>
+							<goal>test</goal>
+						</goals>
+					</execution>
+				</executions>
+
+			</plugin>
+		</plugins>
+	</build>
+
+	<repositories>
+		<repository>
+			<id>usethesource-rascalmpl-unstable</id>
+			<layout>p2</layout>
+			<url>https://update.rascal-mpl.org/unstable/</url>
+		</repository>
+	</repositories>
+
+	<!-- deployment configuration (usethesource) -->
+	<distributionManagement>
+		<repository>
+			<id>usethesource-releases</id>
+			<url>http://nexus.usethesource.io/content/repositories/releases/</url>
+		</repository>
+		<snapshotRepository>
+			<id>usethesource-snapshots</id>
+			<url>http://nexus.usethesource.io/content/repositories/snapshots/</url>
+		</snapshotRepository>
+	</distributionManagement>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>usethesource</id>
+			<url>http://nexus.usethesource.io/content/repositories/public/</url>
+		</pluginRepository>
+	</pluginRepositories>
+
+	<dependencies>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.12</version>
+		</dependency>
+		<dependency>
+			<groupId>org.rascalmpl</groupId>
+			<artifactId>rascal</artifactId>
+			<version>0.13.0-SNAPSHOT</version>
+		</dependency>
+	</dependencies>
+</project>

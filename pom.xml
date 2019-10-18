@@ -77,7 +77,7 @@
 								-Dfile.encoding=UTF-8
 							</argLine>
 							<includes>
-								<include>**/RunTests.java</include>
+								<include>**/*Tests.java</include>
 							</includes>
 							<testSourceDirectory>${basedir}/src/</testSourceDirectory>
 							<testClassesDirectory>${project.build.directory}/classes/</testClassesDirectory>

@@ -639,7 +639,7 @@ bool isSideEffectFree(\aload(_,_)) = true;
 bool isSideEffectFree(null()) = true;
 bool isSideEffectFree(const(_,_)) = true;
 default bool isSideEffectFree(Exp _) = false;
-
+ 
 // RECOVERY OF TYPE SPECIFIC CONSTANTS
 Exp recover(const(Type _, 0), \boolean()) = \false();
 Exp recover(const(Type _, 1), \boolean()) = \true();

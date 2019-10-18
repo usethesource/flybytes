@@ -16,7 +16,7 @@ node {
             }
 
             stage('Packaging') {
-                sh "mvn clean package"
+                sh "mvn package"
             }
 
             stage('Deploy') {

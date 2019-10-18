@@ -493,14 +493,14 @@ Exp new(Type class, list[Type] argTypes, list[Exp] args)
   
 // "new" short-hand, without parameters  
 Exp new(Type class) = new(class, [], []);
-     
+      
 // Load the standard "this" reference for every object. 
 // NB! This works only inside non-static methods and inside constructors 
 Exp this() = load("this");
 
 // the "<current>" class refers to the class currently being generated
 private Type CURRENT = object("\<current\>");
-
+ 
 Type current() = CURRENT;
 
 // Load a field from the currently defined class

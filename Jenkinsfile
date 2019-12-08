@@ -33,7 +33,6 @@ node {
         }
 
         build job: '../rascal-eclipse-libraries/master', wait: false
-        build job: '../rascal-core-plugin/master', wait: false
     } catch (e) {
         slackSend (color: '#d9534f', message: "FAILED: <${env.BUILD_URL}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>")
             throw e

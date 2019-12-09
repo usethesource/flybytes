@@ -289,7 +289,8 @@ list[Instruction] stmts(
 
 
           
-// In the case of a finally block, things are different. This pattern heavily relies on backtracking to identify repetitions of the finally block:  
+// In the case of a finally block, things are different. This pattern heavily relies on backtracking to identify repetitions of the finally block.
+// Also the pattern exploits the fact that the finally handler code is duplicated by the compiler for accurate decompilation.   
 list[Instruction] stmts(
   [ *Instruction pre,
  	TRYCATCH(Type typ, str from, str to, str handler, handlers=hs),
@@ -297,14 +298,14 @@ list[Instruction] stmts(
 	LABEL(from),
 	*Instruction tryBlock,
 	LABEL(to),
-	*Instruction finallyHandlerBlock,
+	*Instruction finallyHandlerBlock, // the boundary with endTryBlock is implicit, but guarded by the exact re-occurrence of the finallyHandlerBlock block later
 	*Instruction endTryBlock,
 	TRYCATCH(_, handler, str endHandler, finallyHandler),
 	LABEL(handler),
 	exp(load(str var)),
 	*Instruction handlerBlock,
 	LABEL(endHandler),
-	*finallyHandlerBlock,
+	*finallyHandlerBlock, // guarded duplicate helps to identify the width of the finally handler before
 	*Instruction endHandlerBlock,
 	LABEL(finallyHandler),
 	ASTORE(int eTmp),
@@ -548,7 +549,7 @@ Type typ("Z") = boolean();
 
 alias BinOp = Exp (Exp, Exp);
 
-BinOp invertedCond("EQ") = ne;
+BinOp invertedCond("EQ") = ne; 
 BinOp invertedCond("NE") = eq;
 BinOp invertedCond("LT") = ge;
 BinOp invertedCond("GE") = lt;

@@ -18,7 +18,7 @@ import ParseTree;
 void testFactorial() {
   Program tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/pico/fac.pico|).top;
   compileProgram(tree, "Factorial", |project://flybytes/generated|);
-}
+} 
 
 void testITE() {
   Program tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/pico/ite.pico|).top;

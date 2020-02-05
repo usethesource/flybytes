@@ -274,4 +274,4 @@ Class doWhileClass() {
     );
 } 
 
-test bool testNormalDoWhile() = testForClass(doWhileClass());
+test bool testNormalDoWhile2() = testForClass(doWhileClass());

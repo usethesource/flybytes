@@ -76,29 +76,29 @@ test bool testLe(int i, int j)
             
 list[Type] floatTypes = [float(), double()];
 
-test bool testEqTrue(real r) 
+test bool testEqTrue2(real r) 
   = all (t <- floatTypes, 
          I := 1. / (r + .1),
          testCmpOp(cmpOpClass(t, eq), t, prim(t, I), prim(t, I), true));
          
-test bool testEqFalse(real r) 
+test bool testEqFalse2(real r) 
   = all (t <- floatTypes, 
          I := 1. / (r + .1),
          testCmpOp(cmpOpClass(t, eq), t, prim(t, I), prim(t, I + .1), false));         
 
-test bool testLe(real i, real j) 
+test bool testLe2(real i, real j) 
   = all (t <- floatTypes, 
          I := fit(t, 1. / (i + .1)),
          J := fit(t, 1. / (j + .1)),
          testCmpOp(cmpOpClass(t, le), t, prim(t, I), prim(t, J), I <= J));
          
-test bool testLt(real i, real j) 
+test bool testLt2(real i, real j) 
   = all (t <- floatTypes, 
          I := fit(t, 1. / (i + .1)),
          J := fit(t, 1. / (j + .1)),
          testCmpOp(cmpOpClass(t, lt), t, prim(t, I), prim(t, J), I < J));
  
-test bool testGt(real i, real j) 
+test bool testGt2(real i, real j) 
   = all (t <- floatTypes, 
          I := fit(t, 1. / (i + .1)),
          J := fit(t, 1. / (j + .1)),
@@ -113,12 +113,12 @@ test bool testGeReal(real i, real j)
                                          
 list[Type] objectTypes = [object(), string(), array(integer())];
 
-test bool testEqTrue() 
+test bool testEqTrue3() 
   = all (t <- objectTypes, 
          v := make(t, 1),
          testCmpOp(cmpOpClass(t, eq), t, v, v, true));
 
-test bool testEqFalse(int i) 
+test bool testEqFalse3() 
   = all (t <- objectTypes, 
          v1 := make(t, 1),
          v2 := make(t, 2),

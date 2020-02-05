@@ -85,23 +85,23 @@ bool testUnOpRange(Class c, Type t, num arg, real answer) {
 
 list[Type] exactArithmeticTypes = [integer(), short(), byte(), long()];
 
-test bool testNeg(int i)
+test bool testNeg1(int i)
   = all(t <- exactArithmeticTypes,
         I := i % maxValue(t), testUnOp(unOpClass(t, neg), t, I, -1 * I));
         
-test bool testAdd(int i, int j) 
+test bool testAdd2(int i, int j) 
   = all (t <- exactArithmeticTypes,
          I := (i % maxValue(t)) / 2,
          J := (j % maxValue(t)) / 2, 
          testBinOp(binOpClass(t, add), t, I, J, I + J));
          
-test bool testMul(int i, int j) 
+test bool testMul2(int i, int j) 
   = all (t <- exactArithmeticTypes,
          I := (i % 10),
          J := (j % 10), 
          testBinOp(binOpClass(t, mul), t, I, J, I * J)); 
          
-test bool testSub(int i, int j) 
+test bool testSub2(int i, int j) 
   = all (t <- exactArithmeticTypes,
          I := (i % maxValue(t)) / 2,
          J := ((j % maxValue(t)) / 2),

@@ -106,6 +106,7 @@ data Field(list[Annotation] annotations = [], set[Modifier] modifiers = {\privat
          
 data Method(list[Annotation] annotations = [], loc src=|unknown:///|)
   = method(Signature desc, list[Formal] formals, list[Stat] block, set[Modifier] modifiers = {\public()})
+  | procedure(Signature desc, list[Formal] formals, list[Instruction] instructions, set[Modifier] modifiers = {\public()})
   | method(Signature desc, set[Modifier] modifiers={\abstract(), \public()})
   | static(list[Stat] block)
   ;
@@ -249,7 +250,7 @@ data Exp(loc src = |unknown:///|)
   | ge(Exp lhs, Exp rhs)
   | lt(Exp lhs, Exp rhs)
   | newArray(Type \type, Exp size)
-  | newArray(Type \type, list[Exp] args)
+  | newInitArray(Type \type, list[Exp] args)
   | alength(Exp arg)
   | checkcast(Exp arg, Type \type)
   | coerce(Type from, Type to, Exp arg)
@@ -581,7 +582,7 @@ Method bootstrapMethod(BootstrapCall b, list[Stat] body)
          var(object("java.lang.invoke.MethodHandles$Lookup"), "callerClass"),
          var(string(), "dynMethodName"),
          var(object("java.lang.invoke.MethodType"), "dynMethodType"),
-         *[var(callsiteInfoType(b.args[i]), "info_<i>") | i <- index(b.args), csi <- b.args]
+         *[var(callsiteInfoType(b.args[i]), "info_<i>") | i <- index(b.args)]
       ], 
       body, modifiers={\public(), \static()});
       

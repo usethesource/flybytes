@@ -176,7 +176,7 @@ public class ClassDisassembler {
 			return ast.Method_static(VF.list(ast.Stat_asm(instructions)));
 		}
 		else {
-			return ast.Method_method(desc, formals, VF.list(ast.Stat_asm(instructions)));
+			return ast.Method_procedure(desc, formals, instructions);
 		}
 	}
 

@@ -22,6 +22,9 @@ Method decompile(loc classFile, str methodName, bool cleanup=true) {
   throw "no method named <methodName> exists in this class: <for (m <- cls.methods, m.desc?, m.desc.name?) {><m.desc.name> <}>";
 }
 
+Method decompile(Method m:procedure(Signature d, list[Formal] f, list[Instruction] instrs, modifiers=set[Modifier] ms), bool cleanup=true) 
+  = decompile(method(d, f, [asm(instrs)], modifiers=ms), cleanup=cleanup); 
+
 Method decompile(Method m:method(_, _, [asm(list[Instruction] instrs)]), bool cleanup=true) {  
   withoutLines = lines(instrs);
   withJumps = jumps(withoutLines);
@@ -157,7 +160,7 @@ list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def
 // when the number of cases is odd, we have a single final case to fold in, which is always bracketed by the default label:  
 list[Instruction] stmts([*Instruction pre, TABLESWITCH(int from, int to, str def, list[str] keys, cases=cl), LABEL(str c1), *Instruction case1, LABEL(def), *Instruction post]) 
   = stmts([*pre, TABLESWITCH(from, to, def, keys, cases=cl+[<\case(size(before) + from, [asm(case1)]), c1>]), LABEL(def), *post]) 
-  when  [*before, c1, *after] := keys;
+  when  [*before, c1, *_] := keys;
   
 // now we can lift the TABLESWITCH statement to the switch statement (signalled by the empty case list and the immediate following of the def label)
 // Note this case only works if there is at least one break label to bracket the default case with:  
@@ -472,7 +475,7 @@ list[Instruction] exprs([*Instruction pre, *Instruction args, INVOKESTATIC(cls, 
   when (args == [] && formals == []) || all(a <- args, a is exp), size(args) == size(formals);
     
 list[Instruction] exprs([*Instruction pre, exp(const(Type intType, int arraySize)), ANEWARRAY(typ), *Instruction elems, *Instruction post]) 
-  = exprs([*pre, exp(newArray(typ, [e | [*_, DUP(), exp(const(intType, _)), exp(e), AASTORE(), *_] := elems])), *post])
+  = exprs([*pre, exp(newInitArray(typ, [e | [*_, DUP(), exp(const(intType, _)), exp(e), AASTORE(), *_] := elems])), *post])
   when size(elems) == 4 * arraySize;
   
 default list[Instruction] exprs([*Instruction pre, exp(Exp sizeExp:const(Type intType, int arraySize)), ANEWARRAY(typ), *Instruction post]) 

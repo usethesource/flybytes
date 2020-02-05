@@ -615,7 +615,12 @@ public class ClassCompiler {
 					fieldInitializers(classNode, method);
 				}
 
-				statements(AST.$getBlock(cons), methodStartLabel, methodEndLabel, methodEndLabel, getLineNumber(cons, parentLine));
+				if (AST.$is("procedure", cons)) {
+				    instructions(AST.$getInstructions(cons), methodEndLabel, methodEndLabel, methodEndLabel, getLineNumber(cons, parentLine));
+				}
+				else {
+				    statements(AST.$getBlock(cons), methodStartLabel, methodEndLabel, methodEndLabel, getLineNumber(cons, parentLine));
+				}
 
 				method.visitLabel(methodEndLabel);
 
@@ -649,7 +654,7 @@ public class ClassCompiler {
 			classNode.methods.add(method);
 		}
 
-		private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize, IList annotations, int line) {
+        private void declareVariable(IConstructor type, String name, IConstructor def, boolean alwaysInitialize, IList annotations, int line) {
 			int pos = variableNames.size();
 
 			variableTypes.add(type);
@@ -4097,7 +4102,7 @@ public class ClassCompiler {
 		public static IList $getBlock(IConstructor cons) {
 			return (IList) cons.get("block");
 		}
-
+		
 		public static IList $getMethodsParameter(IWithKeywordParameters<? extends IConstructor> kws) {
 			return (IList) kws.getParameter("methods");
 		}
@@ -4115,7 +4120,7 @@ public class ClassCompiler {
 		}
 
 		public static ISet $getModifiers(IConstructor o) {
-			return (ISet) o.get("modifiers");
+			return (ISet) o.asWithKeywordParameters().getParameter("modifiers");
 		}
 
 		public static String $getSuper(IWithKeywordParameters<? extends IConstructor> kws) {

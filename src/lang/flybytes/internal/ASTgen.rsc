@@ -49,10 +49,7 @@ public str generate(str apiName, list[type[value]] types) {
            'import io.usethesource.vallang.type.TypeFactory;
            'import io.usethesource.vallang.type.TypeStore;
            'import io.usethesource.vallang.*;
-           'import java.util.Map;
-           'import java.util.HashMap;
            '
-           '@SuppressWarnings(\"deprecation\")
            'public class <apiName> {
            '  private static TypeStore typestore = new TypeStore();
            '  private static TypeFactory tf = TypeFactory.getInstance();
@@ -79,7 +76,7 @@ str declareType(adt(str name, list[Symbol] _), Production choice)
      '<declareConstructor(c, name)><}>";
   
   
-str declareConstructor(Production::cons(label(str cname, Symbol _), list[Symbol] args, list[Symbol] kwTypes, set[Attr] _), str typeName) 
+str declareConstructor(Production::cons(label(str cname, Symbol _), list[Symbol] args, list[Symbol] _/*kwTypes*/, set[Attr] _), str typeName) 
   = "private static final Type _<typeName>_<cname>_<size(args)> 
     '  = tf.constructor(typestore,_<typeName>,\"<cname>\"<typeNameTuples2FactoryCallArgs(args)>);";
   
@@ -203,7 +200,7 @@ str type2FactoryCall(Symbol t){
       case \str() :  return "IString";
       case \datetime() : return "IDateTime";
       case \tuple(_) : return  "ITuple";     
-      case \func(returnType, args): return "ICallableValue";
+      case \func(_, _): return "ICallableValue";
       case \alias(_,_,a) : return typeToJavaType(a);
       default : return "IValue";
     }

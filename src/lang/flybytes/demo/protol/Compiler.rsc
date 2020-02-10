@@ -104,7 +104,7 @@ Exp compile((Expr) `<Expr rec>.<Id name>(<{Expr ","}* args>)`)
 list[Exp] compile({Expr ","}* args) = [compile(a)[src=a@\loc] | a <- args];
    
 Exp compile(x:(Expr) `[<{Expr ","}* elems>]`)
-  = new(Arr, [array(Prototype)], [newArray(array(Prototype), [compile(e) | e <- elems])])[src=x@\loc]; 
+  = new(Arr, [array(Prototype)], [newInitArray(array(Prototype), [compile(e) | e <- elems])])[src=x@\loc]; 
 
 Exp compile((Expr) `<Expr receiver>.<Id name>`)
   = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "$get_<name>", []), [compile(receiver)])[src=name@\loc];

@@ -1,7 +1,6 @@
 module lang::flybytes::demo::pico::Syntax
 
 import ParseTree;
-import IO;
 
 start syntax Program 
   = program: "begin" Declarations decls {Statement  ";"}* body "end" ;

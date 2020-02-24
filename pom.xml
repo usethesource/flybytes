@@ -49,7 +49,6 @@
 					<srcs>
 						<src>${project.basedir}/src</src>
 					</srcs>
-					<errorsAsWarnings>true</errorsAsWarnings>
 				</configuration>
 				<executions>
 					<execution>

@@ -4,7 +4,7 @@ import lang::flybytes::Syntax;
 
 Exp String_format(Exp e, str format) 
     = invokeStatic(object("java.lang.String"), methodDesc(string(), "format", [string(), array(object())]),
-           [const(string(), format), newArray(object(), [e])]);
+           [const(string(), format), newInitArray(object(), [e])]);
            
            
 Exp String_concat(Exp l, Exp r) 

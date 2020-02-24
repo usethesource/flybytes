@@ -375,13 +375,13 @@ list[Instruction] stmts([*Instruction pre, GOTO(str cond), LABEL(str body), *Ins
 list[Instruction] stmts([*Instruction pre, LABEL(str body), *Instruction c, stat(\if(Exp co, [asm([GOTO(body)])])), *Instruction post]) 
   = stmts([*pre, stat(\doWhile([asm(stmts(c))], co)), *post]);
 
-list[Instruction] stmts([*Instruction pre, stat(first:store(str name,_)), stat(\while(c, [asm([*Instruction b, stat(next)])])), *Instruction post]) 
+list[Instruction] stmts([*Instruction pre, stat(first:store(str name,_)), stat(\while(c, [asm([*Instruction b, stat(Stat next)])])), *Instruction post]) 
   = stmts([*pre, stat(\for([first], c, [next], [asm(stmts(b))])), *post])
   when store(name,_) := next || do(inc(name, _)) := next
   ;
   
 // fold in multiple inits and nexts in for loop  
-list[Instruction] stmts([*Instruction pre, stat(first:store(str name, _)), stat(\for(firsts, c, nexts, [asm([*Instruction b, stat(next)])])), *Instruction post]) 
+list[Instruction] stmts([*Instruction pre, stat(first:store(str name, _)), stat(\for(firsts, c, nexts, [asm([*Instruction b, stat(Stat next)])])), *Instruction post]) 
   = stmts([*pre, stat(\for([first,*firsts], c, [next, *nexts], [asm(stmts(b))])), *post])
   when store(name,_) := next || do(inc(name, _)) := next
   ;     

@@ -175,7 +175,7 @@ list[Method] methods(Definition* defs)
     [ method("missing", missingArgs(name, args), commands)[src=d@\loc]
     | d:(Definition) `missing(<Id name>, <Id args>) { <Command* commands> }` <- defs]
     +
-    [ getter("<name>")[src=name@\loc], setter("<name>")[src=name@\loc] | (Definition) `<Id name> = <Expr val>` <- defs]
+    [ getter("<name>")[src=name@\loc], setter("<name>")[src=name@\loc] | (Definition) `<Id name> = <Expr _>` <- defs]
     ;
 
 Method getter(str name) 
@@ -198,11 +198,11 @@ Field field(str name, Expr val)
    
 &T declareVariables(&T classes) 
   = visit(classes) {
-      case method(desc, formals, block, modifiers=m) => 
-           method(desc, formals, [*decls, *block], modifiers=m)  
+      case method(Signature desc, list[Formal] formals, list[Stat] block, modifiers=m) => 
+           method(desc, formals, [*ds, *block], modifiers=m)  
       when 
         // transform assignments to declarations and remove duplicates:
-        decls := { decl(Prototype, name) | /store(str name, _) := block}
+        set[Stat] ds := { decl(Prototype, name) | /store(str name, _) := block}
   };
   
 Class removePrototypeClasses(Class main) = visit(main) {

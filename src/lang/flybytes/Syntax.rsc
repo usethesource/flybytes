@@ -450,80 +450,88 @@ Exp defVal(object(str _)) = null();
 Exp defVal(array(Type _)) = null();
 Exp defVal(string()) = null();
  
- // Below popular some convenience macros for
+ // Below some convenience macros for
  // generating methods and constructors:
- 
+
+@synopsis{Object is the top of the JVMs type system} 
 Type object() = object("java.lang.Object");
 
+@synopsis{Generates `name+=i;`}
 Stat incr(str name, int i) = \do(inc(name, i));
 
+@synopsis{Generates `super(f1, f2); for a given anonymous constructor of type (F1 f1, F2 f2)`}
 Stat invokeSuper(list[Type] formals, list[Exp] args)
   = invokeSuper(constructorDesc(formals), args);
   
+@synopsis{Generates `super();`}  
 Stat invokeSuper() = invokeSuper([], []);
   
-// main method shorthand
+@synopsis{Generates a main method `public static final void main(String[] args) { block }`}
 Method main(str args, list[Stat] block) 
   = method(methodDesc(\void(), "main", [array(string())]), 
       [var(array(string()), args)], 
       block, 
       modifiers={\public(), \static(), \final()});
       
-// normal method shorthand
+@synopsis{Short-hand for generating a normal method}
 Method method(Modifier access, Type ret, str name, list[Formal] args, list[Stat] block)
   = method(methodDesc(ret, name, [a.\type | a <- args]), 
            args, 
            block, 
            modifiers={access});
  
-// static method shorthand           
+@synopsis{Short-hand for generating a static method}           
 Method staticMethod(Modifier access, Type ret, str name, list[Formal] args, list[Stat] block)
   = method(methodDesc(ret, name, [a.\type | a <- args]), 
            args, 
            block, 
            modifiers={static(), access});
 
-// constructor shorthand with arguments and code 
-//   NB: don't forget to generate a super call in the block!    
+@synopsis{Short-hand for generating a constructor.}
+@pitfalls{Don't forgot to generate a super call.}    
 Method constructor(Modifier access, list[Formal] formals, list[Stat] block)
   = method(constructorDesc([ var.\type | var <- formals]), formals, block, modifiers={access});
   
-// "new" short-hand with parameters
+@synopsis{"new" short-hand with parameters}
 Exp new(Type class, list[Type] argTypes, list[Exp] args)
   = newInstance(class, constructorDesc(argTypes), args);
   
-// "new" short-hand, without parameters  
+@synopsis{"new" short-hand, without parameters}
 Exp new(Type class) = new(class, [], []);
       
-// Load the standard "this" reference for every object. 
-// NB! This works only inside non-static methods and inside constructors 
+@synopsis{Load the standard "this" reference for every object.} 
+@pitfalls{This works only inside non-static methods and inside constructors} 
 Exp this() = load("this");
 
-// the "<current>" class refers to the class currently being generated
 private Type CURRENT = object("\<current\>");
- 
+
+@synopsis{the "<current>" class refers to the class currently being compiled, for convenience's sake.}
 Type current() = CURRENT;
 
-// Load a field from the currently defined class
+@synopsis{Load a field from the currently compiled class}
 Exp getField(Type \type, str name) = getField(CURRENT, this(), \type, name);
  
-// Load a static field from the currently defined class  
+@synopsis{Load a static field from the currently compiled class}  
 Exp getStatic(Type \type, str name) = getStatic(CURRENT, \type, name);
   
-// Store a field in the currently defined class  
+@synopsis{Store a field in the currently compiled class}  
 Stat putField(Type \type, str name, Exp arg) = putField(CURRENT, this(), \type, name, arg);  
 
-// Store a static field in the currently defined class
+@synopsis{Store a static field in the currently defined class}
 Stat putStatic(Type \type, str name, Exp arg) = putStatic(CURRENT, name, \type, arg);
  
+@synopsis{Invoke a static method on the currently defined class} 
 Exp invokeStatic(Signature desc, list[Exp] args) = invokeStatic(CURRENT, desc, args);
-  
+
+@synopsis{Invoke a method on the currently defined class using invokeSpecial} 
 Exp invokeSpecial(Exp receiver, Signature desc, list[Exp] args)
   = invokeSpecial(CURRENT, receiver, desc, args);
 
+@synopsis{Invoke a method on the currently defined class using invokeVirtual}
 Exp invokeVirtual(Exp receiver, Signature desc, list[Exp] args)
   = invokeVirtual(CURRENT, receiver, desc, args);
   
+@synopsis{Invoke a method on the currently defined interface using invokeInterface}  
 Exp invokeInterface(Exp receiver, Signature desc, list[Exp] args)
   = invokeVirtual(CURRENT, receiver, desc, args);
    

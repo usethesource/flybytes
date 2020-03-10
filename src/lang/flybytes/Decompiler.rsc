@@ -53,13 +53,13 @@ Method decompile(Method m:static([asm(list[Instruction] instrs)]), bool cleanup=
 Method decompile(Method m) = m when \abstract in m.modifiers; 
 
 // LINES: 
-data Instruction(int line = -1);
-data Exp(int line = -1);
-data Stat(int line = -1);
+data Instruction(int LINE = -1);
+data Exp(int LINE = -1);
+data Stat(int LINE = -1);
 
 @synopsis{set the information from LINENUMBER instructions to all following instructions as a field, and removes the instruction}
 list[Instruction] lines([*Instruction pre, LINENUMBER(lin, lab), Instruction next, *Instruction post])
-  = lines([*pre, next[line=lin], *lines([LINENUMBER(lin, lab), *post])])
+  = lines([*pre, next[LINE=lin], *lines([LINENUMBER(lin, lab), *post])])
   when !(next is LINENUMBER);
 
 list[Instruction] lines([*Instruction pre, LINENUMBER(_, _), Instruction next:LINENUMBER(_,_), *Instruction post])

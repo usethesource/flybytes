@@ -475,11 +475,11 @@ public class Mirror {
 	}
 
 	private Method getMethod(Class<?> cls, IConstructor sig) throws NoSuchMethodException, SecurityException, ClassNotFoundException {
-		return cls.getMethod(AST.$getName(sig), Signature.binaryClasses(AST.$getFormals(sig), ctx.getStdOut()));
+		return cls.getMethod(AST.$getName(sig), Signature.binaryClasses(AST.$getFormals(sig), ctx.getOutPrinter()));
 	}
 	
 	private <T> Constructor<T> getDeclaredConstructor(Class<T> cls, IConstructor sig) throws NoSuchMethodException, SecurityException, ClassNotFoundException {
-		return cls.getDeclaredConstructor(Signature.binaryClasses(AST.$getFormals(sig), ctx.getStdOut()));
+		return cls.getDeclaredConstructor(Signature.binaryClasses(AST.$getFormals(sig), ctx.getOutPrinter()));
 	}
 
 	private abstract static class MirrorCallBack<T> extends AbstractFunction {

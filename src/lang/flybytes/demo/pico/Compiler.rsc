@@ -12,20 +12,37 @@ import lang::flybytes::api::JavaLang; // for parseInt
 
 import lang::flybytes::macros::ControlFlow; // for_array
 
+import IO;
 import String;
 import ParseTree;
+import util::IDE;
+import util::ValueUI;
+
+void registerPico() {
+  registerLanguage("Pico", "pico", 
+    Tree (str input, loc src) { 
+      return parse(#start[Program], input, src); 
+    }
+  );
+}
+
+Program parse(loc program) = parse(#start[Program], program).top;
 
 void testFactorial() {
-  Program tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/pico/fac.pico|).top;
+  Program tree = parse(|project://flybytes/src/lang/flybytes/demo/pico/fac.pico|);
+  println(tree);
   compileProgram(tree, "Factorial", |project://flybytes/generated|);
 } 
 
 void testITE() {
-  Program tree = parse(#start[Program], |project://flybytes/src/lang/flybytes/demo/pico/ite.pico|).top;
+  Program tree = parse(|project://flybytes/src/lang/flybytes/demo/pico/ite.pico|);
+  println(tree);
   compileProgram(tree, "ITE", |project://flybytes/generated|);
 }
 
 void compileProgram(Program p, str name, loc folder) {
+  cl = compileProgram(p, name);
+  text(cl);
   compileClass(compileProgram(p, name), folder + "<name>.class", debugMode=true);
 }
 

@@ -63,7 +63,7 @@ public class ClassCompiler {
 	}
 
 	public void compileClass(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IBool debugMode, IEvaluatorContext ctx) {
-		this.out = ctx.getStdOut();
+		this.out = ctx.getOutPrinter();
 
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES + ClassWriter.COMPUTE_MAXS);
@@ -125,7 +125,7 @@ public class ClassCompiler {
 	}
 
 	public IValue loadClass(IConstructor cls, IConstructor output, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode, IEvaluatorContext ctx) {
-		this.out = ctx.getStdOut();
+		this.out = ctx.getOutPrinter();
 
 		try {
 			String className = AST.$getName(AST.$getType(cls));

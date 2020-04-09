@@ -35,6 +35,7 @@ import org.rascalmpl.objectweb.asm.tree.VarInsnNode;
 import org.rascalmpl.objectweb.asm.tree.MultiANewArrayInsnNode;
 import org.rascalmpl.uri.URIResolverRegistry;
 
+import io.usethesource.vallang.IBool;
 import io.usethesource.vallang.IConstructor;
 import io.usethesource.vallang.IList;
 import io.usethesource.vallang.IListWriter;
@@ -59,23 +60,23 @@ public class ClassDisassembler {
 		this.ast = new AST(VF);
 	}
 	
-	public IConstructor disassemble(ISourceLocation classLoc) {
+	public IConstructor disassemble(ISourceLocation classLoc, IBool signaturesOnly) {
 		try {
 			ClassReader reader = new ClassReader(URIResolverRegistry.getInstance().getInputStream(classLoc));
-			return readClass(reader);
+			return readClass(reader, signaturesOnly.getValue());
 		}
 		catch (IOException e) {
 			throw RuntimeExceptionFactory.io(VF.string(e.getMessage()), null, null);
 		}
 	}
 	
-	private IConstructor readClass(ClassReader reader) {
+	private IConstructor readClass(ClassReader reader, boolean signaturesOnly) {
 		ClassNode cn = new ClassNode();
 		reader.accept(cn, ClassReader.SKIP_FRAMES);
 		Map<String, IValue> params = new HashMap<>();
 		
 		params.put("fields", fields(cn.fields));
-		params.put("methods", methods(cn.methods));
+		params.put("methods", methods(cn.methods, signaturesOnly));
 		params.put("modifiers", modifiers(cn.access));
 		if (cn.superName != null) {
 			params.put("super", objectType(cn.superName));
@@ -144,30 +145,35 @@ public class ClassDisassembler {
 		return (access & bit) != 0;
 	}
 
-	private IList methods(List<MethodNode> methods) {
+	private IList methods(List<MethodNode> methods, boolean signaturesOnly) {
 		IListWriter lw = VF.listWriter();
 		
 		for (MethodNode fn : methods) {
-			lw.append(method(fn));
+			lw.append(method(fn, signaturesOnly));
 		}
 		
 		return lw.done();
 	}
 
-	private IConstructor method(MethodNode fn) {
+	private IConstructor method(MethodNode fn, boolean signaturesOnly) {
 		IConstructor desc = descriptor(fn.name, fn.desc);
-		IList instructions = instructions(fn.instructions);
 		
-		if (fn.tryCatchBlocks != null) {
-			for (TryCatchBlockNode tc : fn.tryCatchBlocks) {
-				instructions = instructions.append(ast.Instruction_TRYCATCH(typeName(tc.type), tc.start.getLabel().toString(), tc.end.getLabel().toString(), tc.handler.getLabel().toString()));
-			}
-		}
+		IList instructions = VF.list();
 		
-		if (fn.localVariables != null) {
-			for (LocalVariableNode var : fn.localVariables) {
-				instructions = instructions.append(ast.Instruction_LOCALVARIABLE(var.name, type(var.desc), var.start.getLabel().toString(), var.end.getLabel().toString(), var.index));
-			}
+		if (!signaturesOnly) {
+		    instructions = instructions(fn.instructions);
+
+		    if (fn.tryCatchBlocks != null) {
+		        for (TryCatchBlockNode tc : fn.tryCatchBlocks) {
+		            instructions = instructions.append(ast.Instruction_TRYCATCH(typeName(tc.type), tc.start.getLabel().toString(), tc.end.getLabel().toString(), tc.handler.getLabel().toString()));
+		        }
+		    }
+
+		    if (fn.localVariables != null) {
+		        for (LocalVariableNode var : fn.localVariables) {
+		            instructions = instructions.append(ast.Instruction_LOCALVARIABLE(var.name, type(var.desc), var.start.getLabel().toString(), var.end.getLabel().toString(), var.index));
+		        }
+		    }
 		}
 		
 		IList formals = formals(fn.parameters, fn.localVariables, (IList) desc.get("formals"), set(fn.access, Opcodes.ACC_STATIC));

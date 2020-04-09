@@ -5,16 +5,9 @@ import Exception;
 
 @javaClass{lang.flybytes.internal.ClassDisassembler}
 @synopsis{reverses the flybytes compiler, but recovers only lists of instructions from the methods' bodies.}
-java Class disassemble(loc classFile) throws IO;
+java Class disassemble(loc classFile, bool signaturesOnly=false) throws IO;
 
+@synopsis{return the disassembled information from all (overloaded) methods with a given name in the given class.}
 list[Method] disassemble(loc classFile, str methodName)
   = [ m | Method m <- disassemble(classFile).methods, m.desc?, (m.desc.name?"") == methodName];
-  
-Method disassemble(loc classFile, str methodName) {
-  cls = disassemble(classFile);
-  if (Method m <- cls.methods, m.desc?, m.desc.name?, m.desc.name == methodName) {
-    return m;
-  }
-  
-  throw "no method named <methodName> exists in this class: <for (m <- cls.methods, m.desc?, m.desc.name?) {><m.desc.name> <}>";
-}
+ 

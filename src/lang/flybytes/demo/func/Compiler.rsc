@@ -49,7 +49,7 @@ list[Formal] formals({Ident ","}* params) = [var(integer(), "<i>") | Ident i <- 
 Exp expr((Exp) `let <{Binding ","}* bindings> in <Exp e> end`, map[str,str] names) {
   decls = for((Binding) `<Ident i> = <Exp val>` <- bindings) {
     // it's a let*
-    names += ("<i>" : (names["<i>"]?) ? "<names["<i>"]>_prime" : "<i>");
+    names += ("<i>" : (names["<i>"]?) ? "<names["<i>"]>\'" : "<i>"); // shadowing works via renaming
     append decl(integer(), names["<i>"], init=expr(val, names), src=val@\loc);
   }
   

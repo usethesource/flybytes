@@ -4,4 +4,4 @@ fact(n) = if n <= 1 then
              n * fact(n-1)
           end
           
-main() = fact(4)
+main() = fact(5)

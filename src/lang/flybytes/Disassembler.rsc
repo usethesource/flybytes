@@ -17,4 +17,4 @@ Method disassemble(loc classFile, str methodName) {
   }
   
   throw "no method named <methodName> exists in this class: <for (m <- cls.methods, m.desc?, m.desc.name?) {><m.desc.name> <}>";
-}  
+}

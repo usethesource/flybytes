@@ -4,7 +4,10 @@ test(n) = let
           in
 	        let y = 2 * x 
 	        in
-	           2 * y
+	           let y = 3 * x 
+	           in 
+	             3 * y 
+	           end
 	        end
 	      end
 

@@ -56,7 +56,6 @@ Flybytes is an intermediate language towards JVM bytecode generation for Rascal-
 
 ### TODO:
 
-* add support for the JVM debugger (line and symbol information)
 * add support for error nodes (to support partial compilation and running partially compiled classes)
 * refactor compiler exceptions to Rascal exceptions (to help debugging Flybytes AST generators)
 * add support for nested classes (helps in generating code for lambda expressions)
@@ -479,13 +478,21 @@ Method method(Modifier access, Type ret, str name, list[Formal] args, list[Stat]
            args, 
            block, 
            modifiers={access});
- 
+
+@synopsis{Short-hand for generating a normal public method}
+Method method(Type ret, str name, list[Formal] args, list[Stat] block)
+  = method(\public(), ret, name, args, block);
+            
 @synopsis{Short-hand for generating a static method}           
 Method staticMethod(Modifier access, Type ret, str name, list[Formal] args, list[Stat] block)
   = method(methodDesc(ret, name, [a.\type | a <- args]), 
            args, 
            block, 
            modifiers={static(), access});
+
+@synopsis{Short-hand for generating a public static method}           
+Method staticMethod(Type ret, str name, list[Formal] args, list[Stat] block)
+  = staticMethod(\public, ret, name, args, block);
 
 @synopsis{Short-hand for generating a constructor.}
 @pitfalls{Don't forgot to generate a super call.}    
@@ -565,6 +572,18 @@ the call site with the static type of the static bootstrap method.
 } 
 data BootstrapCall = bootstrap(Type class, Signature desc, list[CallSiteInfo] args);
  
+@synopsis{generate a bootstrap call with all the required standard parameters, and optionally more.}
+@benefits{
+* A raw BootstrapCall must return a CallSite and take a MethodHandle.Lookup, a string and a MethodType as the first three parameters.    
+This convenience function guarantees that this the true, but allows for adding additional static information about
+the call site.
+* The types of the additional parameters are inferred automatically from the CallSiteInfo structures, so 
+you do not have to distribute this information during code generation.
+}
+@pitfalls{
+* the signature of the bootstrap method `name` in `class` (which you might have written in Java, or generated
+in a different part of your compiler) must be the exactly the same as generated here.
+}        
 BootstrapCall bootstrap(Type class, str name, list[CallSiteInfo] args)
   = bootstrap(class,  
       methodDesc(object("java.lang.invoke.CallSite"),
@@ -577,13 +596,31 @@ BootstrapCall bootstrap(Type class, str name, list[CallSiteInfo] args)
                  ]),
        args);
 
+@synopsis{Generate a basic bootstrap caller with only the minimally required information for a dynamic invoke.}
+@benefits{This is the starting point for any use of invokeDynamic. Get this working first and add additional information
+later}
+@pitfalls{Writing bootstrap method implementations is hard.}
 BootstrapCall bootstrap(str name, list[CallSiteInfo] args)
   = bootstrap(object("\<CURRENT\>"), name, args);
   
-@doc{
+@synopsis{
 Convenience function to use existing BootstrapCall information to generate a fitting bootstrap 
 method to call.
 }  
+@description{
+This function mirrors the `bootstrap` function; it generates the method referenced by the output of that function.
+}
+@benefits{
+* the bootstrap method and the bootstrapCall information have to be aligned perfectly. If you use the pair
+of functions `bootstrapMethod` and `bootstrap` together then this alignment is guaranteed. 
+}
+@pitfalls{
+* generating the body of a bootstrap method can be challenging. It is recommended to first write the example
+in Java and decompile the resulting method, and copy the result into the `body` parameter of this function.
+* another solution is to keep the source of the bootstrap method completely in Java, but making sure the 
+signatures keep matching inside the BootstrapCall data. This is usually possible; when the bootstrap method
+is generic enough.
+}
 Method bootstrapMethod(BootstrapCall b, list[Stat] body)
   = method(b.desc, 
       [
@@ -619,6 +656,7 @@ data CallSiteInfo
     constructorHandle(Type class, Signature desc)
   ;
   
+@synopsis{Type inference for callsiteInfo parameters to bootstrap methods.}  
 Type callsiteInfoType(stringInfo(_))             = string();
 Type callsiteInfoType(classInfo(_))              = object("java.lang.Class");
 Type callsiteInfoType(integerInfo(_))            = integer();
@@ -632,4 +670,4 @@ Type callsiteInfoType(setterHandle(_,_,_))       = object("java.lang.invoke.Meth
 Type callsiteInfoType(staticGetterHandle(_,_,_)) = object("java.lang.invoke.MethodHandle");
 Type callsiteInfoType(staticSetterHandle(_,_,_)) = object("java.lang.invoke.MethodHandle");
 Type callsiteInfoType(constructorHandle(_,_))    = object("java.lang.invoke.MethodHandle");
-Type callsiteInfoType(methodTypeInfo(_))         = object("java.lang.invoke.MethodType");   
+Type callsiteInfoType(methodTypeInfo(_))         = object("java.lang.invoke.MethodType");

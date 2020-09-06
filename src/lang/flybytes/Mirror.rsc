@@ -35,7 +35,7 @@ java Mirror val(value v);
 @javaClass{lang.flybytes.internal.ClassCompiler}
 @reflect{for stdout}
 @memo
-@doc{reflects a Rascal value as a JVM object Mirror}
+@doc{reflects a JVM class object as Mirror class}
 java Mirror classMirror(str name);
 
 @javaClass{lang.flybytes.internal.ClassCompiler}

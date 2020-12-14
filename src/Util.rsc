@@ -29,7 +29,7 @@ Tree reparse(type[Tree] grammar, Tree t) = reparse(grammar, symbol(t), "<t>");
 Tree reparse(type[Tree] grammar, str x) = reparse(grammar, grammar.symbol, x);
 
 Tree reparse(type[Tree] grammar, Symbol s, str x) {
-  if (s notin grammar.definitions<0>) {
+  if ((s is sort || s is lex) && s notin grammar.definitions<0>) {
     throw "<s> is not in this grammar";
   }
    
@@ -48,15 +48,29 @@ Tree reparse(type[Tree] grammar, Symbol s, str x) {
 }
 
 Maybe[Tree] saveParse(type[Tree] grammar, str input) {
-        try {
-           return just(completeLocs(parse(grammar, input, allowAmbiguity=true)));        
-        }
-        catch ParseError(l) : {
-           return nothing();
-        }
-        catch value x : {
-           return nothing();
-        }
+  try {
+    s= grammar.symbol;
+    if ((s is sort || s is lex) && s notin grammar.definitions<0>) {
+      throw "<s> is not in this grammar";
+    }
+   
+    wrapped = (sort(_) !:= s) && (lex(_) !:= s);
+  
+    if (wrapped) {
+      grammar = type(grammar.symbol, grammar.definitions + (sort("$WRAP$") : prod(sort("$WRAP$"), [s], {})));
+    }
+  
+    if (type[Tree] subgrammar := type(wrapped ? sort("$WRAP$") : s , grammar.definitions)) {
+      result = parse(subgrammar, input, allowAmbiguity=true);
+      return just(wrapped ? completeLocs(result.args[0]) : completeLocs(result));
+    }        
+  }
+  catch ParseError(l) : {
+    return nothing();
+  }
+  catch value x : {
+    return nothing();
+  }
 }
 
 bool isChar(char(_)) = true;
@@ -78,8 +92,9 @@ Tree unique(Tree t) {
    };
 }  
 
-Tree completeLocs(Tree t:amb({Tree u,*_})) = nt when <nt, _> := completeLocs(t, u@\loc.top, 0);
-default Tree completeLocs(Tree t) = nt when <nt, _> := completeLocs(t, t@\loc.top, 0);
+Tree completeLocs(Tree t:amb({Tree u,*_})) = nt when u@\loc?, <nt, _> := completeLocs(t, u@\loc.top, 0);
+Tree completeLocs(Tree t:amb({Tree u,*_})) = nt when !(u@\loc?), <nt, _> := completeLocs(t, |unknown:///|(0,0), 0);
+default Tree completeLocs(Tree t) = nt when t@\loc?, <nt, _> := completeLocs(t, t@\loc.top, 0);
 
 tuple[Tree, int] completeLocs(Tree t, loc parent, int offset) {
   int s = offset;

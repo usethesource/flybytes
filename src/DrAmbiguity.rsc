@@ -35,7 +35,7 @@ private loc root = getModuleLocation("DrAmbiguity").parent;
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
   = app(Model () { return model(grammar, input=readFile(input)); }, view, update, www, root);
   
-App[Model] drAmbiguity() = drAmbiguity(|home:///myproject.dra|);
+App[Model] drAmbiguity() = drAmbiguity(|home:///myproject-empty.dra|);
 
 App[Model] drAmbiguity(loc project) 
   = app(Model () { return readBinaryValueFile(#Model, project); }, view, update, www, root);
@@ -127,6 +127,7 @@ Model update(saveProject(loc f), Model m) {
  
 Model update(selectExample(int count), Model m) {
   m.tree = m.examples[count-1].tree;
+  m.grammar = type[Tree] ng := type(m.examples[count-1].nt, m.grammar.definitions) ? ng : m.grammar;
   m.input = m.examples[count-1].input;
   m.inputDirty = true;
   if (m.tree == nothing()) {
@@ -226,7 +227,7 @@ Model update(commitGrammar(int selector), Model m) {
 Model update(newInput(str new), Model m) {
   try {
     m.input = new;
-    m.tree = just(completeLocs(parse(m.grammar, new, allowAmbiguity=true)));
+    m.tree = saveParse(m.grammar, new);
     m.errors = [];
     m.inputDirty = false;
   }
@@ -527,6 +528,7 @@ void fileUI(Model m) {
  }
  
 void inputPane(Model m) {
+   bool isError = m.tree == nothing();
    bool isAmb = m.tree != nothing() && amb(_) := m.tree.val ;
    bool nestedAmb = m.tree != nothing() && (amb({/amb(_), *_}) := m.tree.val || appl(_,/amb(_)) := m.tree.val);
    str  sentence = m.input;
@@ -543,7 +545,12 @@ void inputPane(Model m) {
           column(2, md(), () {
             div(class("list-group list-group-flush"), style(<"list-style-type","none">), () {
               span(class("list-group-item"), () {
-                paragraph("This sentence is <if (!isAmb) {>not<}> ambiguous, and it has<if (!nestedAmb) {> no<}> nested ambiguity.");
+                if (isError) {
+                  paragraph("This sentence is not a <m.grammar>; it has a parse error");
+                } 
+                else {
+                  paragraph("This sentence is <if (!isAmb) {>not<}> ambiguous, and it has<if (!nestedAmb) {> no<}> nested ambiguity.");
+                }
               });
               if (nestedAmb) {          
                 button(class("list-group-item"), onClick(focus()), "Focus on nested");

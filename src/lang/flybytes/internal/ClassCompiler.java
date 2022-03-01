@@ -16,18 +16,18 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.rascalmpl.exceptions.RuntimeExceptionFactory;
 import org.rascalmpl.interpreter.IEvaluatorContext;
-import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
-import org.rascalmpl.objectweb.asm.AnnotationVisitor;
-import org.rascalmpl.objectweb.asm.ClassVisitor;
-import org.rascalmpl.objectweb.asm.ClassWriter;
-import org.rascalmpl.objectweb.asm.Handle;
-import org.rascalmpl.objectweb.asm.Label;
-import org.rascalmpl.objectweb.asm.Opcodes;
-import org.rascalmpl.objectweb.asm.TypeReference;
-import org.rascalmpl.objectweb.asm.tree.ClassNode;
-import org.rascalmpl.objectweb.asm.tree.FieldNode;
-import org.rascalmpl.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.TypeReference;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.MethodNode;
 import org.rascalmpl.uri.URIResolverRegistry;
 import org.rascalmpl.uri.URIUtil;
 import org.rascalmpl.values.ValueFactoryFactory;
@@ -55,15 +55,17 @@ import io.usethesource.vallang.type.TypeStore;
  * using the ASM library.
  */
 public class ClassCompiler {
-	private PrintWriter out;
 	private final IValueFactory vf;
+	private final TypeStore ts;
+	private final PrintWriter out;
 
-	public ClassCompiler(IValueFactory vf) {
+	public ClassCompiler(IValueFactory vf, TypeStore store, PrintWriter out) {
 		this.vf = vf;
+		this.ts = store;
+		this.out = out;
 	}
 
-	public void compileClass(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IBool debugMode, IEvaluatorContext ctx) {
-		this.out = ctx.getOutPrinter();
+	public void compileClass(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IBool debugMode) {
 
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES + ClassWriter.COMPUTE_MAXS);
@@ -73,12 +75,11 @@ public class ClassCompiler {
 
 			output.write(cw.toByteArray());
 		} catch (Throwable e) {
-			// TODO better error handling
-			e.printStackTrace(out);
+			throw new RuntimeException(e);
 		}
 	}
 
-	public IMap loadClasses(IList classes, IConstructor prefix, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode, IEvaluatorContext ctx) {
+	public IMap loadClasses(IList classes, IConstructor prefix, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode) {
 		ClassMapLoader l = new ClassMapLoader(getClass().getClassLoader());
 
 		ISourceLocation classFolder = null;
@@ -111,7 +112,7 @@ public class ClassCompiler {
 		}
 
 		try {
-			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+			Mirror m = new Mirror(vf, ts, out);
 			IMapWriter w = vf.mapWriter();
 
 			for (String name : l) {
@@ -124,9 +125,7 @@ public class ClassCompiler {
 		}
 	}
 
-	public IValue loadClass(IConstructor cls, IConstructor output, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode, IEvaluatorContext ctx) {
-		this.out = ctx.getOutPrinter();
-
+	public IValue loadClass(IConstructor cls, IConstructor output, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode) {
 		try {
 			String className = AST.$getName(AST.$getType(cls));
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
@@ -136,7 +135,7 @@ public class ClassCompiler {
 
 			Class<?> loaded = loadSingleClass(className, cw);
 
-			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+			Mirror m = new Mirror(vf, ts, out);
 
 			if (output.getConstructorType().getName().equals("just")) {
 				ISourceLocation classFile = (ISourceLocation) output.get("val");
@@ -157,23 +156,23 @@ public class ClassCompiler {
 	}
 
 	public IValue val(IValue v, IEvaluatorContext ctx) {
-		Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+		Mirror m = new Mirror(vf, ts, out);
 		return m.mirrorObject(v);
 	}
 
 	public IValue array(IConstructor type, IList elems, IEvaluatorContext ctx) throws ClassNotFoundException {
-		Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+		Mirror m = new Mirror(vf, ts, out);
 		return m.mirrorArray(type, elems);
 	}
 
 	public IValue array(IConstructor type, IInteger length, IEvaluatorContext ctx) throws ClassNotFoundException {
-		Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+		Mirror m = new Mirror(vf, ts, out);
 		return m.mirrorArray(type, length.intValue());
 	}
 
 	public IValue classMirror(IString n, IEvaluatorContext ctx) {
 		try {
-			Mirror m = new Mirror(vf, ctx.getCurrentEnvt().getStore(), ctx);
+			Mirror m = new Mirror(vf, ts, out);
 			String name = n.getValue();
 			return m.mirrorClass(name, Class.forName(name));
 		} catch (ClassNotFoundException e) {
@@ -3465,7 +3464,7 @@ public class ClassCompiler {
 				method.visitIntInsn(Opcodes.SIPUSH, constant);
 			}
 			else {
-				method.visitLdcInsn(new Integer(constant));
+				method.visitLdcInsn(Integer.valueOf(constant));
 			}
 		}
 
@@ -3477,7 +3476,7 @@ public class ClassCompiler {
 				method.visitInsn(Opcodes.LCONST_1);
 			}
 			else {
-				method.visitLdcInsn(new Long(constant));
+				method.visitLdcInsn(Long.valueOf(constant));
 			}
 		}
 
@@ -3496,7 +3495,7 @@ public class ClassCompiler {
 				method.visitInsn(Opcodes.FCONST_2);
 			}
 			else {
-				method.visitLdcInsn(new Float(Float.toString(constant)));
+				method.visitLdcInsn(Float.valueOf(Float.toString(constant)));
 			}
 		}
 
@@ -3508,7 +3507,7 @@ public class ClassCompiler {
 				method.visitInsn(Opcodes.DCONST_1);
 			}
 			else {
-				method.visitLdcInsn(new Double(Double.toString(constant)));
+				method.visitLdcInsn(Double.valueOf(Double.toString(constant)));
 			}
 		}
 

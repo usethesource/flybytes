@@ -1,27 +1,17 @@
 package lang.flybytes.internal;
 
+import java.io.PrintWriter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Collections;
 import java.util.Map;
 
-import org.rascalmpl.debug.IRascalMonitor;
-import org.rascalmpl.interpreter.IEvaluatorContext;
-import org.rascalmpl.interpreter.TypeReifier;
-import org.rascalmpl.interpreter.control_exceptions.MatchFailed;
-import org.rascalmpl.interpreter.control_exceptions.Throw;
-import org.rascalmpl.interpreter.env.Environment;
-import org.rascalmpl.interpreter.result.AbstractFunction;
-import org.rascalmpl.interpreter.result.ICallableValue;
-import org.rascalmpl.interpreter.result.Result;
-import org.rascalmpl.interpreter.result.ResultFactory;
-import org.rascalmpl.interpreter.types.FunctionType;
-import org.rascalmpl.interpreter.utils.RuntimeExceptionFactory;
-import org.rascalmpl.values.uptr.RascalValueFactory;
+import org.rascalmpl.exceptions.RuntimeExceptionFactory;
+import org.rascalmpl.types.TypeReifier;
+import org.rascalmpl.values.functions.IFunction;
 
 import io.usethesource.vallang.IConstructor;
 import io.usethesource.vallang.IInteger;
@@ -43,42 +33,42 @@ import lang.flybytes.internal.ClassCompiler.Switch;
 public class Mirror {
 	private final IValueFactory vf;
 	private final TypeReifier tr;
+	private final PrintWriter out;
 	private final Type Mirror;
 	private final Type classCons;
-	private final FunctionType invokeStaticFunc;
-	private final FunctionType getStaticFunc;
-	private final FunctionType newInstanceFunc;
-	private final FunctionType getAnnotationFunc;
+	private final Type invokeStaticFunc;
+	private final Type getStaticFunc;
+	private final Type newInstanceFunc;
+	private final Type getAnnotationFunc;
 	private final Type objectCons;
-	private final FunctionType invokeFunc;
-	private final FunctionType getFieldFunc;
-	private final FunctionType toValueFunc;
+	private final Type invokeFunc;
+	private final Type getFieldFunc;
+	private final Type toValueFunc;
 	private final Type arrayCons;
-	private final FunctionType lengthFunc;
-	private final FunctionType loadFunc;
+	private final Type lengthFunc;
+	private final Type loadFunc;
 	private final Type nullCons;
-	private IEvaluatorContext ctx;
 
-	public Mirror(IValueFactory vf, TypeStore store, IEvaluatorContext ctx) {
+	public Mirror(IValueFactory vf, TypeStore store, PrintWriter out) {
 		this.vf = vf;
 		this.tr = new TypeReifier(vf);
-		this.ctx = ctx;
+		this.out = out;
 		this.Mirror = store.lookupAbstractDataType("Mirror");
 		
 		this.classCons = store.lookupConstructor(Mirror, "class").iterator().next();
-		this.invokeStaticFunc = (FunctionType) classCons.getFieldType(1);
-		this.getStaticFunc = (FunctionType) classCons.getFieldType(2);
-		this.newInstanceFunc = (FunctionType) classCons.getFieldType(3);
-		this.getAnnotationFunc = (FunctionType) classCons.getFieldType(4);
+		this.invokeStaticFunc = (Type) classCons.getFieldType(1);
+		this.getStaticFunc = (Type) classCons.getFieldType(2);
+		this.newInstanceFunc = (Type) classCons.getFieldType(3);
+		this.getAnnotationFunc = (Type) classCons.getFieldType(4);
 		
 		this.objectCons = store.lookupConstructor(Mirror, "object").iterator().next();
-		this.invokeFunc = (FunctionType) objectCons.getFieldType(1);
-		this.getFieldFunc = (FunctionType) objectCons.getFieldType(2);
-		this.toValueFunc = (FunctionType) objectCons.getFieldType(3);
+		this.invokeFunc = (Type) objectCons.getFieldType(1);
+		this.getFieldFunc = (Type) objectCons.getFieldType(2);
+		this.toValueFunc = (Type) objectCons.getFieldType(3);
 		
 		this.arrayCons = store.lookupConstructor(Mirror, "array").iterator().next();
-		this.lengthFunc = (FunctionType) arrayCons.getFieldType(0);
-		this.loadFunc = (FunctionType) arrayCons.getFieldType(1);
+		this.lengthFunc = (Type) arrayCons.getFieldType(0);
+		this.loadFunc = (Type) arrayCons.getFieldType(1);
 		
 		this.nullCons = store.lookupConstructor(Mirror, "null").iterator().next();
 	}
@@ -120,45 +110,32 @@ public class Mirror {
 	}
 
 	private IValue load(Object object) {
-		return new MirrorCallBack<Object>(object, loadFunc, ctx) {
+		return new MirrorCallBack<Object>(object, loadFunc) {
 			@Override
-			public Type getType() {
-				return loadFunc;
-			}
-
-			@Override
-			Result<IValue> call(Type[] formals, IValue[] actuals) {
+			@SuppressWarnings("unchecked")
+			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
 				int index = ((IInteger) actuals[0]).intValue();
-				return ResultFactory.makeResult(Mirror, mirrorObject(Array.get(getWrapped(), index)), ctx);
+				return (U) mirrorObject(Array.get(getWrapped(), index));
 			}
 		};
 	}
 
 	private IValue length(Object object) {
-		return new MirrorCallBack<Object>(object, lengthFunc, ctx) {
+		return new MirrorCallBack<Object>(object, lengthFunc) {
 			@Override
-			public Type getType() {
-				return lengthFunc;
-			}
-
-			@Override
-			Result<IValue> call(Type[] formals, IValue[] actuals) {
-				IInteger result = vf.integer(Array.getLength(getWrapped()));
-				return ResultFactory.makeResult(result.getType(), result, ctx);
+			@SuppressWarnings("unchecked")
+			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
+				return (U) vf.integer(Array.getLength(getWrapped()));
 			}
 		};
 	}
 
 	private IValue toValue(Object object) {
-		return new MirrorCallBack<Object>(object, toValueFunc, ctx) {
+		return new MirrorCallBack<Object>(object, toValueFunc) {
 			
 			@Override
-			public Type getType() {
-				return toValueFunc;
-			}
-			
-			@Override
-			Result<IValue> call(Type[] formals, IValue[] actuals) {
+			@SuppressWarnings("unchecked")
+			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
 				Type expected = tr.valueToType((IConstructor) actuals[0]);
 				Object wrapped = getWrapped();
 				IValue result = null;
@@ -172,7 +149,7 @@ public class Mirror {
 				}
 
 				if (result.getType().comparable(expected)) {
-					return ResultFactory.makeResult(expected, result, ctx);
+					return (U) result;
 				}
 				else {
 					throw RuntimeExceptionFactory.illegalTypeArgument(expected.toString(), null, null);
@@ -322,25 +299,27 @@ public class Mirror {
 			public IValue visitVoid(Type arg0) throws RuntimeException {
 				throw illegalType(expected);
 			}
+
+			@Override
+			public IValue visitFunction(Type type) throws RuntimeException {
+				throw illegalType(expected);
+			}
 		});
 	}
 	
 	private IValue newInstance(String className, Class<?> cls) {
-		return new MirrorCallBack<Class<?>>(cls, newInstanceFunc, ctx) {
-			@Override
-			public int getArity() {
-				return 2;
-			} 
+		return new MirrorCallBack<Class<?>>(cls, newInstanceFunc) {
 
 			@Override
-			Result<IValue> call(Type[] formals, IValue[] actuals) {
+			@SuppressWarnings("unchecked")
+			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
 				try {
 					IConstructor signature = (IConstructor) actuals[0];
 					IList args = (IList) actuals[1];
 					
 					Constructor<?> meth = getDeclaredConstructor(getWrapped(), signature);
 					Object object = meth.newInstance(unreflect(args));
-					return ResultFactory.makeResult(Mirror, mirrorObject(object), ctx);
+					return (U) mirrorObject(object);
 				} catch (IllegalAccessException | IllegalArgumentException
 						| InvocationTargetException | SecurityException | NoSuchMethodException | ClassNotFoundException | InstantiationException e) {
 					throw new RuntimeException(e);
@@ -350,19 +329,15 @@ public class Mirror {
 	}
 	
 	private IValue getStatic(String className, Class<?> cls) {
-		return new MirrorCallBack<Class<?>>(cls, getStaticFunc, ctx) {
+		return new MirrorCallBack<Class<?>>(cls, getStaticFunc) {
 			@Override
-			public int getArity() {
-				return 1;
-			} 
-
-			@Override
-			Result<IValue> call(Type[] formals, IValue[] actuals) {
+			@SuppressWarnings("unchecked")
+			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
 				try {
 					String name = ((IString) actuals[0]).getValue();
 					Field field = getWrapped().getField(name);
 					Object result = field.get(null); 
-					return ResultFactory.makeResult(Mirror, mirrorObject(result), ctx);
+					return (U) mirrorObject(result);
 				} catch (IllegalAccessException | IllegalArgumentException
 					 | SecurityException | NoSuchFieldException e) {
 					throw new RuntimeException(e);
@@ -372,19 +347,15 @@ public class Mirror {
 	}
 	
 	private IValue getAnnotation(String className, Class<?> cls) {
-		return new MirrorCallBack<Class<?>>(cls, getAnnotationFunc, ctx) {
+		return new MirrorCallBack<Class<?>>(cls, getAnnotationFunc) {
 			@Override
-			public int getArity() {
-				return 1;
-			} 
-
-			@Override
-			Result<IValue> call(Type[] formals, IValue[] actuals) {
+			@SuppressWarnings("unchecked")
+			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
 				try {
 					Class<?> annoClass = Signature.binaryClass((IConstructor) actuals[0]);
-					@SuppressWarnings({ "unchecked", "rawtypes" })
+					@SuppressWarnings("rawtypes")
 					Annotation anno = getWrapped().getAnnotation((Class) annoClass);
-					return  ResultFactory.makeResult(Mirror, mirrorObject(anno), ctx);
+					return (U) mirrorObject(anno);
 				} catch (IllegalArgumentException | SecurityException | ClassNotFoundException e) {
 					throw new RuntimeException(e);
 				}
@@ -393,20 +364,17 @@ public class Mirror {
 	}
 
 	private IValue field(Object object) {
-		return new MirrorCallBack<Object>(object, getFieldFunc, ctx) {
-			@Override
-			public int getArity() {
-				return 1;
-			} 
+		return new MirrorCallBack<Object>(object, getFieldFunc) {
 
 			@Override
-			Result<IValue> call(Type[] formals, IValue[] actuals) {
+			@SuppressWarnings("unchecked")
+			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
 				try {
 					String name = ((IString) actuals[0]).getValue();
 					Field field = getWrapped().getClass().getDeclaredField(name);
 					field.setAccessible(true);
 					Object result = field.get(getWrapped());
-					return ResultFactory.makeResult(Mirror, mirrorObject(result), ctx);
+					return (U) mirrorObject(result);
 				} catch (IllegalAccessException | IllegalArgumentException
 					 | SecurityException | NoSuchFieldException e) {
 					throw new RuntimeException(e);
@@ -416,14 +384,11 @@ public class Mirror {
 	}
 
 	private IValue invoke(Object object) {
-		return new MirrorCallBack<Object>(object, invokeFunc, ctx) {
-			@Override
-			public int getArity() {
-				return 2;
-			} 
+		return new MirrorCallBack<Object>(object, invokeFunc) {
 
 			@Override
-			Result<IValue> call(Type[] formals, IValue[] actuals) {
+			@SuppressWarnings("unchecked")
+			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
 				try {
 					IConstructor signature = (IConstructor) actuals[0];
 					IList args = (IList) actuals[1];
@@ -431,7 +396,7 @@ public class Mirror {
 					Method meth = getMethod(objectClass, signature);
 					meth.setAccessible(true);
 					Object object = meth.invoke(getWrapped(), unreflect(args));
-					return ResultFactory.makeResult(Mirror, mirrorObject(object), ctx);
+					return (U) mirrorObject(object);
 				} catch (IllegalAccessException | IllegalArgumentException
 						| InvocationTargetException | SecurityException | NoSuchMethodException | ClassNotFoundException e) {
 					throw new RuntimeException(e);
@@ -441,21 +406,18 @@ public class Mirror {
 	}
 	
 	private IValue invokeStatic(String className, Class<?> cls) {
-		return new MirrorCallBack<Class<?>>(cls, invokeStaticFunc, ctx) {
-			@Override
-			public int getArity() {
-				return 2;
-			} 
+		return new MirrorCallBack<Class<?>>(cls, invokeStaticFunc) {
 
 			@Override
-			Result<IValue> call(Type[] formals, IValue[] actuals) {
+			@SuppressWarnings("unchecked")
+			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
 				try {
 					IConstructor signature = (IConstructor) actuals[0];
 					IList args = (IList) actuals[1];
 					Method meth = getMethod(getWrapped(), signature);
 					meth.setAccessible(true);
 					Object object = meth.invoke(null, unreflect(args));
-					return ResultFactory.makeResult(Mirror, mirrorObject(object), ctx);
+					return (U) mirrorObject(object);
 				} catch (IllegalAccessException | IllegalArgumentException
 						| InvocationTargetException | SecurityException | NoSuchMethodException | ClassNotFoundException e) {
 					throw new RuntimeException(e);
@@ -475,88 +437,33 @@ public class Mirror {
 	}
 
 	private Method getMethod(Class<?> cls, IConstructor sig) throws NoSuchMethodException, SecurityException, ClassNotFoundException {
-		return cls.getMethod(AST.$getName(sig), Signature.binaryClasses(AST.$getFormals(sig), ctx.getOutPrinter()));
+		return cls.getMethod(AST.$getName(sig), Signature.binaryClasses(AST.$getFormals(sig), out));
 	}
 	
 	private <T> Constructor<T> getDeclaredConstructor(Class<T> cls, IConstructor sig) throws NoSuchMethodException, SecurityException, ClassNotFoundException {
-		return cls.getDeclaredConstructor(Signature.binaryClasses(AST.$getFormals(sig), ctx.getOutPrinter()));
+		return cls.getDeclaredConstructor(Signature.binaryClasses(AST.$getFormals(sig), out));
 	}
 
-	private abstract static class MirrorCallBack<T> extends AbstractFunction {
+	private static abstract class MirrorCallBack<T> implements IFunction {
 		private final T wrapped;
+		private final Type type;
 
-		public MirrorCallBack(T wrapped, FunctionType type, IEvaluatorContext ctx) {
-			super(null, ctx.getEvaluator(), type, Collections.emptyList(), false, ctx.getCurrentEnvt());
+		public MirrorCallBack(T wrapped, Type type) {
 			this.wrapped = wrapped;
+			this.type = type;
 		}
 
 		public T getWrapped() {
 			return wrapped;
 		}
-		
-		@Override
-		public ICallableValue cloneInto(Environment env) {
-			return null;
-		}
-		
-		@Override
-		public boolean isStatic() {
-			return false;
-		}
-		
-		@Override
-		public boolean isDefault() {
-			return false;
-		}
-		
-		@Override
-		public IConstructor encodeAsConstructor() {
-			IValueFactory vf = eval.getValueFactory();
-			return vf.constructor(RascalValueFactory.Function_Function, vf.sourceLocation("file:///unknown"));
-		}
-		
-		@Override
-		public Result<IValue> call(Type[] argTypes, IValue[] argValues, Map<String, IValue> keyArgValues)
-				throws MatchFailed {
-			try {
-				if (argTypes.length != argValues.length) {
-					throw new RuntimeException("function should have " + argTypes.length + " arguments");
-				}
-				
-				for (int i = 0; i < argTypes.length; i++) {
-					Type actualType = argValues[i].getType();
-					Type formalType = getFunctionType().getFieldType(i);
-					if (!actualType.isSubtypeOf(formalType)) {
-						throw new RuntimeException("argument " + i + " is a " + actualType + " but should be a " + formalType);
-					}
-				}
-				
-				return call(argTypes, argValues);
-			}
-			catch (Throwable e) {
-				while (e.getCause() != e && e.getCause() != null) {
-					e = e.getCause();
-				}
 
-				if (e instanceof Throw) {
-					throw (Throw) e;
-				}
-				else if (e instanceof RuntimeException) {
-					throw (RuntimeException) e;
-				}
-				else {
-					throw new RuntimeException(e);
-				}
-			}
-		}
-		
 		@Override
-		public Result<IValue> call(IRascalMonitor monitor, Type[] argTypes, IValue[] argValues,
-				Map<String, IValue> keyArgValues) {
-			return call(argTypes, argValues, null);
+		public Type getType() {
+			return type;
 		}
 
-		abstract Result<IValue> call(Type[] argTypes, IValue[] argValues);
+		@Override
+		public abstract <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... parameters);
 	}
 
 	public IValue mirrorArray(IConstructor type, int length) throws ClassNotFoundException {

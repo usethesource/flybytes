@@ -15,16 +15,6 @@ import lang::flybytes::macros::ControlFlow; // for_array
 import IO;
 import String;
 import ParseTree;
-import util::IDE;
-import util::ValueUI;
-
-void registerPico() {
-  registerLanguage("Pico", "pico", 
-    Tree (str input, loc src) { 
-      return parse(#start[Program], input, src); 
-    }
-  );
-}
 
 Program parse(loc program) = parse(#start[Program], program).top;
 
@@ -42,7 +32,6 @@ void testITE() {
 
 void compileProgram(Program p, str name, loc folder) {
   cl = compileProgram(p, name);
-  text(cl);
   compileClass(compileProgram(p, name), folder + "<name>.class", debugMode=true);
 }
 

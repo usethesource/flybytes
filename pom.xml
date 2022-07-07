@@ -9,7 +9,7 @@
 	<packaging>jar</packaging>
 
 	<scm>
-		<developerConnection>scm:git:ssh://git@github.com/cwi-swat/flybytes.git</developerConnection>
+		<developerConnection>scm:git:ssh://git@github.com/usethesource/flybytes.git</developerConnection>
 	</scm>
 
 	<build>

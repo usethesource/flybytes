@@ -1,3 +1,29 @@
+/*
+ * Copyright (c) 2022, NWO-I CWI 
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 package lang.flybytes.internal;
 
 import java.io.PrintWriter;
@@ -8,17 +34,17 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 import org.rascalmpl.exceptions.RuntimeExceptionFactory;
 import org.rascalmpl.types.TypeReifier;
-import org.rascalmpl.values.functions.IFunction;
+import org.rascalmpl.values.IRascalValueFactory;
 
 import io.usethesource.vallang.IConstructor;
 import io.usethesource.vallang.IInteger;
 import io.usethesource.vallang.IList;
 import io.usethesource.vallang.IString;
 import io.usethesource.vallang.IValue;
-import io.usethesource.vallang.IValueFactory;
 import io.usethesource.vallang.type.ITypeVisitor;
 import io.usethesource.vallang.type.Type;
 import io.usethesource.vallang.type.TypeStore;
@@ -31,7 +57,7 @@ import lang.flybytes.internal.ClassCompiler.Switch;
  * with callbacks into the reflection API. For testing purposes.
  */
 public class Mirror {
-	private final IValueFactory vf;
+	private final IRascalValueFactory vf;
 	private final TypeReifier tr;
 	private final PrintWriter out;
 	private final Type Mirror;
@@ -49,8 +75,25 @@ public class Mirror {
 	private final Type loadFunc;
 	private final Type nullCons;
 
-	public Mirror(IValueFactory vf, TypeStore store, PrintWriter out) {
-		this.vf = vf;
+	/**
+	 * These "unreflect" maps store the inverse Mirror relation, such that mirrored
+	 * classes, objects and arrays can be unwrapped to their original JVM 
+	 * value. The values returns from .get are exactly the captured variables
+	 * of the closures passed to IRascalValueFactory.function, because when
+	 * we capture those values we .put them here in the respective maps.
+	 * 
+	 * Do not turn these maps into time-delayed evictions, since it must
+	 * always be possible to revert a mirrored object back to its original,
+	 * while it is still in memory. 
+	 * 
+	 * The keys are weak to make sure that irrelevant mirrors are not kept
+	 * in memory here.
+	 */
+	private final Map<IConstructor, Class<?>> unreflectClass = new WeakHashMap<>();
+	private final Map<IConstructor, Object> unreflectObject = new WeakHashMap<>();
+
+	public Mirror(IRascalValueFactory rvf, TypeStore store, PrintWriter out) {
+		this.vf = rvf;
 		this.tr = new TypeReifier(vf);
 		this.out = out;
 		this.Mirror = store.lookupAbstractDataType("Mirror");
@@ -74,13 +117,15 @@ public class Mirror {
 	}
 
 	public IConstructor mirrorClass(String className, Class<?> cls) {
-		return vf.constructor(classCons, 
+		IConstructor result= vf.constructor(classCons, 
 				vf.string(className),
 				invokeStatic(className, cls),
 				getStatic(className, cls),
 				newInstance(className, cls),
 				getAnnotation(className, cls)
 				);
+		unreflectClass.put(result, cls);
+		return result;
 	}
 	
 	public IConstructor mirrorObject(Object object) {
@@ -90,72 +135,64 @@ public class Mirror {
 		
 		Class<?> cls = object.getClass();
 		IConstructor classMirror = mirrorClass(cls.getName(), cls);
-		return mirrorObject(classMirror, object);
+		IConstructor objectMirror= mirrorObject(classMirror, object);
+		unreflectObject.put(objectMirror, object);
+		return objectMirror;
 	}
 	
 	private IConstructor mirrorObject(IConstructor classMirror, Object object) {
 		if (object.getClass().isArray()) {
-			return vf.constructor(arrayCons,
+			IConstructor arrayMirror = vf.constructor(arrayCons,
 					length(object),
 					load(object));
+			unreflectObject.put(arrayMirror, object);
+			return arrayMirror;
 		}
 		else {
-			return vf.constructor(objectCons,
+			IConstructor objectMirror = vf.constructor(objectCons,
 					classMirror,
 					invoke(object),
 					field(object),
 					toValue(object)
 					);
+			unreflectObject.put(objectMirror, object);
+			return objectMirror;
 		}
 	}
 
 	private IValue load(Object object) {
-		return new MirrorCallBack<Object>(object, loadFunc) {
-			@Override
-			@SuppressWarnings("unchecked")
-			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
-				int index = ((IInteger) actuals[0]).intValue();
-				return (U) mirrorObject(Array.get(getWrapped(), index));
-			}
-		};
+		return vf.function(loadFunc, (actuals, keywordParameters) -> {
+			int index = ((IInteger) actuals[0]).intValue();
+			return mirrorObject(Array.get(object, index));
+		});
 	}
 
 	private IValue length(Object object) {
-		return new MirrorCallBack<Object>(object, lengthFunc) {
-			@Override
-			@SuppressWarnings("unchecked")
-			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
-				return (U) vf.integer(Array.getLength(getWrapped()));
-			}
-		};
+		return vf.function(lengthFunc, (actuals, keywordParameters) -> {
+			return vf.integer(Array.getLength(object));
+		});
 	}
 
 	private IValue toValue(Object object) {
-		return new MirrorCallBack<Object>(object, toValueFunc) {
-			
-			@Override
-			@SuppressWarnings("unchecked")
-			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
-				Type expected = tr.valueToType((IConstructor) actuals[0]);
-				Object wrapped = getWrapped();
-				IValue result = null;
+		return vf.function(toValueFunc, (actuals, keywordParameters) -> {
+			Type expected = tr.valueToType((IConstructor) actuals[0]);
+			Object wrapped = object;
+			IValue result = null;
 
-				
-				if (wrapped instanceof IValue) {
-					result = (IValue) wrapped;
-				}
-				else {
-					result = asValue(expected, wrapped);
-				}
-
-				if (result.getType().comparable(expected)) {
-					return (U) result;
-				}
-				else {
-					throw RuntimeExceptionFactory.illegalTypeArgument(expected.toString(), null, null);
-				}
+			if (wrapped instanceof IValue) {
+				result = (IValue) wrapped;
 			}
-		};
+			else {
+				result = asValue(expected, wrapped);
+			}
+
+			if (result.getType().comparable(expected)) {
+				return result;
+			}
+			else {
+				throw RuntimeExceptionFactory.illegalTypeArgument(expected.toString(), null, null);
+			}
+		});
 	}
 
 	private IValue asValue(Type expected, Object wrapped) {
@@ -308,122 +345,99 @@ public class Mirror {
 	}
 	
 	private IValue newInstance(String className, Class<?> cls) {
-		return new MirrorCallBack<Class<?>>(cls, newInstanceFunc) {
-
-			@Override
-			@SuppressWarnings("unchecked")
-			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
-				try {
-					IConstructor signature = (IConstructor) actuals[0];
-					IList args = (IList) actuals[1];
-					
-					Constructor<?> meth = getDeclaredConstructor(getWrapped(), signature);
-					Object object = meth.newInstance(unreflect(args));
-					return (U) mirrorObject(object);
-				} catch (IllegalAccessException | IllegalArgumentException
-						| InvocationTargetException | SecurityException | NoSuchMethodException | ClassNotFoundException | InstantiationException e) {
-					throw new RuntimeException(e);
-				}
+		return vf.function(newInstanceFunc, (actuals, keywordParameters) -> {
+			try {
+				IConstructor signature = (IConstructor) actuals[0];
+				IList args = (IList) actuals[1];
+				
+				Constructor<?> meth = getDeclaredConstructor(cls, signature);
+				Object object = meth.newInstance(unreflect(args));
+				return mirrorObject(object);
+			} catch (IllegalAccessException | IllegalArgumentException
+					| InvocationTargetException | SecurityException | NoSuchMethodException | ClassNotFoundException | InstantiationException e) {
+				throw new RuntimeException(e);
 			}
-		};
+		});
 	}
 	
 	private IValue getStatic(String className, Class<?> cls) {
-		return new MirrorCallBack<Class<?>>(cls, getStaticFunc) {
-			@Override
-			@SuppressWarnings("unchecked")
-			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
-				try {
-					String name = ((IString) actuals[0]).getValue();
-					Field field = getWrapped().getField(name);
-					Object result = field.get(null); 
-					return (U) mirrorObject(result);
-				} catch (IllegalAccessException | IllegalArgumentException
-					 | SecurityException | NoSuchFieldException e) {
-					throw new RuntimeException(e);
-				}
+		return vf.function(getStaticFunc, (actuals, keywordParameters) -> {
+			try { 
+				String name = ((IString) actuals[0]).getValue();
+				Field field = cls.getField(name);
+				Object result = field.get(null); 
+				return mirrorObject(result);
+			} catch (IllegalAccessException | IllegalArgumentException
+					| SecurityException | NoSuchFieldException e) {
+				throw new RuntimeException(e);
 			}
-		};
+		});
 	}
 	
 	private IValue getAnnotation(String className, Class<?> cls) {
-		return new MirrorCallBack<Class<?>>(cls, getAnnotationFunc) {
-			@Override
-			@SuppressWarnings("unchecked")
-			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
-				try {
-					Class<?> annoClass = Signature.binaryClass((IConstructor) actuals[0]);
-					@SuppressWarnings("rawtypes")
-					Annotation anno = getWrapped().getAnnotation((Class) annoClass);
-					return (U) mirrorObject(anno);
-				} catch (IllegalArgumentException | SecurityException | ClassNotFoundException e) {
-					throw new RuntimeException(e);
+		return vf.function(getAnnotationFunc, (actuals, keywordParameters) -> {
+			try {
+				Class<?> annoClass = Signature.binaryClass((IConstructor) actuals[0]);
+				for (Annotation anno : cls.getAnnotations()) {
+					if (anno.getClass().isAssignableFrom(annoClass)) {
+						return mirrorObject(anno);
+					}
 				}
+
+				throw RuntimeExceptionFactory.illegalArgument(vf.string(className));
+			} catch (IllegalArgumentException | SecurityException | ClassNotFoundException e) {
+				throw new RuntimeException(e);
 			}
-		};
+		});
 	}
 
 	private IValue field(Object object) {
-		return new MirrorCallBack<Object>(object, getFieldFunc) {
-
-			@Override
-			@SuppressWarnings("unchecked")
-			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
-				try {
-					String name = ((IString) actuals[0]).getValue();
-					Field field = getWrapped().getClass().getDeclaredField(name);
-					field.setAccessible(true);
-					Object result = field.get(getWrapped());
-					return (U) mirrorObject(result);
-				} catch (IllegalAccessException | IllegalArgumentException
-					 | SecurityException | NoSuchFieldException e) {
-					throw new RuntimeException(e);
-				}
+		return vf.function(getFieldFunc, (actuals, keywordParameters) -> {
+			try {
+				String name = ((IString) actuals[0]).getValue();
+				Field field = object.getClass().getDeclaredField(name);
+				field.setAccessible(true);
+				Object result = field.get(object);
+				return mirrorObject(result);
+			} catch (IllegalAccessException | IllegalArgumentException
+					| SecurityException | NoSuchFieldException e) {
+				throw new RuntimeException(e);
 			}
-		};
+		});
 	}
 
 	private IValue invoke(Object object) {
-		return new MirrorCallBack<Object>(object, invokeFunc) {
-
-			@Override
-			@SuppressWarnings("unchecked")
-			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
-				try {
-					IConstructor signature = (IConstructor) actuals[0];
-					IList args = (IList) actuals[1];
-					Class<?> objectClass = getWrapped().getClass();
-					Method meth = getMethod(objectClass, signature);
-					meth.setAccessible(true);
-					Object object = meth.invoke(getWrapped(), unreflect(args));
-					return (U) mirrorObject(object);
-				} catch (IllegalAccessException | IllegalArgumentException
-						| InvocationTargetException | SecurityException | NoSuchMethodException | ClassNotFoundException e) {
-					throw new RuntimeException(e);
-				}
+		return vf.function(invokeFunc, (actuals, keywordParameters) -> {
+			try {
+				IConstructor signature = (IConstructor) actuals[0];
+				IList args = (IList) actuals[1];
+				Class<?> objectClass = object.getClass();
+				Method meth = getMethod(objectClass, signature);
+				meth.setAccessible(true);
+				Object obj = meth.invoke(object, unreflect(args));
+				return mirrorObject(obj);
+			} catch (IllegalAccessException | IllegalArgumentException
+					| InvocationTargetException | SecurityException | NoSuchMethodException | ClassNotFoundException e) {
+				throw new RuntimeException(e);
 			}
-		};
+		});
 	}
 	
 	private IValue invokeStatic(String className, Class<?> cls) {
-		return new MirrorCallBack<Class<?>>(cls, invokeStaticFunc) {
-
-			@Override
-			@SuppressWarnings("unchecked")
-			public <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... actuals) {
-				try {
-					IConstructor signature = (IConstructor) actuals[0];
-					IList args = (IList) actuals[1];
-					Method meth = getMethod(getWrapped(), signature);
-					meth.setAccessible(true);
-					Object object = meth.invoke(null, unreflect(args));
-					return (U) mirrorObject(object);
-				} catch (IllegalAccessException | IllegalArgumentException
-						| InvocationTargetException | SecurityException | NoSuchMethodException | ClassNotFoundException e) {
-					throw new RuntimeException(e);
-				}
+		return vf.function(invokeStaticFunc, (actuals, keywordParameters) -> {
+			try {
+				IConstructor signature = (IConstructor) actuals[0];
+				IList args = (IList) actuals[1];
+				Method meth = getMethod(cls, signature);
+				meth.setAccessible(true);
+				Object obj = meth.invoke(null, unreflect(args));
+				return mirrorObject(obj);
+			} catch (IllegalAccessException | IllegalArgumentException
+					| InvocationTargetException | SecurityException | NoSuchMethodException | ClassNotFoundException e) {
+						e.printStackTrace();
+				throw new RuntimeException(e);
 			}
-		};
+		});
 	}
 	
 	protected Object[] unreflect(IList args) {
@@ -442,28 +456,6 @@ public class Mirror {
 	
 	private <T> Constructor<T> getDeclaredConstructor(Class<T> cls, IConstructor sig) throws NoSuchMethodException, SecurityException, ClassNotFoundException {
 		return cls.getDeclaredConstructor(Signature.binaryClasses(AST.$getFormals(sig), out));
-	}
-
-	private static abstract class MirrorCallBack<T> implements IFunction {
-		private final T wrapped;
-		private final Type type;
-
-		public MirrorCallBack(T wrapped, Type type) {
-			this.wrapped = wrapped;
-			this.type = type;
-		}
-
-		public T getWrapped() {
-			return wrapped;
-		}
-
-		@Override
-		public Type getType() {
-			return type;
-		}
-
-		@Override
-		public abstract <U extends IValue> U call(Map<String, IValue> keywordParameters, IValue... parameters);
 	}
 
 	public IValue mirrorArray(IConstructor type, int length) throws ClassNotFoundException {
@@ -508,19 +500,23 @@ public class Mirror {
 
 	private Object unreflect(IConstructor mirror) {
 		switch (mirror.getConstructorType().getName()) {
-		case "null" : 
+		case "null": 
 			return null; 
-		case "reference" : 
-			return ((MirrorCallBack<?>) mirror.get("invokeStatic")).getWrapped();
+		case "class": 
+			Class<?> cls = unreflectClass.get(mirror);
+			if (cls == null) {
+				throw RuntimeExceptionFactory.illegalArgument(mirror);
+			}
+			return cls;
 		case "object": 
-			return ((MirrorCallBack<?>) mirror.get("invoke")).getWrapped();
-		case "array" :
-			Object wrapped = ((MirrorCallBack<?>) mirror.get("load")).getWrapped();
-			return wrapped;
+		case "array":
+			Object obj = unreflectObject.get(mirror);
+			if (obj == null) {
+				throw RuntimeExceptionFactory.illegalArgument(mirror);
+			}
+			return obj;
 		default:
 			throw new IllegalArgumentException(mirror.toString());
 		}
 	}
-	
-	
 }

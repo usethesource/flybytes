@@ -1,3 +1,29 @@
+/*
+ * Copyright (c) 2022, NWO-I CWI 
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 package lang.flybytes.internal;
 
 import java.io.IOException;
@@ -17,7 +43,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.rascalmpl.exceptions.RuntimeExceptionFactory;
-import org.rascalmpl.interpreter.IEvaluatorContext;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -30,6 +55,7 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.rascalmpl.uri.URIResolverRegistry;
 import org.rascalmpl.uri.URIUtil;
+import org.rascalmpl.values.IRascalValueFactory;
 import org.rascalmpl.values.ValueFactoryFactory;
 
 import io.usethesource.vallang.IBool;
@@ -55,14 +81,16 @@ import io.usethesource.vallang.type.TypeStore;
  * using the ASM library.
  */
 public class ClassCompiler {
-	private final IValueFactory vf;
+	private final IRascalValueFactory vf;
 	private final TypeStore ts;
 	private final PrintWriter out;
+	private final Mirror mirror;
 
-	public ClassCompiler(IValueFactory vf, TypeStore store, PrintWriter out) {
+	public ClassCompiler(IRascalValueFactory vf, TypeStore store, PrintWriter out) {
 		this.vf = vf;
 		this.ts = store;
 		this.out = out;
+		this.mirror = new Mirror(vf, ts, out);
 	}
 
 	public void compileClass(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IBool debugMode) {
@@ -135,8 +163,6 @@ public class ClassCompiler {
 
 			Class<?> loaded = loadSingleClass(className, cw);
 
-			Mirror m = new Mirror(vf, ts, out);
-
 			if (output.getConstructorType().getName().equals("just")) {
 				ISourceLocation classFile = (ISourceLocation) output.get("val");
 				try (OutputStream out = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
@@ -147,7 +173,7 @@ public class ClassCompiler {
 				}
 			}
 
-			return m.mirrorClass(className, loaded);
+			return mirror.mirrorClass(className, loaded);
 		} 
 		catch (Throwable e) {
 			e.printStackTrace(out);
@@ -155,26 +181,22 @@ public class ClassCompiler {
 		}
 	}
 
-	public IValue val(IValue v, IEvaluatorContext ctx) {
-		Mirror m = new Mirror(vf, ts, out);
-		return m.mirrorObject(v);
+	public IValue val(IValue v) {
+		return mirror.mirrorObject(v);
 	}
 
-	public IValue array(IConstructor type, IList elems, IEvaluatorContext ctx) throws ClassNotFoundException {
-		Mirror m = new Mirror(vf, ts, out);
-		return m.mirrorArray(type, elems);
+	public IValue array(IConstructor type, IList elems) throws ClassNotFoundException {
+		return mirror.mirrorArray(type, elems);
 	}
 
-	public IValue array(IConstructor type, IInteger length, IEvaluatorContext ctx) throws ClassNotFoundException {
-		Mirror m = new Mirror(vf, ts, out);
-		return m.mirrorArray(type, length.intValue());
+	public IValue array(IConstructor type, IInteger length) throws ClassNotFoundException {
+		return mirror.mirrorArray(type, length.intValue());
 	}
 
-	public IValue classMirror(IString n, IEvaluatorContext ctx) {
+	public IValue classMirror(IString n) {
 		try {
-			Mirror m = new Mirror(vf, ts, out);
 			String name = n.getValue();
-			return m.mirrorClass(name, Class.forName(name));
+			return mirror.mirrorClass(name, Class.forName(name));
 		} catch (ClassNotFoundException e) {
 			throw new IllegalArgumentException(n.getValue());
 		}

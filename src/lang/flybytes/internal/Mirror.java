@@ -374,17 +374,14 @@ public class Mirror {
 		});
 	}
 	
+	@SuppressWarnings({"rawtypes","unchecked"})
 	private IValue getAnnotation(String className, Class<?> cls) {
 		return vf.function(getAnnotationFunc, (actuals, keywordParameters) -> {
 			try {
-				Class<?> annoClass = Signature.binaryClass((IConstructor) actuals[0]);
-				for (Annotation anno : cls.getAnnotations()) {
-					if (anno.getClass().isAssignableFrom(annoClass)) {
-						return mirrorObject(anno);
-					}
-				}
-
-				throw RuntimeExceptionFactory.illegalArgument(vf.string(className));
+				Class annoClass = Signature.binaryClass((IConstructor) actuals[0]);
+				Annotation annoObject = cls.getAnnotation(annoClass);
+				
+				return mirrorObject(annoObject);
 			} catch (IllegalArgumentException | SecurityException | ClassNotFoundException e) {
 				throw new RuntimeException(e);
 			}

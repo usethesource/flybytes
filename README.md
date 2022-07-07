@@ -71,6 +71,20 @@ Flybytes is an intermediate language towards JVM bytecode generation for Rascal-
 * The language is fully implemented, with the noted exception of nested classes
 * The language is fully tested, with the noted exception of the invokedynamic feature
 
+
+### Installation
+
+* Install Rascal into Eclipse or VScode
+* Use util::Reflective::newRascalProject to make a folder with the standard setup
+* Add this to the pom.xml under `<dependencies>`
+```
+<dependency>
+   <groupId>org.rascalmpl</groupId>
+   <artifactId>flybytes</artifactId>
+   <version>0.0.1</version>
+</dependency>
+```                
+
 ### Citations
 
 The design of Flybtyes was informed by the JVM VM spec, the ASM library code and documentation and the Jitescript API:

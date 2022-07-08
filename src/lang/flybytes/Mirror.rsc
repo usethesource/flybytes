@@ -46,7 +46,7 @@ java Mirror val(value v);
 @javaClass{lang.flybytes.internal.ClassCompiler}
 @memo
 @doc{reflects a JVM class object as Mirror class}
-java Mirror classMirror(str name);
+java Mirror classMirror(str name,list[loc] classpath = [|system:///|]);
 
 @javaClass{lang.flybytes.internal.ClassCompiler}
 @doc{creates a mirrored array}

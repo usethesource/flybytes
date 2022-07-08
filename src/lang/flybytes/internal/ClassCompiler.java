@@ -55,6 +55,7 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.rascalmpl.uri.URIResolverRegistry;
 import org.rascalmpl.uri.URIUtil;
+import org.rascalmpl.uri.classloaders.SourceLocationClassLoader;
 import org.rascalmpl.values.IRascalValueFactory;
 import org.rascalmpl.values.ValueFactoryFactory;
 
@@ -85,12 +86,14 @@ public class ClassCompiler {
 	private final TypeStore ts;
 	private final PrintWriter out;
 	private final Mirror mirror;
+	private final ClassLoader loader;
 
-	public ClassCompiler(IRascalValueFactory vf, TypeStore store, PrintWriter out) {
+	public ClassCompiler(IRascalValueFactory vf, TypeStore store, PrintWriter out, ClassLoader loader) {
 		this.vf = vf;
 		this.ts = store;
 		this.out = out;
 		this.mirror = new Mirror(vf, ts, out);
+		this.loader = loader;
 	}
 
 	public void compileClass(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IBool debugMode) {
@@ -193,10 +196,11 @@ public class ClassCompiler {
 		return mirror.mirrorArray(type, length.intValue());
 	}
 
-	public IValue classMirror(IString n) {
+	public IValue classMirror(IString n, IList classpath) {
 		try {
+			ClassLoader loader = new SourceLocationClassLoader(classpath, this.loader);
 			String name = n.getValue();
-			return mirror.mirrorClass(name, Class.forName(name));
+			return mirror.mirrorClass(name, loader.loadClass(name));
 		} catch (ClassNotFoundException e) {
 			throw new IllegalArgumentException(n.getValue());
 		}

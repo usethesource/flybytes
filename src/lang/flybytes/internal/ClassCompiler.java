@@ -111,8 +111,7 @@ public class ClassCompiler {
 	}
 
 	public IMap loadClasses(IList classes, IConstructor prefix, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode) {
-		ClassLoader locLoader = new SourceLocationClassLoader(classpath, loader);
-		ClassMapLoader l = new ClassMapLoader(locLoader);
+		ClassMapLoader l = new ClassMapLoader(getClass().getClassLoader());
 
 		ISourceLocation classFolder = null;
 
@@ -159,14 +158,13 @@ public class ClassCompiler {
 
 	public IValue loadClass(IConstructor cls, IConstructor output, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode) {
 		try {
-			ClassLoader locLoader = new SourceLocationClassLoader(classpath, loader);
 			String className = AST.$getName(AST.$getType(cls));
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 			ClassVisitor cv = cw;
 
 			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
 
-			Class<?> loaded = loadSingleClass(className, cw, locLoader);
+			Class<?> loaded = loadSingleClass(className, cw);
 
 			if (output.getConstructorType().getName().equals("just")) {
 				ISourceLocation classFile = (ISourceLocation) output.get("val");
@@ -208,8 +206,8 @@ public class ClassCompiler {
 		}
 	}
 
-	private Class<?> loadSingleClass(String className, ClassWriter cw, ClassLoader loader) throws ClassNotFoundException {
-		ClassMapLoader l = new ClassMapLoader(loader);
+	private Class<?> loadSingleClass(String className, ClassWriter cw) throws ClassNotFoundException {
+		ClassMapLoader l = new ClassMapLoader(getClass().getClassLoader());
 		l.putBytes(className, cw.toByteArray());
 		return l.getClass(className);
 	}

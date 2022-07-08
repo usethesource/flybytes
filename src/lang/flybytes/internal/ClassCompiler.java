@@ -102,7 +102,7 @@ public class ClassCompiler {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES + ClassWriter.COMPUTE_MAXS);
 			ClassVisitor cv = cw;
 
-			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
+			new Compile(cv, AST.$getVersionCode(version), debugMode.getValue()).compileClass(cls);
 
 			output.write(cw.toByteArray());
 		} catch (Throwable e) {
@@ -111,7 +111,7 @@ public class ClassCompiler {
 	}
 
 	public IMap loadClasses(IList classes, IConstructor prefix, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode) {
-		ClassLoader locLoader = new SourceLocationClassLoader(classpath, loader);
+		ClassLoader locLoader = new SourceLocationClassLoader(classpath.append(URIUtil.rootLocation("system")), loader);
 		ClassMapLoader l = new ClassMapLoader(locLoader);
 
 		ISourceLocation classFolder = null;
@@ -127,7 +127,7 @@ public class ClassCompiler {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 			ClassVisitor cv = cw;
 
-			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
+			new Compile(cv, AST.$getVersionCode(version), debugMode.getValue()).compileClass(cls);
 			byte[] bytes = cw.toByteArray();
 
 			l.putBytes(name, cw.toByteArray());
@@ -159,12 +159,12 @@ public class ClassCompiler {
 
 	public IValue loadClass(IConstructor cls, IConstructor output, IList classpath, IBool enableAsserts, IConstructor version, IBool debugMode) {
 		try {
-			ClassLoader locLoader = new SourceLocationClassLoader(classpath, loader);
+			ClassLoader locLoader = new SourceLocationClassLoader(classpath.append(URIUtil.rootLocation("system")), getClass().getClassLoader());
 			String className = AST.$getName(AST.$getType(cls));
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 			ClassVisitor cv = cw;
 
-			new Compile(cv, AST.$getVersionCode(version), out, debugMode.getValue()).compileClass(cls);
+			new Compile(cv, AST.$getVersionCode(version), debugMode.getValue()).compileClass(cls);
 
 			Class<?> loaded = loadSingleClass(className, cw, locLoader);
 
@@ -270,8 +270,6 @@ public class ClassCompiler {
 		private static final Builder<IConstructor> DONE = () -> { return null; };
 		private final ClassVisitor cw;
 		private final int version;
-		@SuppressWarnings("unused")
-		private final PrintWriter out;
 		private ArrayList<IConstructor> variableTypes;
 		private ArrayList<String> variableNames;
 		private ArrayList<IConstructor> variableDefaults;
@@ -295,10 +293,9 @@ public class ClassCompiler {
 		private boolean emittingFinally = false;
 		private final boolean debug;
 
-		public Compile(ClassVisitor cw, int version, PrintWriter out, boolean debug) {
+		public Compile(ClassVisitor cw, int version, boolean debug) {
 			this.cw = cw;
 			this.version = version;
-			this.out = out;
 			this.debug = debug;
 		}
 

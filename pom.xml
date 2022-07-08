@@ -27,6 +27,7 @@
 				<includes>
 					<include>META-INF/RASCAL.MF</include>
 					<include>src/**/*.rsc</include>
+					<include>doc/**/*.md</include>
 				</includes>
 			</resource>
 		</resources>

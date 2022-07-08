@@ -4176,6 +4176,16 @@ public class ClassCompiler {
 			case "v1_6": return Opcodes.V1_6;
 			case "v1_7": return Opcodes.V1_7;
 			case "v1_8": return Opcodes.V1_8;
+			case "v9"  : return Opcodes.V9;
+			case "v10"  : return Opcodes.V10;
+			case "v11"  : return Opcodes.V11;
+			case "v12"  : return Opcodes.V12;
+			case "v13"  : return Opcodes.V13;
+			case "v14"  : return Opcodes.V14;
+			case "v15"  : return Opcodes.V15;
+			case "v16"  : return Opcodes.V16;
+			case "v17"  : return Opcodes.V17;
+			case "v18"  : return Opcodes.V18;
 			default:
 				throw new IllegalArgumentException(version.toString());
 			}

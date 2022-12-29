@@ -10,11 +10,8 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 }
 @contributor{Jurgen J. Vinju}
-@doc{
-.Synopsis Provides a native interface to Java objects via class and object reflection.
-
-.Description
-
+@synopsis{Provides a native interface to Java objects via class and object reflection.}
+@description{
 Using this Mirror representation you can test generated class files by loading the class
 and executing static methods on the classes, getting static fields, allocating new instances,
 calling methods on these instances, etc. There is also support for native arrays.
@@ -40,20 +37,20 @@ data Mirror
               
 @javaClass{lang.flybytes.internal.ClassCompiler}
 @memo
-@doc{reflects a Rascal value as a JVM object Mirror}
+@synopsis{reflects a Rascal value as a JVM object Mirror}
 java Mirror val(value v);
 
 @javaClass{lang.flybytes.internal.ClassCompiler}
 @memo
-@doc{reflects a JVM class object as Mirror class}
+@synopsis{reflects a JVM class object as Mirror class}
 java Mirror classMirror(str name,list[loc] classpath = [|system:///|]);
 
 @javaClass{lang.flybytes.internal.ClassCompiler}
-@doc{creates a mirrored array}
+@synopsis{creates a mirrored array}
 java Mirror array(Type \type, list[Mirror] elems);
 
 @javaClass{lang.flybytes.internal.ClassCompiler}
-@doc{creates a mirrored array}
+@synopsis{creates a mirrored array}
 java Mirror array(Type \type, int length);
 
 str toString(Mirror m:object(_, _, _, _)) = m.invoke(methodDesc(string(),"toString", []), []).toValue(#str);

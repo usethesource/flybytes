@@ -10,81 +10,12 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 }
 @contributor{Jurgen J. Vinju}
-@doc{
-
-.Synopsis Flybytes is an intermediate language just above the abstraction level of the JVM bytecode language.
-
-.Description
-
-Flybytes is an intermediate language towards JVM bytecode generation for Rascal-based compilers of Domain Specific Languages and Programming Languages.
-
-### Context:
-
-* you are implementing a textual or graphical DSL or a programming language using Rascal
-* you want to target the JVM because of its general availability and the JIT compiler
-* you do not have time to get into the hairy details of JVM bytecode generation, and do not have time for debugging on the JVM bytecode level
-* you do want to profit from the Just In Time (JIT) compiler, so you need idiomatic JVM bytecode that the JIT compiler understands
-* you understand the Java programming language pretty well
-* you could generate Java code but that would be too slow and require a JDK as a dependency, or you need `invokedynamic` support for your language which Java does not offer.
-
-### Solution:
-
-1. Flybytes is an intermediate abstract syntax tree format that looks a lot like abstract syntax trees for Java code
-1. You translate your own abstract syntax trees for your own language directly to Flybytes ASTs using Rascal
-1. The Flybytes compiler use the [ASM framework](https://asm.ow2.io/) to generate bytecode in a single pass of the Flybytes AST
-   * either the code is directly streamed to a class file (and optionally loaded)
-   * or a reasonably clear error message is produced due to an error in the FlyBytes AST.
-   
-### Presumptions:
-
-* Flybytes does not cover a priori type checking of the input Flybytes AST. So, a proper application of the Flybytes compiler assumes:
-   * Your DSL has its own type checker and the compiler is not called if the input code still has serious type errors or name resolution errors (but you could also generate error nodes for partial compilation support)
-   * Your compiler to Flybytes ASTs does not introduce new type errors with respect to the JVM's type system.
-* Flybytes does not cover much name resolution, so for imports, foreign names and such you have to provide fully qualified names while generating Flybytes ASTs
-
-### Features:
-
-* Protection from ASM and JVM crashes: the Flybytes compiler does some on-the-fly type checking and error reporting in case you generated something weird.
-* Tries to generate JVM bytecode that looks like it could have come from a Java compiler
-* Offers many Java-like (high-level programming language) features:
-   1. local variable names
-   1. formal parameter names
-   1. structured control flow: if, while, do-while, try-catch-finally, for, break, continue, return, switch
-   1. monitor blocks
-   1. full expression language (fully hides stack operations of JVM bytecode)
-   1. class, method, and variable annotations 
-   1. method invocation specialized towards specific JVM instructions (for efficiency's sake)
-* Offers symbolic types and method descriptors (as opposed to mangled strings in JVM bytecode)
-* Can generate JVM bytecode which would be type-incorrect for Java, but type-correct for the JVM.
-* Additional dynamic language support via `invokedynamic` and construction and invocation of bootstrap methods
-* Incrementally growing library of macros for typical program element snippets, such as loops over arrays and loops over iterables, etc.
-
-### Status:
-
-* Flybytes is experimental and currently in alpha stage. 
-* Expect renamings and API changes
-* The language is fully implemented, with the noted exception of nested classes
-* The language is fully tested, with the noted exception of the invokedynamic feature
-
-### TODO:
-
-* add support for error nodes (to support partial compilation and running partially compiled classes)
-* refactor compiler exceptions to Rascal exceptions (to help debugging Flybytes AST generators)
-* add support for nested classes (helps in generating code for lambda expressions)
-
-### Citations
-
-The design of Flybtyes was informed by the JVM VM spec, the ASM library code and documentation and the Jitescript API:
-
-* <https://docs.oracle.com/javase/specs/jvms/se8/jvms8.pdf>
-* <https://asm.ow2.io/>
-* <https://github.com/qmx/jitescript>
-}
 @author{Jurgen J. Vinju}
 module lang::flybytes::Syntax
 
 import List;
 
+@synopsis{The top-level compilation unit for flybytes is the class or the interface}
 data Class(list[Annotation] annotations = [], loc src = |unknown:///|)
   = class(Type \type /* object(str name) */, 
       set[Modifier] modifiers = {\public()},
@@ -112,9 +43,19 @@ data Modifier
    | \abstract()
    ;
 
+@synopsis{Class fields members have optional initialization expressions.}
 data Field(list[Annotation] annotations = [], set[Modifier] modifiers = {\private()}, loc src=|unknown:///|)
   = field(Type \type, str name, Exp init = defVal(\type));
-         
+
+@synopsis{Four kinds of methods can be generated}
+@description{
+* `procedure` is a special extension since it contains only JVM bytecode instructions as a body, instead of high-level programming constructs like expressions and statements.
+* one alternative of `method` is *abstract* methods, which do not have a body, the other is methods
+* static blocks are also modeled as methods but without a signature.
+* normal static methods are methods with a static ((Modifier)).
+
+The `src` field is important for stack traces and other debugging features.
+}         
 data Method(list[Annotation] annotations = [], loc src=|unknown:///|)
   = method(Signature desc, list[Formal] formals, list[Stat] block, set[Modifier] modifiers = {\public()})
   | procedure(Signature desc, list[Formal] formals, list[Instruction] instructions, set[Modifier] modifiers = {\public()})
@@ -122,14 +63,17 @@ data Method(list[Annotation] annotations = [], loc src=|unknown:///|)
   | static(list[Stat] block)
   ;
 
+@synopsis{Shorthand for directly producing a method with its signature and code block.}
 Method method(Modifier access, Type ret, str name, list[Formal] formals, list[Stat] block)
   = method(methodDesc(ret, name, [ var.\type | var <- formals]), formals, block, modifiers={access});
 
+@synopsis{Method and constructor signatures}
 data Signature 
   = methodDesc(Type \return, str name, list[Type] formals)
   | constructorDesc(list[Type] formals)
   ;
 
+@synopsis{JVM type symbols}
 data Type
   = byte()
   | boolean()
@@ -157,11 +101,16 @@ data RetentionPolicy
   | source()  // forget immediately
   ;
  
-@doc{optional init expressions will be used at run-time if `null` is passed as actual parameter}
+@synopsis{optional init expressions will be used at run-time if `null` is passed as actual parameter}
 data Formal
   = var(Type \type, str name, Exp init = defVal(\type)); 
 
-@doc{Structured programming, OO primitives, JVM monitor blocks and breakpoints}
+@synopsis{Structured programming with statements, OO primitives like `new`, and JVM monitor blocks and breakpoints}
+@description{
+* `invokeSuper` is typically only used as the first statement of a constructor
+* `monitor` guarantees release of the lock in case of exceptions, break and continue that break out of the block, but only if `release` and `acquire` are not used on the same lock object anywhere.  
+* `asm` allows for inling raw bytecode instructions, but please understand that the monitor blocks' semantics can be broken by jumping out of the block unseen.
+}
 data Stat(loc src = |unknown:///|)
   = \store(str name, Exp \value)
   | \decl(Type \type, str name, Exp init = defVal(\type))
@@ -183,18 +132,12 @@ data Stat(loc src = |unknown:///|)
   | \while(Exp condition, list[Stat] block, str label = "") 
   | \doWhile(list[Stat] block, Exp condition, str label = "") 
   | \throw(Exp arg) 
-  // `monitor` guarantees release of the lock in case of exceptions, break and continue out of the block, 
-  // but only if `release` and `acquire` are not used on the same lock object anywhere:
   | \monitor(Exp arg, list[Stat] block) 
   | \acquire(Exp arg) // this is a bare lock acquire with no regard for exceptions or break and continue
   | \release(Exp arg) // this is a bare lock release. do not mix with the monitor statement on the same lock object.
   | \try(list[Stat] block, list[Handler] \catch) 
   | \switch(Exp arg, list[Case] cases, SwitchOption option = lookup(/*for best performance on current JVMs*/))
-  // raw bytecode instruction lists can be inlined directly
-  | 
-  // Invoke a super constructor, typically only used in constructor method bodies 
-    invokeSuper(Signature desc, list[Exp] args)
-  
+  | invokeSuper(Signature desc, list[Exp] args)
   | \asm(list[Instruction] instructions) 
   ;
 
@@ -214,6 +157,23 @@ data Handler
   | \finally(list[Stat] block)
   ;
 
+@synopsis{JVM bytecode instructions lifted to the expression level.}
+@description{
+The `Exp` syntax allows for expression all JVM bytecode expression stackmachine operations but with a nested recursive
+syntax that is closer to programming languages. 
+
+* with `load`, name resolution is limited to local variables and parameter names. 
+* method invocation *always* requires the full method signature.
+* field access and update also require the full class name and field name.
+* about invokving methods:
+   * `invokeStatic` must be used when invoking methods with the `static` modifier.
+   * `invokeSpecial` can be used when no dynamic dispatch is needed, or searching superclasses is required, and you know which class implements the method. Use this to invoke a method for efficiency's sake. **The invocation is type-checked at class load time.** 
+   * `invokeVirtual` should be used if you **do need** dynamic dispatch, or the method is implemented in a superclass, and this is not a default method of an interface, use this invocation method. You need to be sure the method exists _somewhere_ reachable from the \class reference type. **The invocation is type-checked at class load time.** 
+   * `invokeInterface` is for invoking methods you know only from interfaces, such as default methods. The method can even be absent at runtime in which case this throws a RuntimeException. **The type-check occurs at the first invocation at run-time.** 
+   * `invokeDynamic` is very special. It generates a new call site at run-time using a static "bootstrap" method, then caches the site and invokes it. Depending on the semantics of the bootstrap method the call site has the samen semantics or a different semantics the next time it is invoked.
+      * The first type in `desc` of `invokeDynamic must be the receiver type if the method is not static.
+      * The first argument in `args` is then also the receiver itself and not one of  the method's arguments.
+}
 data Exp(loc src = |unknown:///|)
   = null()
   | \true()
@@ -222,34 +182,11 @@ data Exp(loc src = |unknown:///|)
   | aload(Exp array, Exp index)
   | \const(Type \type, value constant)
   | sblock(list[Stat] statements, Exp arg)
-  
-  | /* For invoking static methods of classes or interfaces */
-    invokeStatic(Type class, Signature desc, list[Exp] args)
-  
-  | /* If no dynamic dispatch is needed, or searching superclasses is required, and you know which class 
-     * implements the method, use this to invoke a method for efficiency's sake. 
-     * The invocation is checked at class load time. 
-     */
-    invokeSpecial(Type class, Exp receiver, Signature desc, list[Exp] args)
-  
-  | /* If you do need dynamic dispatch, or the method is implemented in a superclass, and this is
-     * not a default method of an interface, use this invocation method. You need to be sure the method
-     * exists _somewhere_ reachable from the \class reference type.
-     * The invocation is checked at class load time. 
-     */
-    invokeVirtual(Type class, Exp receiver, Signature desc, list[Exp] args)
-  
-  | /* For invoking methods you know only from interfaces, such as default methods. 
-     * The method can even be absent at runtime in which case this throws a RuntimeException. 
-     * The check occurs at the first invocation at run-time. 
-     */
-    invokeInterface(Type class, Exp receiver, Signature desc, list[Exp] args)
-  
-  | /* Generate a call site using a static "bootstrap" method, cache it and invoke it */
-    /* NB: the first type in `desc` must be the receiver type if the method is not static,
-     * and the first argument in `args` is then also the receiver itself */
-    invokeDynamic(BootstrapCall handle, Signature desc, list[Exp] args)
-      
+  | invokeStatic(Type class, Signature desc, list[Exp] args)  
+  | invokeSpecial(Type class, Exp receiver, Signature desc, list[Exp] args)
+  | invokeVirtual(Type class, Exp receiver, Signature desc, list[Exp] args)
+  | invokeInterface(Type class, Exp receiver, Signature desc, list[Exp] args)
+  | invokeDynamic(BootstrapCall handle, Signature desc, list[Exp] args)  
   | newInstance(Type class, Signature desc, list[Exp] args)
   | getField(Type class, Exp receiver, Type \type, str name)
   | getStatic(Type class, Type \type, str name)
@@ -283,6 +220,7 @@ data Exp(loc src = |unknown:///|)
   | cond(Exp condition, Exp thenExp, Exp elseExp)
   ;
  
+@synopsis{The JVM low-level instruction set} 
 data Instruction
   = LABEL(str label)
   | LINENUMBER(int line, str label)
@@ -566,10 +504,11 @@ Exp fconst(real i) = const(float(), i);
 
 // dynamic invoke needs a lot of extra detail, which is all below this line:
 
-@doc{
+@synopsis{
 A bootstrap handle is a name of a static method (as defined by its host class,
 its name and its type signature), and a list of "constant" arguments. 
-
+}
+@description{
 These "constant"
 arguments can be used to declare properties of the call site which can then be used by
 the bootstrap method to define in which way the dynamic call must be resolved. So these

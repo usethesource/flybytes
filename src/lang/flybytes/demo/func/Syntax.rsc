@@ -1,3 +1,4 @@
+
 module lang::flybytes::demo::func::Syntax
 
 lexical Ident =  [a-zA-Z][a-zA-Z0-9]* !>> [a-zA-Z0-9];

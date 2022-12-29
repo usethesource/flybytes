@@ -35,33 +35,50 @@
 
                 <plugins>
                     <plugin>
-				<groupId>org.rascalmpl</groupId>
-				<artifactId>rascal-maven-plugin</artifactId>
-				<version>0.7.3</version>
+                        <groupId>org.rascalmpl</groupId>
+                        <artifactId>rascal-maven-plugin</artifactId>
+                        <version>0.14.1</version>
+                        <configuration>
+                            <errorsAsWarnings>true</errorsAsWarnings>
+                            <bin>${project.build.outputDirectory}</bin>
+                            <srcs>
+                                <src>${project.basedir}/src</src>
+                            </srcs>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>flybytes-compile</id>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>compile</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>flybytes-package</id>
+                                <phase>pre-package</phase>
+                                <goals>
+                                    <goal>package</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>default-cli</id>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>tutor</goal>
+                                </goals>
                                 <configuration>
-                                    <errorsAsWarnings>true</errorsAsWarnings>
-					<bin>${project.build.outputDirectory}</bin>
-					<srcs>
-						<src>${project.basedir}/src</src>
-					</srcs>
-				</configuration>
-				<executions>
-					<execution>
-						<id>flybytes-compile</id>
-						<phase>compile</phase>
-						<goals>
-							<goal>compile</goal>
-						</goals>
-					</execution>
-					<execution>
-						<id>flybytes-package</id>
-						<phase>pre-package</phase>
-						<goals>
-							<goal>package</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+                                    <enableStandardLibrary>true</enableStandardLibrary>
+                                    <errorsAsWarnings>false</errorsAsWarnings>
+                                    <bin>${project.build.outputDirectory}</bin>
+                                    <srcs>
+                                        <src>${project.basedir}/src</src>
+                                    </srcs>
+                                    <ignores>
+                                    </ignores>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>

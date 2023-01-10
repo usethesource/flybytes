@@ -462,7 +462,7 @@ Exp this() = load("this");
 
 private Type CURRENT = object("\<current\>");
 
-@synopsis{the "<current>" class refers to the class currently being compiled, for convenience's sake.}
+@synopsis{the `<current>` class refers to the class currently being compiled, for convenience's sake.}
 Type current() = CURRENT;
 
 @synopsis{Load a field from the currently compiled class}
@@ -509,14 +509,14 @@ A bootstrap handle is a name of a static method (as defined by its host class,
 its name and its type signature), and a list of "constant" arguments. 
 }
 @description{
-These "constant"
+These **constant**
 arguments can be used to declare properties of the call site which can then be used by
 the bootstrap method to define in which way the dynamic call must be resolved. So these
 argument help to avoid having to define a combinatorially large number of bootstrap methods
 (one for each call site situation).  
 
 It's advisable to use the convenience function below to create a `BootstrapCall` instance:
-  * `bootstrap(Type class, str name, list[BootstrapInfo] args)`
+* `bootstrap(Type class, str name, list[BootstrapInfo] args)`
   
 That function makes sure to line up the additional information in the extra arguments about 
 the call site with the static type of the static bootstrap method.

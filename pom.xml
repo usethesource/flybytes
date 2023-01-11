@@ -3,12 +3,12 @@
 
 	<groupId>org.rascalmpl</groupId>
 	<artifactId>flybytes</artifactId>
-	<version>0.1.1-SNAPSHOT</version>
+	<version>0.1.1</version>
 	<packaging>jar</packaging>
 
 	<scm>
 		<developerConnection>scm:git:ssh://git@github.com/usethesource/flybytes.git</developerConnection>
-	  <tag>HEAD</tag>
+	  <tag>flybytes-0.1.1</tag>
   </scm>
 
 	<build>
@@ -37,7 +37,7 @@
                     <plugin>
                         <groupId>org.rascalmpl</groupId>
                         <artifactId>rascal-maven-plugin</artifactId>
-                        <version>0.14.4-SNAPSHOT</version>
+                        <version>0.14.4</version>
                         <configuration>
                             <errorsAsWarnings>true</errorsAsWarnings>
                             <bin>${project.build.outputDirectory}</bin>

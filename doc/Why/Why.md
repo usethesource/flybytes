@@ -11,7 +11,7 @@ keywords:
 
 Flybytes is an intermediate language towards JVM **bytecode generation**, **bytecode analysis**, and **bytecode transformation** for Rascal-based compilers of Domain Specific Languages and Programming Languages. It is has forward and reverse engineering features, such that analyzing, transforming and generating JVM bytecode can be done purely symbolically.
 
-### Context:
+### Context
 
 * you are implementing a textual or graphical DSL or a programming language (using Rascal)
 * and, you want to target the JVM because of its general availability and the JIT compiler, 
@@ -24,7 +24,7 @@ Flybytes is an intermediate language towards JVM **bytecode generation**, **byte
 * and, you require JVM debugging support for your language
 * or you need `invokedynamic` support for your language (which Java does not offer).
 
-### Solution:
+### Solution
 
 1. Flybytes is an intermediate abstract syntax tree format that looks a lot like abstract syntax trees for Java code
 1. You translate your own abstract syntax trees for your own language directly to Flybytes ASTs using Rascal
@@ -34,7 +34,7 @@ Flybytes is an intermediate language towards JVM **bytecode generation**, **byte
 1. Also it can deconpile JVM bytecode back to statememts and expressions (almost done)
 1. Flybytes does not require a JDK as a dependency. It uses only ASM to generate JVM bytecode, very quickly.
    
-### Presumptions:
+### Assumptions
 
 * Flybytes does not cover a priori type checking of the input Flybytes AST. So, a proper application of the Flybytes compiler assumes:
    * Your DSL has its own type checker and the compiler is not called if the input code still has serious type errors or name resolution errors (but you could also generate error nodes for partial compilation support)
@@ -56,7 +56,7 @@ Flybytes is an intermediate language towards JVM **bytecode generation**, **byte
    * additionally Flybytes has the string() types which is equivalent to `object("java.lang.String")`
    * additionally Flybytes offers a safe syntax for constructing and calling "bootstrap" methods for `invokedynamic`
 
-### Features:
+### Features
 
 * Protection from ASM and JVM crashes: the Flybytes compiler does some on-the-fly type checking and error reporting in case you generated something weird.
 * Tries to generate JVM bytecode that looks like it could have come from a Java compiler

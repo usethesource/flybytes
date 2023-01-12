@@ -75,6 +75,8 @@
                                     <issues>|http://github.com/usethesource/flybytes/issues|</issues>
                                     <srcs>
                                         <src>${project.basedir}/src</src>
+                                        <src>${project.basedir}/doc/Why</src>
+                                        <src>${project.basedir}/src</src>
                                     </srcs>
                                     <ignores>
                                     </ignores>

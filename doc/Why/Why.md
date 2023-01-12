@@ -1,8 +1,15 @@
 ---
 title: Why Flybytes?
+keywords:
+    - JVM
+    - bytecode
+    - generation
+    - analysis
+    - transformation
+    - intermediate
 ---
 
-Flybytes is an intermediate language towards JVM **bytecode generation**, **bytecode analysis**, and **bytecode transformation** for Rascal-based compilers of Domain Specific Languages and Programming Languages. It is has forward and reverse engineering features, such that analyzing and transforming JVM bytecode can be done purely symbolically.
+Flybytes is an intermediate language towards JVM **bytecode generation**, **bytecode analysis**, and **bytecode transformation** for Rascal-based compilers of Domain Specific Languages and Programming Languages. It is has forward and reverse engineering features, such that analyzing, transforming and generating JVM bytecode can be done purely symbolically.
 
 ### Context:
 

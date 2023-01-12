@@ -76,6 +76,7 @@
                                     <srcs>
                                         <src>${project.basedir}/src</src>
                                         <src>${project.basedir}/doc/Why</src>
+                                        <src>${project.basedir}/doc/References</src>
                                         <src>${project.basedir}/src</src>
                                     </srcs>
                                     <ignores>

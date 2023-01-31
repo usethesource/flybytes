@@ -4,7 +4,7 @@ import DateTime;
 import salix::lib::Dagre;
 import salix::Core;
 import salix::HTML;
-import salix::SVG;
+// import salix::SVG;
 import salix::App;
 import salix::lib::Bootstrap;
 extend salix::lib::CodeMirror;
@@ -14,7 +14,7 @@ import IO;
 import List;
 import Set;
 import String;
-import Boolean;
+import Boolean;  
 import util::Math;
 import Simplify;
 import GenerateTrees;
@@ -22,33 +22,32 @@ import Detection;
 import util::Reflective;
 import Util;
 import Grammar;
-import Diagnose;
+import Diagnose; 
 import Brackets;
 import GrammarEditor;
 import util::Maybe;
 import ValueIO;
 
 private loc www = |http://localhost:7000/index.html|;
-private loc root = getModuleLocation("DrAmbiguity").parent;
+private loc root = |project://drambiguity/src|;
 
-  
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
-  = app(Model () { return model(grammar, input=readFile(input)); }, view, update, www, root);
+  = webApp(Model () { return model(grammar, input=readFile(input)); }, view, update);
   
 App[Model] drAmbiguity() = drAmbiguity(|home:///myproject-empty.dra|);
 
 App[Model] drAmbiguity(loc project) 
-  = app(Model () { return readBinaryValueFile(#Model, project); }, view, update, www, root);
+  = webApp(Model () { return readBinaryValueFile(#Model, project); }, view, update);
 
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar, str input) 
-  = app(Model () { return model(grammar, input=input); }, view, update, www, root);
+  = webApp(makeApp("drAmbiguity", Model () { return model(grammar, input=input); }, view, update), www);
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar) 
-  = app(Model () { return model(grammar); }, view, update, www, root);
+  = webApp(Model () { return model(grammar); }, view, update);
   
 App[Model] drAmbiguity(type[&T <: Tree] grammar, &T input) 
-  = app(Model () { return model(completeLocs(input), grammar); }, view, update, www, root);
+  = webApp(Model () { return model(completeLocs(input), grammar); }, view, update);
 
 data Model 
   = model(type[Tree] grammar,

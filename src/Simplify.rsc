@@ -7,6 +7,7 @@ import Detection;
 import Util;
 import Set;
 
+@synopsis{simplifies an ambiguous parse forest while trying to remain ambiguous}
 Tree simplify(type[Tree] gr, Tree t, int effort=100) {
    work = effort;
 

@@ -1,9 +1,8 @@
 module Util
 
 import ParseTree;
-import Grammar;
+import Grammar; 
 import Node;
-import IO;
 import lang::rascal::grammar::definition::Regular;
 import util::Maybe;
 

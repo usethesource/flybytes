@@ -11,7 +11,8 @@ Production la() = prod(layouts("*default*"), [], {});
 Tree wrap(Tree x) = appl(rule(Util::symbol(x)), [appl(bo(), [char(40)]), appl(la(), []), x, appl(la(), []), appl(bc(), [char(41)])]);
 
 list[Tree] wrap(Symbol s, list[Tree] args) = [ delabel(symbol(a)) == s ? wrap(a) : a | a <- args];
- 
+
+@synopsis{Adds a bracket rule around all directly recursive non-terminals (expressions)} 
 Tree brackets(Tree t) = visit(t) {
   case appl(p, args) => appl(p, wrap(delabel(p.def), args))
 };

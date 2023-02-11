@@ -442,7 +442,7 @@ Method staticMethod(Modifier access, Type ret, str name, list[Formal] args, list
 
 @synopsis{Short-hand for generating a public static method}           
 Method staticMethod(Type ret, str name, list[Formal] args, list[Stat] block)
-  = staticMethod(\public, ret, name, args, block);
+  = staticMethod(\public(), ret, name, args, block);
 
 @synopsis{Short-hand for generating a constructor.}
 @pitfalls{Don't forgot to generate a super call.}    

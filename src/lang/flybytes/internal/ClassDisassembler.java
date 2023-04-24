@@ -216,14 +216,14 @@ public class ClassDisassembler {
 		IListWriter lw = VF.listWriter();
 	
 		if (parameters != null && !parameters.isEmpty()) {
-			// only when class was compiled with javac -parameters
+			// only when class was compiled with `javac -parameters`
 			int i = 0;
 			for (IValue elem : types) {
 				lw.append(ast.Formal_var((IConstructor) elem, parameters.get(i++).name));
 			}
 		}
-		else if (locals != null && locals.size() >= types.length() - (isStatic?0:1)) {
-			// only when class was compiled with javac -debug
+		else if (locals != null && locals.size() > 0 && locals.size() >= types.length() - (isStatic?0:1)) {
+			// only when class was compiled with `javac -g` (debug)
 			int i = 0;
 			for (IValue elem : types) {
 				LocalVariableNode local = locals.get(i + (isStatic?0:1));

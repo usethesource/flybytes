@@ -3,6 +3,7 @@ module lang::flybytes::tests::ArrayTests
 import lang::flybytes::Syntax;
 import lang::flybytes::Compiler;
 import Node;
+import List;
   
 Class primArrayTestClass(Type t, int len) {
   rf = \return(\false());
@@ -100,3 +101,31 @@ test bool boolArrayFalse1()
 test bool boolArrayFalse10() 
   = testArrayClass(valArrayTestClass(boolean(), 10, \false()));
  
+
+Class initArrayTestClass(Type t, list[Exp] values, Exp val) {
+  rf = \return(\false());
+  rt = \return(\true());
+  
+  return class(object("ValInitArrayTestClass_<getName(t)>_<size(values)>"),
+      methods=[
+        staticMethod(\public(), boolean(), "testMethod", [],
+        [
+          decl(array(t), "tmp"),
+          // tmp = new Type[len];
+          store("tmp", newInitArray(array(t), values)),
+           
+          // fail if tmp.length != size(values)
+          // \if(ne(const(integer(), size(values)), alength(load("tmp"))), [rf]),
+           
+          // fail if (tmp[i] != values[i])
+          // *[\if(ne(values[i], aload(load("tmp"), iconst(i))),[rf]) | i <- [0..size(values)]],
+          
+          // return true; 
+          rt
+        ])
+      ]
+    );
+}  
+
+test bool boolInitArrayTrue() 
+  = testArrayClass(initArrayTestClass(integer(), [iconst(10), iconst(20), iconst(30)], \true()));

@@ -585,7 +585,15 @@ public class ClassDisassembler {
 		            descriptor(invokeDynamicNode.name, invokeDynamicNode.desc),
 		            handle(invokeDynamicNode.bsm, invokeDynamicNode.bsmArgs));
 		case Opcodes.NEWARRAY:
-			return ast.Instruction_NEWARRAY(type(((TypeInsnNode) instr).desc));
+			if (instr instanceof IntInsnNode) {
+				return ast.Instruction_NEWARRAY(type(((IntInsnNode) instr).operand));
+			}
+			else if (instr instanceof TypeInsnNode) {
+				return ast.Instruction_NEWARRAY(type(((TypeInsnNode) instr).desc));
+			}
+			else {
+				throw new IllegalArgumentException("unsupported shape of NEWARRAY instruction: " + instr);
+			}
 		case Opcodes.NEW:
 			return ast.Instruction_NEW(typeName(((TypeInsnNode) instr).desc));
 		case Opcodes.ANEWARRAY:
@@ -804,6 +812,29 @@ public class ClassDisassembler {
 		return type("L" + cls + ";");
 	}
 	
+	private IConstructor type(int index) {
+		switch (index) {
+			case Opcodes.T_BOOLEAN:
+				return ast.Type_boolean();
+			case Opcodes.T_BYTE:
+				return ast.Type_byte();
+			case Opcodes.T_CHAR:
+				return ast.Type_character();
+			case Opcodes.T_DOUBLE:
+				return ast.Type_double();
+			case Opcodes.T_FLOAT:
+				return ast.Type_float();
+			case Opcodes.T_INT:
+				return ast.Type_integer();
+			case Opcodes.T_LONG:
+				return ast.Type_long();
+			case Opcodes.T_SHORT:
+				return ast.Type_short();
+		}
+
+		throw new IllegalArgumentException("not a supported type enum: " + index);
+	}
+
 	private IConstructor type(String desc) {
 		if ("Ljava/lang/String;".equals(desc)) {
 			return ast.Type_string();

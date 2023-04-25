@@ -1988,6 +1988,9 @@ public class ClassCompiler {
 			labels.put("break:" + label, joinLabel);
 			labels.put("continue:" + label, again);
 
+			if (label != null) {
+				method.visitLabel(getOrCreateAsmLabel(label));
+			}
 			method.visitLabel(again);
 			statements(body, again, joinLabel, joinLabel, line);
 		}

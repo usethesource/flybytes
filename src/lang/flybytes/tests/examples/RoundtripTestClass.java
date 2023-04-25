@@ -274,7 +274,8 @@ public class RoundtripTestClass {
 			System.err.println("watch out!");
 		}
 	}
-	
-	
 
+	int[] arrayInitTest(int x) {
+		return new int[] { x, x, x};
+	}
 }

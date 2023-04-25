@@ -493,6 +493,10 @@ list[Instruction] exprs([*Instruction pre, exp(const(Type intType, int arraySize
 default list[Instruction] exprs([*Instruction pre, exp(Exp sizeExp:const(Type intType, int arraySize)), ANEWARRAY(typ), *Instruction post]) 
   = exprs([*pre, exp(newArray(typ, sizeExp)), *post]);
 
+list[Instruction] exprs([*Instruction pre, exp(const(integer(), int len)), NEWARRAY(typ), *Instruction elems, DUP(), exp(const(integer(), lastIndex)), exp(Exp lastElem), IASTORE(), Instruction next, *Instruction post]) 
+  = exprs([*pre, exp(newInitArray(typ, [ v | [*_, DUP(), exp(const(integer(), int ind)), exp(v), IASTORE(), *_] := elems] + [lastElem])), next, *post])
+  when next != DUP();
+
 list[Instruction] exprs([*Instruction pre, GETSTATIC(cls, name, typ), *Instruction post]) 
   = exprs([*pre, exp(getStatic(cls, typ, name)), *post]);
         

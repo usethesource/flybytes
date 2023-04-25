@@ -2217,12 +2217,9 @@ public class ClassCompiler {
 				case "newInstance":
 					return newInstanceExp(exp, line);
 				case "newArray":
-					if (exp.get(1) instanceof IList) {
-						return newArrayExp(AST.$getType(exp), AST.$getArgs(exp), line);
-					}
-					else {
-						return newArrayExp(AST.$getType(exp), AST.$getSize(exp), line);
-					}
+					return newArrayExp(AST.$getType(exp), AST.$getSize(exp), line);
+				case "newInitArray":
+					return newArrayExp(AST.$getType(exp), AST.$getArgs(exp), line);
 				case "alength":
 					return alengthExp(AST.$getArg(exp), line);
 				case "load" : 
@@ -2682,7 +2679,7 @@ public class ClassCompiler {
 				dup();
 				intConstant(i++);
 				expr((IConstructor) elem, line);
-				arrayStoreExpWithArrayIndexValueOnStack(type);
+				arrayStoreExpWithArrayIndexValueOnStack(AST.$getArg(type));
 			}
 
 			return type;

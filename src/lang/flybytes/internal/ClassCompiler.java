@@ -1296,6 +1296,7 @@ public class ClassCompiler {
 				break;
 			case "LINENUMBER":
 				lineNumberInstruction(instr);
+				break;
 			case "IFEQ":
 				jumpInstruction(instr, Opcodes.IFEQ);
 				break;
@@ -1398,7 +1399,21 @@ public class ClassCompiler {
 			case "INVOKEDYNAMIC":
 				invokeDynamicInstruction(instr);
 				break;
+			case "LOCALVARIABLE":
+				localVariableInstruction(instr);
+				break;
+								
 			}
+		}
+
+		private void localVariableInstruction(IConstructor instr) {
+			String name = AST.$getName(instr);
+			String desc = Signature.type(AST.$getType(instr));
+			Label start = getOrCreateAsmLabel(((IString) instr.get("start")).getValue());
+			Label end = getOrCreateAsmLabel(((IString) instr.get("end")).getValue());
+			int var = ((IInteger) instr.get("var")).intValue();
+
+			method.visitLocalVariable(name, desc, null, start, end, var);
 		}
 
 		private void newArrayInstruction(IConstructor instr, int parentLine) {

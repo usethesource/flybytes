@@ -97,7 +97,6 @@ public class ClassCompiler {
 	}
 
 	public void compileClass(IConstructor cls, ISourceLocation classFile, IBool enableAsserts, IConstructor version, IBool debugMode) {
-
 		try (OutputStream output = URIResolverRegistry.getInstance().getOutputStream(classFile, false)) {
 			ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES + ClassWriter.COMPUTE_MAXS);
 			ClassVisitor cv = cw;
@@ -105,8 +104,9 @@ public class ClassCompiler {
 			new Compile(cv, AST.$getVersionCode(version), debugMode.getValue()).compileClass(cls);
 
 			output.write(cw.toByteArray());
-		} catch (Throwable e) {
-			throw new RuntimeException(e);
+		} 
+		catch (IOException e) {
+			throw RuntimeExceptionFactory.io(e.getMessage());
 		}
 	}
 

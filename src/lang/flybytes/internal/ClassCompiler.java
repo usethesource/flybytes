@@ -1440,12 +1440,24 @@ public class ClassCompiler {
 		private void methodInstruction(int opcode, IConstructor instr) {
 			IConstructor cls = AST.$getClass(instr);
 			IConstructor desc = AST.$getDesc(instr);
-			method.visitMethodInsn(opcode, AST.$getRefClassFromType(cls, classNode.name), AST.$getName(desc), Signature.method(desc), AST.$getIsInterface(instr));
-		}
 
+			switch (desc.getName()) {
+				case "constructorDesc":
+					method.visitMethodInsn(opcode, AST.$getRefClassFromType(cls, classNode.name), "<init>", Signature.constructor(desc), false);
+					break;
+				case "methodDesc":
+					method.visitMethodInsn(opcode, AST.$getRefClassFromType(cls, classNode.name), AST.$getName(desc), Signature.method(desc), AST.$getIsInterface(instr));
+					break;
+				default:
+					throw new IllegalArgumentException("unknown method kind: " + instr);
+			}
+		}
+ 
 		private void fieldInstruction(int opcode, IConstructor instr) {
 			IConstructor cls = AST.$getClass(instr);
 			IConstructor type = AST.$getType(instr);
+
+			
 			method.visitFieldInsn(opcode, AST.$getRefClassFromType(cls, classNode.name), AST.$getName(instr), Signature.type(type));
 		}
 

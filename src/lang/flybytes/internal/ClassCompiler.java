@@ -2274,14 +2274,8 @@ public class ClassCompiler {
 				case "sblock":
 					return sblockExp(AST.$getStatements(exp), AST.$getArg(exp), line);
 				case "null":
-					if (exp.getConstructorType().getArity() == 0) {
-						return nullExp();  // null constant
-					}
-					else { 
-						return isNullTest(AST.$getArg(exp), pushTrue, pushFalse, null, line); // null check 
-					}
-				case "nonnull":
-					return isNonNullTest(AST.$getArg(exp), pushTrue, pushFalse, null, line); // null check 
+					lineNumber(line);
+					return nullExp(); 
 				case "true":
 					lineNumber(line);
 					return trueExp();

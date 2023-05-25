@@ -2723,7 +2723,7 @@ public class ClassCompiler {
 					(v) -> { throw new IllegalArgumentException("void array"); }, 
 					(c) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$getRefClassFromType(type, classNode.name)), 
 					(a) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$getRefClassFromType(type, classNode.name)),
-					(S) -> method.visitTypeInsn(Opcodes.ANEWARRAY, Signature.stringType)
+					(S) -> method.visitTypeInsn(Opcodes.ANEWARRAY, AST.$getRefClassFromType(type, classNode.name))
 					);
 		}
 

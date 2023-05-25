@@ -26,6 +26,8 @@
  */
 package lang.flybytes.internal;
 
+import static org.junit.Assert.fail;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -3020,11 +3022,12 @@ public class ClassCompiler {
 		}
 
 		private void coerceArrayToArray(IConstructor from, IConstructor to, IConstructor arg) {
-
+			// TODO: what are we going to do here?
+			failedCoercion(from.toString(), to);
 		}
 
 		private void coerceFromLong(IConstructor to, IConstructor arg, int line) {
-			lineNumber(line);
+			expr(arg, line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { method.visitInsn(Opcodes.L2I); },
@@ -3038,7 +3041,6 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
@@ -3046,7 +3048,7 @@ public class ClassCompiler {
 
 		private void coerceFromClass(IConstructor from, IConstructor to, IConstructor arg, int line) {
 			String cls = AST.$getName(from);
-			lineNumber(line);
+			expr(arg, line);
 
 			Switch.type0(to,
 					(z) -> {
@@ -3124,14 +3126,13 @@ public class ClassCompiler {
 					},
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
 		}
 
 		private void coerceFromDouble(IConstructor to, IConstructor arg, int line) {
-			lineNumber(line);
+			expr(arg, line);
 
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
@@ -3146,14 +3147,13 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
 		}
 
 		private void coerceFromFloat(IConstructor to, IConstructor arg, int line) {
-			lineNumber(line);
+			expr(arg, line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { method.visitInsn(Opcodes.F2I); },
@@ -3167,14 +3167,13 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
 		}
 
 		private void coerceFromChar(IConstructor to, IConstructor arg, int line) {
-			lineNumber(line);
+			expr(arg, line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
@@ -3188,14 +3187,13 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
 		}
 
 		private void coerceFromByte(IConstructor to, IConstructor arg, int line) {
-			lineNumber(line);
+			expr(arg, line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
@@ -3209,14 +3207,13 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
 		}
 
 		private void coerceFromShort(IConstructor to, IConstructor arg, int line) {
-			lineNumber(line);
+			expr(arg, line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
@@ -3230,14 +3227,13 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);
 		}
 
 		private void coerceFromInt(IConstructor to, IConstructor arg, int line) {
-			lineNumber(line);
+			expr(arg, line);
 			Switch.type0(to,
 					(z) -> failedCoercion("boolean", to),
 					(i) -> { /* do nothing */ },
@@ -3251,7 +3247,6 @@ public class ClassCompiler {
 					(c) -> failedCoercion("object", to),
 					(a) -> failedCoercion("array", to),
 					(S) -> {
-						expr(arg, line);
 						method.visitMethodInsn(Opcodes.INVOKESPECIAL, Signature.objectName, "toString", "()V", false);
 					}
 					);

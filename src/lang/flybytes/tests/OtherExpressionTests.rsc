@@ -49,3 +49,23 @@ Class newExpClass()
     
 test bool testNew() = loadClass(newExpClass())
    .invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#bool);   
+
+Class coerceTestClass(Type from, Type to, Exp \in, Exp out) {
+  return class(object("CoerceTest"),
+      methods=[
+        staticMethod(\public(), boolean(), "testMethod", [], [
+           decl(from, "from", init=\in),
+           decl(to, "to", init=\out),
+           \return(eq(load("to"), coerce(from, to, load("from"))))
+        ])
+      ]
+    );
+}
+
+test bool testCoerceIntDouble()
+  = loadClass(coerceTestClass(\integer(), \double(), iconst(1), dconst(1.0)))
+  .invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#bool);
+
+test bool testCoerceDoubleInt()
+  = loadClass(coerceTestClass(\double(), \integer(), dconst(0.0), iconst(0)))
+  .invokeStatic(methodDesc(boolean(), "testMethod", []), []).toValue(#bool);  

@@ -1,7 +1,5 @@
 package lang.flybytes.tests.examples.business;
 
-import lang.flybytes.tests.examples.business.Account;
-
 public class Bank {
     public Account[] counts;
     public int index = 0;

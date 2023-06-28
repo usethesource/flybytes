@@ -36,7 +36,7 @@
             <plugin>
                 <groupId>org.rascalmpl</groupId>
                 <artifactId>rascal-maven-plugin</artifactId>
-                <version>0.19.2</version>
+                <version>0.19.3</version>
                 <configuration>
                     <errorsAsWarnings>true</errorsAsWarnings>
                     <bin>${project.build.outputDirectory}</bin>
@@ -71,7 +71,6 @@
                             <bin>${project.build.outputDirectory}</bin>
                             <license>${project.basedir}/LICENSE</license>
                             <sources>|http://github.com/usethesource/flybytes/blob/main|</sources>
-                            <!--<packageRoot>${project.basedir}</packageRoot> -->
                             <issues>|http://github.com/usethesource/flybytes/issues|</issues>
                             <srcs>
                                 <src>${project.basedir}/src</src>
@@ -161,7 +160,7 @@
                 <dependency>
                     <groupId>org.rascalmpl</groupId>
                     <artifactId>rascal</artifactId>
-                    <version>0.32.0-RC1</version>
+                    <version>0.32.0</version>
                 </dependency>
                 <dependency>
                     <groupId>org.ow2.asm</groupId>

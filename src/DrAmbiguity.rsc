@@ -54,8 +54,26 @@ App[Model] drAmbiguity(type[&T <: Tree] grammar, &T input)
   = drAmbiguity(model(completeLocs(input), grammar));
 
 @synopsis{This is the internal work horse that boots up the Salix application that is called DrAmbiguity.}  
-App[Model] drAmbiguity(Model m) 
-  = webApp(makeApp("drAmbiguity", Model () { return m; }, view, update), www);
+App[Model] drAmbiguity(Model m, str id="DrAmbiguity") 
+  = webApp(
+      makeApp(
+        id, 
+        Model () { return m; }, 
+        withIndex(
+          "Dr Ambiguity", 
+          id, 
+          view, 
+          css=["https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"], 
+          scripts=[
+            "https://code.jquery.com/jquery-3.2.1.slim.min.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js",
+            "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+          ]
+        ),
+        update
+      ),
+      www
+    );
 
 data Model 
   = model(type[Tree] grammar,

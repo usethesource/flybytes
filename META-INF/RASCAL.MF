@@ -1,6 +1,7 @@
 Manifest-Version: 0.0.1
+Project-Name: drambiguity
 Main-Function: main
 Main-Module: Plugin
 Source: src
-Require-Libraries: |lib://salix|
+Require-Libraries: |lib://salix-core|,|lib://salix-contrib|
 

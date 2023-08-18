@@ -14,8 +14,7 @@ default Symbol delabel(Symbol s) = unset(s);
   if (&T t := x) 
     return t;
   else
-    throw "cast exception <c> is not a
-     <x>";
+    throw "cast exception <c> is not a <x>";
 }
 
 Symbol symbol(appl(prod(label(str _, Symbol s), _ , _), _)) = s;
@@ -64,12 +63,10 @@ Maybe[Tree] saveParse(type[Tree] grammar, str input) {
       return just(wrapped ? completeLocs(result.args[0]) : completeLocs(result));
     }        
   }
-  catch ParseError(l) : {
-    return nothing();
-  }
-  catch value x : {
-    return nothing();
-  }
+  catch ParseError(l) : ;
+  catch value x : ;
+
+  return nothing();
 }
 
 bool isChar(char(_)) = true;

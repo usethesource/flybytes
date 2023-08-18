@@ -1,13 +1,14 @@
 module DrAmbiguity
 
 import DateTime;
-import salix::lib::Dagre;
+// import salix::lib::Dagre;
 import salix::Core;
 import salix::HTML;
-// import salix::SVG;
+import salix::Node;
+// import salix::SVG; 
 import salix::App;
 import salix::lib::Bootstrap;
-extend salix::lib::CodeMirror;
+// extend salix::lib::CodeMirror;
 import lang::rascal::format::Grammar;
 import ParseTree;
 import IO;
@@ -32,22 +33,21 @@ private loc www = |http://localhost:7000/index.html|;
 private loc root = |project://drambiguity/src|;
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
-  = webApp(Model () { return model(grammar, input=readFile(input)); }, view, update);
+  = webApp(makeApp(Model () { return model(grammar, input=readFile(input)); }, view, update));
   
 App[Model] drAmbiguity() = drAmbiguity(|home:///myproject-empty.dra|);
 
 App[Model] drAmbiguity(loc project) 
   = webApp(Model () { return readBinaryValueFile(#Model, project); }, view, update);
 
-
 App[Model] drAmbiguity(type[&T <: Tree] grammar, str input) 
   = webApp(makeApp("drAmbiguity", Model () { return model(grammar, input=input); }, view, update), www);
 
 App[Model] drAmbiguity(type[&T <: Tree] grammar) 
-  = webApp(Model () { return model(grammar); }, view, update);
+  = webApp(makeApp("drAmbiguity", Model () { return model(grammar); }, view, update), www);
   
 App[Model] drAmbiguity(type[&T <: Tree] grammar, &T input) 
-  = webApp(Model () { return model(completeLocs(input), grammar); }, view, update);
+  = webApp(makeApp("drAmbiguity", Model () { return model(completeLocs(input), grammar); }, view, update), www);
 
 data Model 
   = model(type[Tree] grammar,
@@ -99,10 +99,10 @@ Model update(clearErrors(), Model m) = m[errors=[]];
 Model update(labels(), Model m) = m[labels = !m.labels];
 Model update(literals(), Model m) = m[literals = !m.literals];
 Model update(\layout(), Model m) = m[\layout = !m.\layout];
-Model update(chars(), Model m) = m[chars = !m.chars];
-Model update(shared(), Model m) = m[shared = !m.shared];
-Model update(focus(), Model m) = focus(m);
-Model update(filename(loc f), Model m) = m[file=just(f)];
+Model update(Msg::chars(), Model m) = m[chars = !m.chars];
+Model update(Msg::shared(), Model m) = m[shared = !m.shared];
+Model update(Msg::focus(), Model m) = focus(m);
+Model update(Msg::filename(loc f), Model m) = m[file=just(f)];
 Model update(nofilename(), Model m) = m[file=nothing()];
 Model update(commitMessage(str msg), Model m) = m[commitMessage=msg];
 Model update(removeGrammar(int count), Model m) = m[grammarHistory = m.grammarHistory[0..count-1] + m.grammarHistory[count..]];
@@ -171,7 +171,7 @@ Model update(setStartNonterminal(Symbol s), Model m) {
   return m;
 }
 
-Model update(commitGrammar(int selector), Model m) {
+Model update(Msg::commitGrammar(int selector), Model m) {
   try {
     str newGrammar = "";
     
@@ -299,60 +299,60 @@ void graphic(Model m) {
    
    t = !m.shared ? unique(m.tree.val) : shared(unique(m.tree.val));
 
-   dagre("Forest",  style(<"overflow-x","scroll">,<"overflow-y","scroll">,<"border", "solid">,<"border-radius","5px">,<"height","600px">,<"width","100%">), rankdir("TD"), (N n, E e) {
-         done = {};
+  //  dagre("Forest",  style(<"overflow-x","scroll">,<"overflow-y","scroll">,<"border", "solid">,<"border-radius","5px">,<"height","600px">,<"width","100%">), rankdir("TD"), (N n, E e) {
+  //        done = {};
          
-         void nodes(Tree a) {
-           if (id(a) in done) return;
-           if (!m.literals && isLiteral(a)) return;
-           if (!m.\layout && isLayout(a)) return;
-           if (!m.chars && isChar(a)) return;
+  //        void nodes(Tree a) {
+  //          if (id(a) in done) return;
+  //          if (!m.literals && isLiteral(a)) return;
+  //          if (!m.\layout && isLayout(a)) return;
+  //          if (!m.chars && isChar(a)) return;
            
-           n(id(a), fill("black"), shape(shp(a)), () { 
-               span(style(<"color","black">), lbl(a));
-           });
+  //          n(id(a), fill("black"), shape(shp(a)), () { 
+  //              span(style(<"color","black">), lbl(a));
+  //          });
            
-           done += {id(a)};
+  //          done += {id(a)};
            
-           if (a@unique > 500) {
-             return;
-           }
+  //          if (a@unique > 500) {
+  //            return;
+  //          }
            
-           for (b <- args(a)) {
-             nodes(b);
-           }
-         }
+  //          for (b <- args(a)) {
+  //            nodes(b);
+  //          }
+  //        }
          
-         void edges(Tree a) {
-           if (!m.literals && isLiteral(a)) return;
-           if (!m.\layout && isLayout(a)) return;
-           if (!m.\layout && isChar(a)) return;
-           if (id(a) in done) return;
+  //        void edges(Tree a) {
+  //          if (!m.literals && isLiteral(a)) return;
+  //          if (!m.\layout && isLayout(a)) return;
+  //          if (!m.\layout && isChar(a)) return;
+  //          if (id(a) in done) return;
            
-           for (b <- args(a)) {
-              if (!m.literals && isLiteral(b)) continue;
-              if (!m.\layout && isLayout(b)) continue;
-              if (!m.chars && isChar(b)) continue;
+  //          for (b <- args(a)) {
+  //             if (!m.literals && isLiteral(b)) continue;
+  //             if (!m.\layout && isLayout(b)) continue;
+  //             if (!m.chars && isChar(b)) continue;
            
-              e(id(a), id(b), lineInterpolate("linear"));
-           }
+  //             e(id(a), id(b), lineInterpolate("linear"));
+  //          }
            
-           done += {id(a)};
+  //          done += {id(a)};
            
-           if (a@unique > 500) {
-             return;
-           }
+  //          if (a@unique > 500) {
+  //            return;
+  //          }
            
-           for (b <- args(a)) {
-             edges(b);
-           }
-         }
+  //          for (b <- args(a)) {
+  //            edges(b);
+  //          }
+  //        }
          
-         nodes(t);
-         done = {};
-         edges(t);
-         done = {};
-       });
+  //        nodes(t);
+  //        done = {};
+  //        edges(t);
+  //        done = {};
+  //      });
 }
  
 Msg onNewSentenceInput(str t) = newInput(t);

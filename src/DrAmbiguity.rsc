@@ -5,6 +5,7 @@ import DateTime;
 import salix::Core;
 import salix::HTML;
 import salix::Node;
+import salix::Index;
 // import salix::SVG; 
 import salix::App;
 import salix::lib::Bootstrap;
@@ -32,22 +33,29 @@ import ValueIO;
 private loc www = |http://localhost:7000/index.html|;
 private loc root = |project://drambiguity/src|;
 
+@synopsis{start DrAmbiguity with a fresh grammar and an example input sentence}
 App[Model] drAmbiguity(type[&T <: Tree] grammar, loc input) 
-  = webApp(makeApp(Model () { return model(grammar, input=readFile(input)); }, view, update));
+  = drAmbiguity(model(grammar, input=readFile(input)));
   
-App[Model] drAmbiguity() = drAmbiguity(|home:///myproject-empty.dra|);
-
+@synopsis{Continue DrAmbiguity with a previously saved project}  
 App[Model] drAmbiguity(loc project) 
-  = webApp(Model () { return readBinaryValueFile(#Model, project); }, view, update);
+  = drAmbiguity(readBinaryValueFile(#Model, project));
 
+@synopsis{start DrAmbiguity with a fresh grammar and an example input sentence}
 App[Model] drAmbiguity(type[&T <: Tree] grammar, str input) 
-  = webApp(makeApp("drAmbiguity", Model () { return model(grammar, input=input); }, view, update), www);
+  = drAmbiguity(model(grammar, input=input));
 
+@synopsis{start DrAmbiguity with a fresh grammar and no input sentence yet}
 App[Model] drAmbiguity(type[&T <: Tree] grammar) 
-  = webApp(makeApp("drAmbiguity", Model () { return model(grammar); }, view, update), www);
+  = drAmbiguity(model(grammar));
   
+@synopsis{start DrAmbiguity with a fresh grammar and a corresponding example (ambiguous) example tree}  
 App[Model] drAmbiguity(type[&T <: Tree] grammar, &T input) 
-  = webApp(makeApp("drAmbiguity", Model () { return model(completeLocs(input), grammar); }, view, update), www);
+  = drAmbiguity(model(completeLocs(input), grammar));
+
+@synopsis{This is the internal work horse that boots up the Salix application that is called DrAmbiguity.}  
+App[Model] drAmbiguity(Model m) 
+  = webApp(makeApp("drAmbiguity", Model () { return m; }, view, update), www);
 
 data Model 
   = model(type[Tree] grammar,

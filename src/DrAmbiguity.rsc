@@ -1,15 +1,12 @@
 module DrAmbiguity
 
 import DateTime;
-// import salix::lib::Dagre;
 import salix::Core;
 import salix::HTML;
 import salix::Node;
 import salix::Index;
-// import salix::SVG; 
 import salix::App;
 import salix::lib::Bootstrap;
-// extend salix::lib::CodeMirror;
 import lang::rascal::format::Grammar;
 import ParseTree;
 import IO;
@@ -92,8 +89,7 @@ data Model
       bool labels = false, 
       bool literals = false,
       bool \layout = false,
-      bool chars = true,
-      bool shared = false
+      bool chars = true
     );
  
 data Msg 
@@ -101,7 +97,6 @@ data Msg
    | literals()
    | \layout()
    | chars()
-   | shared()
    | focus()
    | simplify()
    | freshSentence()
@@ -127,7 +122,6 @@ Model update(labels(), Model m) = m[labels = !m.labels];
 Model update(literals(), Model m) = m[literals = !m.literals];
 Model update(\layout(), Model m) = m[\layout = !m.\layout];
 Model update(Msg::chars(), Model m) = m[chars = !m.chars];
-Model update(Msg::shared(), Model m) = m[shared = !m.shared];
 Model update(Msg::focus(), Model m) = focus(m);
 Model update(Msg::filename(loc f), Model m) = m[file=just(f)];
 Model update(nofilename(), Model m) = m[file=nothing()];
@@ -268,7 +262,7 @@ Model update(newInput(str new), Model m) {
   return m;
 }
 
-Model update(simplify(), Model m) {
+Model update(Msg::simplify(), Model m) {
   m.tree=just(completeLocs(reparse(m.grammar, simplify(m.grammar, m.tree.val))));
   m.tree = m.tree;
   m.input = "<m.tree.val>";
@@ -276,7 +270,7 @@ Model update(simplify(), Model m) {
   return m;
 }
 
-Model update(freshSentence(), Model m) = freshSentences(m);
+Model update(Msg::freshSentence(), Model m) = freshSentences(m);
 
 Model freshSentences(Model m) {
   if (options:{_,*_} := randomAmbiguousSubTrees(m.grammar, m.generateAmount)) {
@@ -333,32 +327,38 @@ Msg onNewSentenceInput(str t) = newInput(t);
 Msg onNewGrammarInput(str t) = newGrammar(t); 
  
 void view(Model m) {
-  //  span("hallo");
    container(true, () {
-     ul(class("tabs nav nav-tabs"), id("tabs"), () {
-       li(() {
-         fileUI(m);
-       });
-       li(() {
-         a(tab(), href("#input"), "Input"); 
-       });
-       li(class("active"), () {
-         a(tab(), href("#graphic"), "Graphic");
-       });
-       li(() {
-         a(tab(), href("#grammar"), "Grammar"); 
-       });
-       li(() {
-         a(tab(), href("#diagnose"), "Diagnosis"); 
-       });
+    div(() {
+      ul(class("nav nav-pills"), id("tabs"), () {
+          li(class("nav-item dropdown"), () {
+            a(class("nav-link dropdown-toggle"), \data-toggle("dropdown"), role("button"), hasPopup(true), expanded(false), "File");
+            fileUI(m);
+          });
+
+          li(class("nav-item"),() {
+            a(class("nav-link"), href("#grammar"), dataToggle("tab"), "Grammar"); 
+          });
+
+          li(class("nav-item active"), () {
+            a(class("nav-link"), href("#input"), dataToggle("tab"), "Sentence");
+          });
+
+          li(class("nav-item"), () {
+            a(class("nav-link"), href("#graphic"), dataToggle("tab"), "Graphic");
+          });
+
+          li(class("nav-item"), () {
+            a(class("nav-link"), href("#diagnose"), dataToggle("tab"), "Diagnosis"); 
+          });
+      });
     });
         
-    div(id("main-tabs"), class("tab-content"), () {
-      div(class("tab-pane fade in"), id("input"), () {
+    div(class("tab-content"), id("tabs"),  () {
+      div(class("tab-pane fade in active"), id("input"), () {
         inputPane(m);
       });
      
-      div(class("tab-pane active"), id("graphic"), () {
+      div(class("tab-pane"), id("graphic"), () {
         graphicPane(m);
       });
       
@@ -371,7 +371,7 @@ void view(Model m) {
             diagnose(m.tree.val);
           }
           else {
-            paragraph("Diagnosis of ambiguity is unavailable while the input sentence has a parse error.");
+             alertInfo("Diagnosis of ambiguity is unavailable while the input sentence has a parse error.");
           } 
       });
     });
@@ -380,9 +380,7 @@ void view(Model m) {
       row(() {
         column(10, md(), () {
            for (e <- m.errors) {
-             div(class("alert"), class("alert-danger"), role("alert"), () {
-                paragraph(e);
-             });
+            alertDanger(e);
            }
         });
         column(2, md(), () {
@@ -481,22 +479,20 @@ Msg onProjectNameInput(str f) {
 }
 
 void fileUI(Model m) {
-  div(class("list-group-item"), class("dropdown"),  () {
-                a(class("dropdown-toggle"), \type("button"), id("projectMenu"), dropdown(), hasPopup(true), expanded(false), "File");
-                div(class("dropdown-menu"), labeledBy("nonterminalChoice"), () {
-                    input(class("list-group-item"), \type("text"), onInput(onProjectNameInput), \value(m.file != nothing() ? (m.file.val[extension=""].path[1..]) : ""));
-                    if (m.file != nothing()) {
-                      button(class("list-group-item"), onClick(saveProject(m.file.val)), "Save");
-                    }
-                    button(class("list-group-item"), attr("onclick", "document.getElementById(\'loadProjectButton\').click();"), "Load…");
-                    input(\type("file"), attr("accept",".dra"), style(<"display", "none">), id("loadProjectButton"), onInput(loadProjectInput));
-                });
-   });
+  div(class("dropdown-menu"), labeledBy("nonterminalChoice"), () {
+      input(class("dropdown-item"), \type("text"), onInput(onProjectNameInput), \value(m.file != nothing() ? (m.file.val[extension=""].path[1..]) : ""));
+      
+      if (m.file != nothing()) {
+        button(class("dropdown-item"), onClick(saveProject(m.file.val)), "Save");
+      }
+
+      button(class("dropdown-item"), attr("onclick", "document.getElementById(\'loadProjectButton\').click();"), "Load…");
+      input(\type("file"), attr("accept",".dra"), style(<"display", "none">), id("loadProjectButton"), onInput(loadProjectInput));
+    });
  }
  
 void inputPane(Model m) {
    bool isError = m.tree == nothing();
-   println("isError <isError> <m.tree == nothing()>");
    bool isAmb = m.tree != nothing() && amb(_) := m.tree.val ;
    bool nestedAmb = m.tree != nothing() && (amb({/amb(_), *_}) := m.tree.val || appl(_,/amb(_)) := m.tree.val);
    str  sentence = m.input;
@@ -514,12 +510,10 @@ void inputPane(Model m) {
             div(class("list-group list-group-flush"), style(<"list-style-type","none">), () {
               span(class("list-group-item"), () {
                 if (isError) {
-                  println("in isError:true");
-                  paragraph("This sentence is not a <m.grammar>; it has a parse error");
+                  alertInfo("This sentence is not a <m.grammar>; it has a parse error");
                 } 
                 else {
-                  println("in isError:false");
-                  paragraph("This sentence is <if (!isAmb) {>not<}> ambiguous, and it has<if (!nestedAmb) {> no<}> nested ambiguity.");
+                  alertInfo("This sentence is <if (!isAmb) {>not<}> ambiguous, and it has<if (!nestedAmb) {> no<}> nested ambiguity.");
                 }
               });
               if (nestedAmb) {          
@@ -595,7 +589,7 @@ void inputPane(Model m) {
 
 void graphicPane(Model m) {
   if (m.tree is nothing) {
-    paragraph("Graphical parse tree representation unavailable due to parse error in input sentence.");
+    alertInfo("Graphical parse tree representation unavailable due to parse error in input sentence.");
     return;
   }
   
@@ -609,15 +603,15 @@ void graphicPane(Model m) {
           column(2, md(), () {
 		        div(class("list-group"), style(<"list-style-type","none">), () {
 		          span(class("list-group-item"), () {
-                  paragraph("This tree is <if (!isAmb) {>not<}> ambiguous, and it has<if (!nestedAmb) {> no<}> nested ambiguity.");
+                  alertInfo("This tree is <if (!isAmb) {>not<}> ambiguous, and it has<if (!nestedAmb) {> no<}> nested ambiguity.");
                 });
                 if (nestedAmb) {          
                   button(class("list-group-item"), onClick(focus()), "Focus on nested");
                 }
-		        div(class("list-group-item"), () { 
-		          input(\type("checkbox"), checked(m.labels), onClick(labels()));
-		          text("rules");
-		        });
+		        // div(class("list-group-item"), () { 
+		        //   input(\type("checkbox"), checked(m.labels), onClick(labels()));
+		        //   text("rules");
+		        // });
 		        div(class("list-group-item "), () { 
 		          input(id("literals"), \type("checkbox"), checked(m.literals), onClick(literals()));
 		          text("literals");
@@ -629,10 +623,6 @@ void graphicPane(Model m) {
 		        div(class("list-group-item"), () { 
 		          input(\type("checkbox"), checked(m.chars), onClick(chars()));
 		          text("chars");
-		        });
-		        div(class("list-group-item"), () { 
-		          input(\type("checkbox"), checked(m.shared), onClick(shared()));
-		          text("shared");
 		        });
 		    });
           });

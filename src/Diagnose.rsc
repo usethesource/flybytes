@@ -49,8 +49,6 @@ void report(Tree x, Tree y) {
   //verticalCauses(x, y, pX, pY)>
   
 }
-
-void paragraph(str x) = p(() { text(x); });    
     
 list[tuple[&T,&T]] zipFill(list[&T] x, list[&T] y, &T fill)
   = [<i < sX ? elementAt(x,i) : fill, i < sY ? elementAt(y,i) : fill> | i <- (sX > sY ? index(x) : index(y)) ]
@@ -207,7 +205,7 @@ void tokens(Tree x, Tree y) {
                 text("<type(cat, ())>");
               });
               td(() {
-                text(word);
+                text("<[word]>"[2..-2]);
               });
             });
           }        
@@ -313,10 +311,7 @@ void tokens(Tree x, Tree y) {
            text("Category");
          });
          th(attr("scope", "col"), () {
-           text("Word 1");
-         });
-         th(attr("scope", "col"), () {
-           text("Word 2");
+           text("Words");
          });
        });
        tbody(() {
@@ -329,12 +324,16 @@ void tokens(Tree x, Tree y) {
                text("<symbol2rascal(c)>");
              });
              td(() {
-               text(w1);
+               text("<[w1]>"[2..-2]);
              });
-             td(() {
-                 text(w2);
-             });           
-           });
+          });
+          tr(() {
+            th(attr("scope","row"));
+            td();
+            td(() {
+                text("<[w2]>"[2..-2]);
+            });
+          });
          }
        });
      });

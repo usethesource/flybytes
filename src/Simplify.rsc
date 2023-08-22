@@ -6,6 +6,7 @@ import util::Math;
 import Detection;
 import Util;
 import Set;
+import IO;
 
 @synopsis{simplifies an ambiguous parse forest while trying to remain ambiguous}
 Tree simplify(type[Tree] gr, Tree t, int effort=100) {
@@ -22,7 +23,11 @@ Tree simplify(type[Tree] gr, Tree t, int effort=100) {
 }
 
 Tree simplify(Tree t) {
-   // half of the time we descend into the tree
+   if (amb(alts) := t, Tree a <- alts, arbBool()) {
+     return simplify(a);
+   }
+
+   // otherwise half of the time we descend into the tree
    if (arbBool(), a:appl(p, args) := t) {
        for (i <- index(args)) {
           n = simplify(args[i]);
@@ -34,12 +39,20 @@ Tree simplify(Tree t) {
    }
     
    // the other half we try to contract some simplification rules, randomly:
-    
+   if (appl(p, _) := t) {
+      println("contracting <p>");
+   }
+
    switch(t) {
      // removes elements from non-empty separated lists
      case Tree a:appl(Production r:regular(\iter-seps(_,list[Symbol] seps)),list[Tree] args:![_]) : {
        delta = size(seps) + 1;
        rand = arbInt(size(args));
+
+       if (arbBool()) {
+          return appl(r, [args]);
+       }
+
        return appl(r, args[..rand*delta] + args[min(rand*(delta+1), size(args))..])[@\loc=a@\loc];
      }
    
@@ -47,17 +60,31 @@ Tree simplify(Tree t) {
      case a:appl(r:regular(\iter-star-seps(_,seps)),args:![]) : {
        delta = size(seps) + 1;
        rand = arbInt(size(args)) mod delta;
+
+       if (arbBool()) {
+          return appl(r, []);
+       }
+
        return appl(r, args[..rand*delta] + args[min(rand*(delta+1), size(args))..])[@\loc=a@\loc];
      }
      
      // removes elements from non-nullable lists
      case a:appl(r:regular(\iter(_)),args:![_]) : {
        rand = arbInt(size(args));
+
+       if (arbBool()) {
+          return appl(r, [args[rand]]);
+       }
+
        return appl(r, args[..rand] + args[(rand+1)..])[@\loc=a@\loc];
      }
      
      // removes elements from nullable lists
      case a:appl(r:regular(\iter-star(_)),args:![]) : {
+       if (arbBool()) {
+          return appl(r, []);
+       }
+
        rand = arbInt(size(args));
        return appl(r, args[..rand] + args[(rand+1)..])[@\loc=a@\loc];
      }
@@ -96,7 +123,7 @@ Tree simplify(Tree t) {
      
      // just pick a random child to continue simplifcation in
      case a:appl(p, args): {
-       for (i <- index(args)) {
+       for (i <- index(args), arbBool()) {
           n = simplify(args[i]);
           
           if (n != args[i]) {

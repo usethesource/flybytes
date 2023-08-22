@@ -263,10 +263,18 @@ Model update(newInput(str new), Model m) {
 }
 
 Model update(Msg::simplify(), Model m) {
-  m.tree=just(completeLocs(reparse(m.grammar, simplify(m.grammar, m.tree.val))));
-  m.tree = m.tree;
+  saved = m.input;
+
+  gr = type(symbol(m.tree.val), m.grammar.definitions);
+  m.tree=just(completeLocs(reparse(gr, simplify(gr, m.tree.val, effort=m.generateAmount * 100))));
   m.input = "<m.tree.val>";
-  m.inputDirty = true;
+  m.inputDirty = m.input != saved;
+
+  if (!m.inputDirty) {
+    m.errors += ["no simpler example found"]; 
+  }
+
+  
   return m;
 }
 

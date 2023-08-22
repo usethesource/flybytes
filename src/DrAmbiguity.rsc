@@ -640,11 +640,15 @@ void graphicPane(Model m) {
 }
 
 Model focus(Model m) {
-  ambs = [a | /Tree a:amb(_) := m.tree.val];
-  
-  m.tree.val = ambs[arbInt(size(ambs))];
-  m.input = "<m.tree.val>";
-  m.inputDirty = true;
+  if (m.tree is just) {
+    ambs = [a | /Tree a:amb(_) := m.tree.val, a != m.tree.val];
+    
+    if (ambs != []) {
+      m.tree = just(ambs[arbInt(size(ambs))]);
+      m.input = "<m.tree.val>";
+      m.inputDirty = true;
+    }
+  }
   
   return m;
 }

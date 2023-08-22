@@ -29,6 +29,7 @@ import Brackets;
 import GrammarEditor;
 import util::Maybe;
 import ValueIO;
+import vis::Text;
 
 private loc www = |http://localhost:7000/index.html|;
 private loc root = |project://drambiguity/src|;
@@ -72,7 +73,7 @@ App[Model] drAmbiguity(Model m, str id="DrAmbiguity")
         ),
         update
       ),
-      www
+      root
     );
 
 data Model 
@@ -152,6 +153,7 @@ Model update(saveProject(loc f), Model m) {
  
 Model update(selectExample(int count), Model m) {
   m.tree = m.examples[count-1].tree;
+  // println("new tree: <m.tree>");
   m.grammar = type[Tree] ng := type(m.examples[count-1].nt, m.grammar.definitions) ? ng : m.grammar;
   m.input = m.examples[count-1].input;
   m.inputDirty = true;
@@ -198,6 +200,7 @@ Model update(setStartNonterminal(Symbol s), Model m) {
 }
 
 Model update(Msg::commitGrammar(int selector), Model m) {
+  println("committing grammar <selector>");
   try {
     str newGrammar = "";
     
@@ -294,97 +297,43 @@ Model freshSentences(Model m) {
 }
 
 void graphic(Model m) {
-   str id(Tree a:appl(_,_)) = "N<a@unique>";
-   str id(Tree a:amb(_))    = "N<a@unique>";
-   str id(Tree a:char(_))   = "N<a@unique>";
-   str id(Tree a:cycle(_,_))   = "N<a@unique>";
-   
-   str lbl(appl(p,_)) = m.labels ? "<symbol2rascal(delabel(p.def))> = <prod2rascal(p)>" : prodlabel(p);
-   str lbl(amb({appl(p,_), *_})) = m.labels ? "<symbol2rascal(delabel(p.def))>" : "amb";
-   str lbl(char(9)) = "⇥"; // tab
-   str lbl(char(10)) = "␤"; // newline
-   str lbl(char(11)) = "⤓"; // vt
-   str lbl(char(12)) = "⇟"; // ff
-   str lbl(char(13)) = "⏎"; // carriage return
-   str lbl(char(32)) = "␠"; //space
-   str lbl(char(int i)) = "␠␠" when i in {133,160,5760,6158,8232,8239,8233,8287,12288} || (i >= 8192 && i <= 8202);
-   // [\u0009-\u000D \u0020 \u0085 \u00A0 \u1680 \u180E \u2000-\u200A \u2028 \u2029 \u202F \u205F \u3000
-   default str lbl(c:char(int ch))       = "<c>";
-   str lbl(cycle(s, i))          = "<s> (<i>)";
-   
-   str shp(appl(prod(_,_,_),_)) = "rect";
-   str shp(appl(regular(_),_)) = "ellipse";
-   str shp(amb(_))    = "diamond";
-   str shp(char(_))   = "circle";
-   str shp(cycle(_,_))   = "circle";
-   
-   list[Tree] args(appl(_,a)) = a;
-   list[Tree] args(amb(alts)) = [*alts];
-   list[Tree] args(char(_))   = [];
-   list[Tree] args(cycle(_,_))   = [];
-   
-   t = !m.shared ? unique(m.tree.val) : shared(unique(m.tree.val));
-
-  //  dagre("Forest",  style(<"overflow-x","scroll">,<"overflow-y","scroll">,<"border", "solid">,<"border-radius","5px">,<"height","600px">,<"width","100%">), rankdir("TD"), (N n, E e) {
-  //        done = {};
-         
-  //        void nodes(Tree a) {
-  //          if (id(a) in done) return;
-  //          if (!m.literals && isLiteral(a)) return;
-  //          if (!m.\layout && isLayout(a)) return;
-  //          if (!m.chars && isChar(a)) return;
-           
-  //          n(id(a), fill("black"), shape(shp(a)), () { 
-  //              span(style(<"color","black">), lbl(a));
-  //          });
-           
-  //          done += {id(a)};
-           
-  //          if (a@unique > 500) {
-  //            return;
-  //          }
-           
-  //          for (b <- args(a)) {
-  //            nodes(b);
-  //          }
-  //        }
-         
-  //        void edges(Tree a) {
-  //          if (!m.literals && isLiteral(a)) return;
-  //          if (!m.\layout && isLayout(a)) return;
-  //          if (!m.\layout && isChar(a)) return;
-  //          if (id(a) in done) return;
-           
-  //          for (b <- args(a)) {
-  //             if (!m.literals && isLiteral(b)) continue;
-  //             if (!m.\layout && isLayout(b)) continue;
-  //             if (!m.chars && isChar(b)) continue;
-           
-  //             e(id(a), id(b), lineInterpolate("linear"));
-  //          }
-           
-  //          done += {id(a)};
-           
-  //          if (a@unique > 500) {
-  //            return;
-  //          }
-           
-  //          for (b <- args(a)) {
-  //            edges(b);
-  //          }
-  //        }
-         
-  //        nodes(t);
-  //        done = {};
-  //        edges(t);
-  //        done = {};
-  //      });
+  // for lack of a visual, here we use ascii art:
+  //  if (m.tree is just) {
+  //     if (tree is amb) {
+  //       table(class("table"), class("table-hover"), class("table-sm"), () {
+  //         thead(() {
+  //           for (_ <- tree.alternatives) {
+  //             th(attr("scope", "col"), () {
+  //               text("Alternative");
+  //             });
+  //           }
+  //         });
+  //         tbody(() {
+  //           tr(() {
+  //             for (t <- tree.alternatives) {
+  //               td(() {
+  //                 pre(() {
+  //                   text(prettyTree(t, characters = m.chars, literals=m.literals, \layout=m.\layout));
+  //                 });
+  //               });
+  //             }
+  //           });       
+  //         }); 
+  //       });
+  //     }
+  //     else {
+  //       pre(() {
+  //         text(prettyTree(m.tree.val, characters = m.chars, literals=m.literals, \layout=m.\layout));
+  //       });
+  //     }
+  //  }
 }
  
 Msg onNewSentenceInput(str t) = newInput(t);
 Msg onNewGrammarInput(str t) = newGrammar(t); 
  
 void view(Model m) {
+  //  span("hallo");
    container(true, () {
      ul(class("tabs nav nav-tabs"), id("tabs"), () {
        li(() {
@@ -401,9 +350,6 @@ void view(Model m) {
        });
        li(() {
          a(tab(), href("#diagnose"), "Diagnosis"); 
-       });
-       li(() {
-         a(tab(), href("#help"), "Help"); 
        });
     });
         
@@ -427,10 +373,6 @@ void view(Model m) {
           else {
             paragraph("Diagnosis of ambiguity is unavailable while the input sentence has a parse error.");
           } 
-      });
-      
-      div(class("tab-pane fade in"), id("help"), () {
-        h3("What is ambiguity?");
       });
     });
     
@@ -461,10 +403,10 @@ void grammarPane(Model m) {
   row(() {
     column(10, md(), () {
       if (m.grammarDirty) {
-        textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), \value(m.grammarText), m.grammarText);
+        textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), \value(m.grammarText));
       }
       else {
-        textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), m.grammarText);
+        textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput));
       }
     });
     column(2, md(), () {
@@ -554,6 +496,7 @@ void fileUI(Model m) {
  
 void inputPane(Model m) {
    bool isError = m.tree == nothing();
+   println("isError <isError> <m.tree == nothing()>");
    bool isAmb = m.tree != nothing() && amb(_) := m.tree.val ;
    bool nestedAmb = m.tree != nothing() && (amb({/amb(_), *_}) := m.tree.val || appl(_,/amb(_)) := m.tree.val);
    str  sentence = m.input;
@@ -561,19 +504,21 @@ void inputPane(Model m) {
    row(() {
           column(10, md(), () {
              if (m.inputDirty) {
-               textarea(class("form-control"), style(<"width","100%">), rows(10), onInput(onNewSentenceInput), \value(sentence), sentence);
+               textarea(class("form-control"), style(<"width","100%">), rows(10), onInput(onNewSentenceInput), \value(sentence));
              }
              else {
-               textarea(class("form-control"), style(<"width","100%">), rows(10), onInput(onNewSentenceInput), sentence);
+               textarea(class("form-control"), style(<"width","100%">), rows(10), onInput(onNewSentenceInput));
              } 
           });    
           column(2, md(), () {
             div(class("list-group list-group-flush"), style(<"list-style-type","none">), () {
               span(class("list-group-item"), () {
                 if (isError) {
+                  println("in isError:true");
                   paragraph("This sentence is not a <m.grammar>; it has a parse error");
                 } 
                 else {
+                  println("in isError:false");
                   paragraph("This sentence is <if (!isAmb) {>not<}> ambiguous, and it has<if (!nestedAmb) {> no<}> nested ambiguity.");
                 }
               });

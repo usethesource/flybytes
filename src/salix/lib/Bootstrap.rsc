@@ -1,6 +1,8 @@
 module salix::lib::Bootstrap
 
-extend salix::HTML;
+extend salix::HTML; 
+extend salix::Node;
+import salix::Core;
 
 data ColSize = xsm() | sm() | md() | lg() | xl();
 
@@ -10,8 +12,10 @@ str colsize(md())  = "-md";
 str colsize(lg())  = "-lg";
 str colsize(xl())  = "-xl";
 alias Column = void (int, ColSize);
-
-void container(bool fluid, value vals...) = build([class("container<if (fluid) {>-fluid<}>")] + vals, "div");
+ 
+void container(bool fluid, value vals...) {
+    build([class("container<if (fluid) {>-fluid<}>")] + vals, "div");
+}
 
 void row(value vals...) =  build([class("row")] + vals, "div");
 

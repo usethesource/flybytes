@@ -298,35 +298,35 @@ Model freshSentences(Model m) {
 
 void graphic(Model m) {
   // for lack of a visual, here we use ascii art:
-  //  if (m.tree is just) {
-  //     if (tree is amb) {
-  //       table(class("table"), class("table-hover"), class("table-sm"), () {
-  //         thead(() {
-  //           for (_ <- tree.alternatives) {
-  //             th(attr("scope", "col"), () {
-  //               text("Alternative");
-  //             });
-  //           }
-  //         });
-  //         tbody(() {
-  //           tr(() {
-  //             for (t <- tree.alternatives) {
-  //               td(() {
-  //                 pre(() {
-  //                   text(prettyTree(t, characters = m.chars, literals=m.literals, \layout=m.\layout));
-  //                 });
-  //               });
-  //             }
-  //           });       
-  //         }); 
-  //       });
-  //     }
-  //     else {
-  //       pre(() {
-  //         text(prettyTree(m.tree.val, characters = m.chars, literals=m.literals, \layout=m.\layout));
-  //       });
-  //     }
-  //  }
+   if (m.tree is just) {
+      if (amb(alts) := m.tree.val) {
+        table(class("table"), class("table-hover"), class("table-sm"), () {
+          thead(() {
+            for (_ <- alts) {
+              th(attr("scope", "col"), () {
+                text("Alternative");
+              });
+            }
+          });
+          tbody(() {
+            tr(() {
+              for (Tree t <- alts) {
+                td(() {
+                  pre(() {
+                    text(prettyTree(t, characters = m.chars, literals=m.literals, \layout=m.\layout));
+                  });
+                });
+              }
+            });       
+          }); 
+        });
+      }
+      else {
+        pre(() {
+          text(prettyTree(m.tree.val, characters = m.chars, literals=m.literals, \layout=m.\layout));
+        });
+      }
+   }
 }
  
 Msg onNewSentenceInput(str t) = newInput(t);

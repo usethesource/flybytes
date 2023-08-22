@@ -21,7 +21,7 @@ Tree simplify(type[Tree] gr, Tree t, int effort=100) {
    return t;
 }
 
-private Tree simplify(Tree t) {
+Tree simplify(Tree t) {
    // half of the time we descend into the tree
    if (arbBool(), a:appl(p, args) := t) {
        for (i <- index(args)) {

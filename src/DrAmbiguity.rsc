@@ -406,11 +406,11 @@ void grammarPane(Model m) {
         textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), \value(m.grammarText));
       }
       else {
-        textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput));
+        textarea(class("form-control"), style(<"width","100%">), rows(25), onInput(onNewGrammarInput), \value(m.grammarText));
       }
     });
     column(2, md(), () {
-      input(class("list-group-item"), style(<"width","100%">), \type("text"), onInput(onCommitMessageInput), m.commitMessage);
+      input(class("list-group-item"), style(<"width","100%">), \type("text"), onInput(onCommitMessageInput), \value(m.commitMessage));
       if (trim(m.commitMessage) != "") {
         button(class("list-group-item"), onClick(commitGrammar(-1)), "Commit");
       }

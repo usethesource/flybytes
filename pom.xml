@@ -36,7 +36,7 @@
             <plugin>
                 <groupId>org.rascalmpl</groupId>
                 <artifactId>rascal-maven-plugin</artifactId>
-                <version>0.21.0</version>
+                <version>0.22.0-RC1</version>
                 <configuration>
                     <errorsAsWarnings>true</errorsAsWarnings>
                     <bin>${project.build.outputDirectory}</bin>
@@ -160,7 +160,7 @@
                 <dependency>
                     <groupId>org.rascalmpl</groupId>
                     <artifactId>rascal</artifactId>
-                    <version>0.33.7</version>
+                    <version>0.34.0-RC3</version>
                 </dependency>
                 <dependency>
                     <groupId>org.ow2.asm</groupId>

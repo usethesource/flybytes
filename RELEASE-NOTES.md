@@ -36,7 +36,6 @@
 * bumped maven-plugin to 0.14.5 for prettier Package doc index page
 ## 0.1.3
 * added References page
-* minor documentation edits
 * initial docs
 * reconfigured release plugin
 ## 0.1.1
@@ -56,7 +55,6 @@
 * removed dead metadata
 * updated README.md
 ## 0.0.1
-* removed old metadata
 * commented out decompilation tests that need a fix after Java 11
 * fixed getAnnotation closure in Mirror library
 * added license header
@@ -106,7 +104,6 @@
 * added local variable decompilation
 * added labels and linenumber decompilation
 * decompile switch instructions
-* minor
 * added lots of instructions to the dissambler
 * added access function for decompiler from Rascal
 * finished field decompilation
@@ -139,7 +136,6 @@
 * added settings
 * added line number feature for debugger information
 * resolved many errors detected by the new TypePal-enabled Rascal type checker
-* minor details
 * added source code comments
 * adapted doc string
 * added some comments
@@ -165,12 +161,10 @@
 * simplifications
 * messing around
 * fixed several issues and added string concat for debugging presentations
-* minor
 * method missing works
 * fixed method invocation for now, next up is method_missing
 * fixed name of Lookup class
 * fixed typo
-* many minor mistakes
 * fixed class name bug in checkcast
 * added toString for all generated classes
 * fixed cast expression, and used it in the protol compiler
@@ -183,28 +177,18 @@
 * added failing test for new
 * fixed more issues in protol compiler
 * more simple bugs
-* many minor bugs
 * added support for fields
 * added example protol program
-* minor rename
 * finished typing in initial version of protol compiler
 * added smarter resolution cache
 * initial design of completely dynamic method calls and object prototyping templates based on cloning at object allocation time
 * refactored KOOL syntax
 * added a syntax definition of KOOL'
 * started on a mini prototype-based demo language
-* Update Compiler.rsc
-* Update README.md
-* Update README.md
 * ignore generated folder
 * removed debug code
-* Update README.md
-* Update Syntax.rsc
-* Update README.md
-* Update README.md
 * Create README.md
-    
-    added explanation of what Flybytes is and what it does.
+* added explanation of what Flybytes is and what it does.
 * renamed mujava to flybytes
 * renamed project
 * added asm libs
@@ -237,7 +221,6 @@
 * added getting annotations of classes to mirror interface
 * started small library of control flow macros, for looping over arrays and iterables, etc.
 * added shorthands for all simple constants and applied through all the test code for readability
-* minor edits
 * added more comments
 * added comments for explaning complex control flow around monitors
 * monitor now deals well with all kinds of block exit scenarios

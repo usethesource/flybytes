@@ -38,8 +38,8 @@ int maxIntValue(long())      = LongMirror().getStatic("MAX_VALUE").toValue(#int)
 int maxIntValue(byte())      = ByteMirror().getStatic("MAX_VALUE").toValue(#int);
 
 @synopsis{the minimal value for an arithmetic type on the JVM}
-real minRealValue(float())     = -1 * maxValue(float());
-real minRealValue(double())    = -1 * maxValue(double());
+real minRealValue(float())     = -1 * maxRealValue(float());
+real minRealValue(double())    = -1 * maxRealValue(double());
 int  minIntValue(byte())      = ByteMirror().getStatic("MIN_VALUE").toValue(#int);
 int  minIntValue(long())      = LongMirror().getStatic("MIN_VALUE").toValue(#int);
 int  minIntValue(integer())   = IntegerMirror().getStatic("MIN_VALUE").toValue(#int);

@@ -47,7 +47,7 @@ test bool testNEqTrue(int i)
 
 test bool testNEqFalse(int i) 
   = all (t <- intTypes, 
-         I := prim(t, abs(i) % maxValue(t)),
+         I := prim(t, abs(i) % maxIntValue(t)),
          testCmpOp(cmpOpClass(t, ne), t, I, I, false));                
          
 test bool testLt(int i, int j) 

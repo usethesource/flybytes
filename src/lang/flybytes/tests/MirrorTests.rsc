@@ -85,7 +85,7 @@ test bool arrayLoadInteger()
   = array(integer(), [integer(1331)]).load(0).toValue(#int) == 1331;
   
 test bool arrayLoadLong()
-  = array(long(), [long(maxValue(long()))]).load(0).toValue(#int) == maxValue(long()); 
+  = array(long(), [long(maxIntValue(long()))]).load(0).toValue(#int) == maxIntValue(long()); 
   
 test bool arrayLoadObjectNull()
   = array(object(), 10).load(0) == Mirror::null(); 

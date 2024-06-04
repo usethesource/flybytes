@@ -60,15 +60,19 @@ list[Stat] stats({Statement  ";"}* stats) = [stat(s)[src=s@\loc] | s <- stats];
   
 Stat stat(s:(Statement) `<Id var> := <Expression val>`)
    = store("<var>", expr(val)); 
-   
+  
+
 Stat stat(s:(Statement) 
                  `if <Expression cond> then 
                  '  <{Statement ";"}* thenPart> 
                  'else 
                  '  <{Statement ";"}* elsePart> 
-                 'fi`)
-   = \if(ne(expr(cond), iconst(0)), stats(thenPart), stats(elsePart));
-   
+                 'fi`)                
+   = \if(ne(expr(cond), iconst(0)), stats(thenPart), stats(elsePart)) when /Id x := thenPart
+
+  
+  
+
 Stat stat(s:(Statement) 
                  `while <Expression cond> do 
                  '  <{Statement ";"}* body> 

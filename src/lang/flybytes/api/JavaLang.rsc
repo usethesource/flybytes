@@ -28,31 +28,31 @@ Mirror LongMirror() = classMirror("java.lang.Long");
 Mirror ShortMirror() = classMirror("java.lang.Short");
 Mirror FloatMirror() = classMirror("java.lang.Float");
 
-@doc{the maximal value for an arithmetic type on the JVM}
-real maxValue(float())     = FloatMirror().getStatic("MAX_VALUE").toValue(#real);
-real maxValue(double())    = DoubleMirror().getStatic("MAX_VALUE").toValue(#real);
-int  maxValue(short())     = ShortMirror().getStatic("MAX_VALUE").toValue(#int);
-int  maxValue(character()) = CharacterMirror().getStatic("MAX_VALUE").toValue(#int);
-int  maxValue(integer())   = IntegerMirror().getStatic("MAX_VALUE").toValue(#int);
-int  maxValue(long())      = LongMirror().getStatic("MAX_VALUE").toValue(#int);
-int  maxValue(byte())      = ByteMirror().getStatic("MAX_VALUE").toValue(#int);
+@synopsis{the maximal value for an arithmetic type on the JVM}
+real maxRealValue(float())     = FloatMirror().getStatic("MAX_VALUE").toValue(#real);
+real maxRealValue(double())    = DoubleMirror().getStatic("MAX_VALUE").toValue(#real);
+int maxIntValue(short())     = ShortMirror().getStatic("MAX_VALUE").toValue(#int);
+int maxIntValue(character()) = CharacterMirror().getStatic("MAX_VALUE").toValue(#int);
+int maxIntValue(integer())   = IntegerMirror().getStatic("MAX_VALUE").toValue(#int);
+int maxIntValue(long())      = LongMirror().getStatic("MAX_VALUE").toValue(#int);
+int maxIntValue(byte())      = ByteMirror().getStatic("MAX_VALUE").toValue(#int);
 
-@doc{the minimal value for an arithmetic type on the JVM}
-int  minValue(byte())      = ByteMirror().getStatic("MIN_VALUE").toValue(#int);
-int  minValue(long())      = LongMirror().getStatic("MIN_VALUE").toValue(#int);
-int  minValue(integer())   = IntegerMirror().getStatic("MIN_VALUE").toValue(#int);
-real minValue(float())     = -1 * maxValue(float());
-real minValue(double())    = -1 * maxValue(double());
-int  minValue(short())     = ShortMirror().getStatic("MIN_VALUE").toValue(#int);
-int  minValue(character()) = CharacterMirror().getStatic("MIN_VALUE").toValue(#int);
+@synopsis{the minimal value for an arithmetic type on the JVM}
+real minRealValue(float())     = -1 * maxValue(float());
+real minRealValue(double())    = -1 * maxValue(double());
+int  minIntValue(byte())      = ByteMirror().getStatic("MIN_VALUE").toValue(#int);
+int  minIntValue(long())      = LongMirror().getStatic("MIN_VALUE").toValue(#int);
+int  minIntValue(integer())   = IntegerMirror().getStatic("MIN_VALUE").toValue(#int);
+int  minIntValue(short())     = ShortMirror().getStatic("MIN_VALUE").toValue(#int);
+int  minIntValue(character()) = CharacterMirror().getStatic("MIN_VALUE").toValue(#int);
 
 @doc{the minimal increment for an arithmetic type on the JVM}
-real epsilon(float())     = FloatMirror().getStatic("MIN_VALUE").toValue(#real);  // misnomer in the Java library
-real epsilon(double())    = DoubleMirror().getStatic("MIN_VALUE").toValue(#real); // misnomer in the Java library
-int  epsilon(short())     = 1;
-int  epsilon(character()) = 1;
-int  epsilon(integer())   = 1;
-int  epsilon(long())      = 1;
-int  epsilon(byte())      = 1;
+num epsilon(float())     = FloatMirror().getStatic("MIN_VALUE").toValue(#real);  // misnomer in the Java library
+num epsilon(double())    = DoubleMirror().getStatic("MIN_VALUE").toValue(#real); // misnomer in the Java library
+num  epsilon(short())     = 1;
+num  epsilon(character()) = 1;
+num  epsilon(integer())   = 1;
+num  epsilon(long())      = 1;
+num  epsilon(byte())      = 1;
 
 Exp Integer_parseInt(Exp e, int radix) = invokeStatic(Integer(), methodDesc(integer(), "parseInt", [string(), integer()]), [e, iconst(radix)]);

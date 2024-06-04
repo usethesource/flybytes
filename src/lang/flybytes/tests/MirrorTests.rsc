@@ -4,10 +4,10 @@ import lang::flybytes::Mirror;
 import lang::flybytes::api::JavaLang;
 import lang::flybytes::Syntax;
 
-test bool intId(int v) = v % maxValue(integer()) == integer(integer(v % maxValue(integer())));
-test bool longId(int v) = v % maxValue(long()) == long(long(v % maxValue(long())));
-test bool byteId(int v) = v % maxValue(byte()) == byte(byte(v % maxValue(byte())));
-test bool shortId(int v) = v % maxValue(short()) == short(short(v % maxValue(short())));  
+test bool intId(int v) = v % maxIntValue(integer()) == integer(integer(v % maxIntValue(integer())));
+test bool longId(int v) = v % maxIntValue(long()) == long(long(v % maxIntValue(long())));
+test bool byteId(int v) = v % maxIntValue(byte()) == byte(byte(v % maxIntValue(byte())));
+test bool shortId(int v) = v % maxIntValue(short()) == short(short(v % maxIntValue(short())));  
 test bool stringId(str x) = x == string(string(x));
 
 // due to loss of precision we can not have a general isomorphism between reals and doubles

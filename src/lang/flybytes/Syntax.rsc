@@ -447,7 +447,7 @@ Method staticMethod(Type ret, str name, list[Formal] args, list[Stat] block)
 @synopsis{Short-hand for generating a constructor.}
 @pitfalls{Don't forgot to generate a super call.}    
 Method constructor(Modifier access, list[Formal] formals, list[Stat] block)
-  = method(constructorDesc([ var.\type | var <- formals]), formals, block, modifiers={access});
+  = method(constructorDesc([ var.\type | Formal var <- formals]), formals, block, modifiers={access});
   
 @synopsis{"new" short-hand with parameters}
 Exp new(Type class, list[Type] argTypes, list[Exp] args)

@@ -38,7 +38,7 @@
                 <artifactId>rascal-maven-plugin</artifactId>
                 <version>0.27.3</version>
                 <configuration>
-                    <errorsAsWarnings>true</errorsAsWarnings>
+                    <errorsAsWarnings>false</errorsAsWarnings>
                     <bin>${project.build.outputDirectory}</bin>
                     <srcs>
                         <src>${project.basedir}/src</src>

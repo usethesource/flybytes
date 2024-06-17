@@ -68,7 +68,7 @@ Stat stat(s:(Statement)
                  'else 
                  '  <{Statement ";"}* elsePart> 
                  'fi`)                
-   = \if(ne(expr(cond), iconst(0)), stats(thenPart), stats(elsePart)) when /Id x := thenPart;
+   = \if(ne(expr(cond), iconst(0)), stats(thenPart), stats(elsePart)) when /Id _ := thenPart;
 
 Stat stat(s:(Statement) 
                  `while <Expression cond> do 

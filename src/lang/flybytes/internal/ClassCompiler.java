@@ -26,8 +26,6 @@
  */
 package lang.flybytes.internal;
 
-import static org.junit.Assert.fail;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;

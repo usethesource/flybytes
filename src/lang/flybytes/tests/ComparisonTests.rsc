@@ -32,46 +32,46 @@ list[Type] intTypes = [integer(), short(), byte(), long()];
 
 test bool testEqTrue(int i) 
   = all (t <- intTypes, 
-         I := prim(t, abs(i) % maxValue(t)),
+         I := prim(t, abs(i) % maxIntValue(t)),
          testCmpOp(cmpOpClass(t, eq), t, I, I, true));
 
 test bool testEqFalse(int i) 
   = all (t <- intTypes, 
-         I := abs(i) % maxValue(t),
+         I := abs(i) % maxIntValue(t),
          testCmpOp(cmpOpClass(t, eq), t, prim(t, I), prim(t, I - 1), false));  
          
 test bool testNEqTrue(int i) 
   = all (t <- intTypes, 
-         I := abs(i) % maxValue(t),
+         I := abs(i) % maxIntValue(t),
          testCmpOp(cmpOpClass(t, ne), t, prim(t, I), prim(t, I - 1), true));
 
 test bool testNEqFalse(int i) 
   = all (t <- intTypes, 
-         I := prim(t, abs(i) % maxValue(t)),
+         I := prim(t, abs(i) % maxIntValue(t)),
          testCmpOp(cmpOpClass(t, ne), t, I, I, false));                
          
 test bool testLt(int i, int j) 
   = all (t <- intTypes, 
-         I := (i % maxValue(t)),
-         J := (j % maxValue(t)),
+         I := (i % maxIntValue(t)),
+         J := (j % maxIntValue(t)),
          testCmpOp(cmpOpClass(t, lt), t, prim(t, I), prim(t, J), I < J));
          
 test bool testGt(int i, int j) 
   = all (t <- intTypes, 
-         I := (i % maxValue(t)),
-         J := (j % maxValue(t)),
+         I := (i % maxIntValue(t)),
+         J := (j % maxIntValue(t)),
          testCmpOp(cmpOpClass(t, gt), t, prim(t, I), prim(t, J), I > J)); 
          
 test bool testGeInt(int i, int j) 
   = all (t <- intTypes, 
-         I := (i % maxValue(t)),
-         J := (j % maxValue(t)),
+         I := (i % maxIntValue(t)),
+         J := (j % maxIntValue(t)),
          testCmpOp(cmpOpClass(t, ge), t, prim(t, I), prim(t, J), I >= J));           
 
 test bool testLe(int i, int j) 
   = all (t <- intTypes, 
-         I := (i % maxValue(t)),
-         J := (j % maxValue(t)),
+         I := (i % maxIntValue(t)),
+         J := (j % maxIntValue(t)),
          testCmpOp(cmpOpClass(t, le), t, prim(t, I), prim(t, J), I <= J));   
             
 list[Type] floatTypes = [float(), double()];

@@ -62,7 +62,7 @@ data Type = prototype(str name, list[Method] methods, list[Field] fields);
 list[Class] compile(Program p, str name) { 
   progClass = class(object(name),
       methods=[
-        main("args", [*compile(p.commands), \return()])[src=p@\loc]
+        main("args", [*compileAll(p.commands), \return()])[src=p@\loc]
       ]
     )[src=p@\loc];
  
@@ -71,7 +71,7 @@ list[Class] compile(Program p, str name) {
   return declareVariables(allClasses);  
 }    
 
-list[Stat] compile(Command* commands) = [compile(c)[src=c@\loc] | c <- commands];
+list[Stat] compileAll(Command* commands) = [compile(c)[src=c@\loc] | c <- commands];
 
 Stat compile((Command) `<Id id> = <Expr v>;`)
   = store("<id>", compile(v));
@@ -85,10 +85,10 @@ Stat compile((Command) `<Expr array>[<Expr index>] = <Expr v>;`)
   = astore(compile(array), getInt(compile(index)), compile(v));
 
 Stat compile((Command) `if(<Expr cond >) { <Command* thenPart> } else { <Command* elsePart> }`)
-  = \if(compile(cond), compile(thenPart), compile(elsePart));
+  = \if(compile(cond), compileAll(thenPart), compileAll(elsePart));
 
 Stat compile((Command) `while(<Expr cond>) { <Command* body> }`)
-  = \while(compile(cond), compile(body));   
+  = \while(compile(cond), compileAll(body));   
 
 Stat compile((Command) `<Expr e>;`) = \do(compile(e));
 
@@ -191,7 +191,7 @@ list[Field] fields(Definition* defs)
   = [ field("<name>", val)[src=name@\loc] | (Definition) `<Id name> = <Expr val>` <- defs];
 
 Method method(str name, {Id ","}* args, Command* commands)
-  = method(\public(), Prototype, name, [var(Prototype, "<a>") | a <- args], compile(commands));
+  = method(\public(), Prototype, name, [var(Prototype, "<a>") | a <- args], compileAll(commands));
 
 Field field(str name, Expr val)
   = field(Prototype, name, init=compile(val), modifiers={\public()});

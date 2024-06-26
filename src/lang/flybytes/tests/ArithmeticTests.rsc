@@ -38,7 +38,7 @@ Class unOpClass(Type t, UnOp op) {
   
 bool testBinOp(Class c, Type t, num lhs, num rhs, num answer) { 
   m = loadClass(c);
-  reply = val(t, m.invokeStatic(methodDesc(t, "op", [t, t]), [prim(t, lhs), prim(t,rhs)]));
+  reply = intVal(t, m.invokeStatic(methodDesc(t, "op", [t, t]), [prim(t, lhs), prim(t,rhs)]));
   
   if (answer != reply) {
     println("op(<lhs>,<rhs>) == <round(t, answer)> != <round(t,reply)>");
@@ -50,7 +50,7 @@ bool testBinOp(Class c, Type t, num lhs, num rhs, num answer) {
 
 bool testUnOp(Class c, Type t, num arg, num answer) { 
   m = loadClass(c);
-  reply = val(t, m.invokeStatic(methodDesc(t, "op", [t]), [prim(t, arg)]));
+  reply = intVal(t, m.invokeStatic(methodDesc(t, "op", [t]), [prim(t, arg)]));
   
   if (answer != reply) {
     println("op(<arg>) == <round(t, answer)> != <round(t,reply)>");
@@ -62,7 +62,7 @@ bool testUnOp(Class c, Type t, num arg, num answer) {
 
 bool testBinOpRange(Class c, Type t, num lhs, num rhs, real answer) { 
   m = loadClass(c);
-  reply = val(t, m.invokeStatic(methodDesc(t, "op", [t, t]), [prim(t, lhs), prim(t,rhs)]));
+  reply = realVal(t, m.invokeStatic(methodDesc(t, "op", [t, t]), [prim(t, lhs), prim(t,rhs)]));
   
   if (real r := reply, abs(answer - r) > 0.1) {
     println("op(<lhs>,<rhs>) == <answer> != <reply> (diff: <abs(answer - r)>)");
@@ -74,7 +74,7 @@ bool testBinOpRange(Class c, Type t, num lhs, num rhs, real answer) {
 
 bool testUnOpRange(Class c, Type t, num arg, real answer) { 
   m = loadClass(c);
-  real reply = val(t, m.invokeStatic(methodDesc(t, "op", [t]), [prim(t, arg)]));
+  real reply = realVal(t, m.invokeStatic(methodDesc(t, "op", [t]), [prim(t, arg)]));
   
   if (abs(answer - reply) > 0.1) {
     return false;
@@ -114,7 +114,7 @@ test bool testDivInt(int i, int j)
          testBinOp(binOpClass(t, div), t, I, J, I / J));
          
 test bool testRem(int i, int j) 
-  = all (t <- exactArithmeticTypes
+  = all (t <- exactArithmeticTypes,
          I := (i % maxIntValue(t)),
          J := abs(((j % maxIntValue(t)) / 2)) + 1, // never 0, 
          testBinOp(binOpClass(t, rem), t, I, J, I % J));                                   
@@ -159,7 +159,7 @@ private real round(float(),  real f) = precision(f, 0);
 private real round(double(), real f) = precision(f, 0);
 private default int round(Type _, int f) = f;
 
-private num          val(float(), Mirror r) = r.toValue(#real);
-private num          val(double(), Mirror r) = r.toValue(#real);
-private default num  val(Type _, Mirror r) = r.toValue(#int);
+private real realVal(float(), Mirror r) = r.toValue(#real);
+private real realVal(double(), Mirror r) = r.toValue(#real);
+private int  intVal(Type _, Mirror r) = r.toValue(#int);
 

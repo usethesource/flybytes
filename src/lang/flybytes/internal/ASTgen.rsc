@@ -200,7 +200,7 @@ str type2FactoryCall(Symbol t){
       case \str() :  return "IString";
       case \datetime() : return "IDateTime";
       case \tuple(_) : return  "ITuple";     
-      case \func(_, _): return "ICallableValue";
+      case \func(_, _, _): return "ICallableValue";
       case \alias(_,_,a) : return typeToJavaType(a);
       default : return "IValue";
     }

@@ -62,7 +62,7 @@ Method decompile(Method m:static([asm(list[Instruction] instrs)]), bool cleanup=
   return cleanup? m[block=done] : m[block=[asm(withStat)]]; 
 }
 
-Method decompile(Method m) = m when \abstract in m.modifiers; 
+default Method decompile(Method m, bool cleanup=true) = m when \abstract in m.modifiers; 
 
 // LINES: 
 data Instruction(int LINE = -1);
@@ -612,8 +612,8 @@ BinOp binOp("ALOAD") = aload;
 
 alias UnOp = Exp (Exp);
 
-UnOp invertedCond("NULL") = nonnull;
-UnOp invertedCond("NONNULL") = null;
+UnOp invertedUnaryCond("NULL") = nonnull;
+UnOp invertedUnaryCond("NONNULL") = null;
 
 Exp nonnull(Exp e) = ne(e, null());
 Exp null(Exp e)    = eq(e, null());

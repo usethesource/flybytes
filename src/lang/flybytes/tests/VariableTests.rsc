@@ -44,7 +44,7 @@ bool testVarClass(Class c) {
 list[Type] intTypes = [integer(), long(), short(), character(), byte()];
 
 test bool intVariables(int i)
-  = all(t <- intTypes, I := i % maxValue(t), testVarClass(primVarTestClass(t, I))); 
+  = all(t <- intTypes, I := i % maxIntValue(t), testVarClass(primVarTestClass(t, I))); 
  
 list[Type] floatTypes = [float(), double()];
   

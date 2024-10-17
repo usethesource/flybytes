@@ -88,46 +88,46 @@ list[str] condTypes = ["ifThenTest", "ifThenElseTest"];
 
 test bool testEqTrue(int i) 
   = all (t <- intTypes, 
-         I := prim(t, abs(i) % maxValue(t)), cl <- condTypes,
+         I := prim(t, abs(i) % maxIntValue(t)), cl <- condTypes,
          testIf(ifCmpClass(t, eq), t, cl, I, I, true));
 
 test bool testEqFalse(int i) 
   = all (t <- intTypes, 
-         I := abs(i) % maxValue(t), cl <- condTypes,
+         I := abs(i) % maxIntValue(t), cl <- condTypes,
          testIf(ifCmpClass(t, eq), t, cl, prim(t, I), prim(t, I - 1), false));  
          
 test bool testNEqTrue(int i) 
   = all (t <- intTypes, 
-         I := abs(i) % maxValue(t), cl <- condTypes,
+         I := abs(i) % maxIntValue(t), cl <- condTypes,
          testIf(ifCmpClass(t, ne), t, cl, prim(t, I), prim(t, I - 1), true));
 
 test bool testNEqFalse(int i) 
   = all (t <- intTypes, 
-         I := prim(t, abs(i) % maxValue(t)), cl <- condTypes,
+         I := prim(t, abs(i) % maxIntValue(t)), cl <- condTypes,
          testIf(ifCmpClass(t, ne), t, cl, I, I, false));                
          
 test bool testLt(int i, int j) 
   = all (t <- intTypes, 
-         I := (i % maxValue(t)),
-         J := (j % maxValue(t)), cl <- condTypes,
+         I := (i % maxIntValue(t)),
+         J := (j % maxIntValue(t)), cl <- condTypes,
          testIf(ifCmpClass(t, lt), t, cl, prim(t, I), prim(t, J), I < J));
          
 test bool testGt(int i, int j) 
   = all (t <- intTypes, 
-         I := (i % maxValue(t)),
-         J := (j % maxValue(t)), cl <- condTypes,
+         I := (i % maxIntValue(t)),
+         J := (j % maxIntValue(t)), cl <- condTypes,
          testIf(ifCmpClass(t, gt), t, cl, prim(t, I), prim(t, J), I > J)); 
          
 test bool testGe(int i, int j) 
   = all (t <- intTypes, 
-         I := (i % maxValue(t)),
-         J := (j % maxValue(t)), cl <- condTypes,
+         I := (i % maxIntValue(t)),
+         J := (j % maxIntValue(t)), cl <- condTypes,
          testIf(ifCmpClass(t, ge), t, cl, prim(t, I), prim(t, J), I >= J));           
 
 test bool testLe(int i, int j) 
   = all (t <- intTypes, 
-         I := (i % maxValue(t)),
-         J := (j % maxValue(t)), cl <- condTypes,
+         I := (i % maxIntValue(t)),
+         J := (j % maxIntValue(t)), cl <- condTypes,
          testIf(ifCmpClass(t, le), t, cl, prim(t, I), prim(t, J), I <= J));
 
          

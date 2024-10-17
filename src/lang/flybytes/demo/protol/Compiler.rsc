@@ -99,9 +99,9 @@ Stat compile((Command) `print <Expr e>;`) = stdout(compile(e));
 Exp compile(e:(Expr) `this`) = load("this", src=e@\loc);
   
 Exp compile((Expr) `<Expr rec>.<Id name>(<{Expr ","}* args>)`)
-  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype]/*receiver*/ + [Prototype | _ <- args] ), [compile(rec), *compile(args) ])[src=name@\loc];
+  = invokeDynamic(bootstrap(Prototype, "bootstrap", []), methodDesc(Prototype, "<name>", [Prototype]/*receiver*/ + [Prototype | _ <- args] ), [compile(rec), *compileList(args) ])[src=name@\loc];
   
-list[Exp] compile({Expr ","}* args) = [compile(a)[src=a@\loc] | a <- args];
+list[Exp] compileList({Expr ","}* args) = [compile(a)[src=a@\loc] | a <- args];
    
 Exp compile(x:(Expr) `[<{Expr ","}* elems>]`)
   = new(Arr, [array(Prototype)], [newInitArray(array(Prototype), [compile(e) | e <- elems])])[src=x@\loc]; 

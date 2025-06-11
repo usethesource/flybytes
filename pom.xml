@@ -9,7 +9,7 @@
 	<scm>
         <developerConnection>scm:git:ssh://git@github.com/usethesource/flybytes.git</developerConnection>
 	    <tag>v0.2.9-RC1</tag>
-    </scm>
+        </scm>
 
 	<build>
 		<sourceDirectory>src</sourceDirectory>
@@ -36,7 +36,7 @@
             <plugin>
                 <groupId>org.rascalmpl</groupId>
                 <artifactId>rascal-maven-plugin</artifactId>
-                <version>0.30.0-RC26-SNAPSHOT</version>
+                <version>0.30.0-RC27</version>
                 <configuration>
                     <bin>${project.build.outputDirectory}</bin>
                     <srcs>
@@ -50,6 +50,13 @@
                         <goals>
                             <goal>compile</goal>
                         </goals>
+                        <configuration>
+                            <parallel>true</parallel>
+                            <parallelMax>5</parallelMax>
+                            <parallelPreChecks>
+                                <check>${project.basedir}/src/lang/flybytes/Syntax.rsc</check>
+                            </parallelPreChecks>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>flybytes-package</id>
@@ -156,7 +163,7 @@
                 <dependency>
                     <groupId>org.rascalmpl</groupId>
                     <artifactId>rascal</artifactId>
-                    <version>0.41.0-RC44-SNAPSHOT</version>
+                    <version>0.41.0-RC47</version>
                 </dependency>
                 <dependency>
                     <groupId>org.ow2.asm</groupId>

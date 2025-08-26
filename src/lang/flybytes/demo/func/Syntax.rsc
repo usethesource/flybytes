@@ -11,32 +11,32 @@ layout LAYOUTLIST = LAYOUT*  !>> [\t-\n\r\ ] ;
 
 start syntax Prog = prog: Func* ;
 
-syntax Func = func: Ident name "(" {Ident ","}* ")" "=" Exp;
+syntax Func = func: Ident name "(" {Ident ","}* ")" "=" FExp;
 
-syntax Exp = let: "let" {Binding ","}* "in" Exp "end"
-           | cond: "if" Exp "then" Exp "else" Exp "end"
-           | bracket "(" Exp ")"
-           | var: Ident
-           | nat: Natural 
-           | call: Ident "(" {Exp ","}* ")"
-           > non-assoc (
-               left mul: Exp "*" Exp 
-             | non-assoc div: Exp "/" Exp
-           ) 
-           > left (
-               left add: Exp "+" Exp 
-             | left sub: Exp "-" Exp
-           )
-           >
-           non-assoc (
-               non-assoc gt: Exp "\>" Exp
-             | non-assoc lt:  Exp "\<" Exp
-             | non-assoc geq:  Exp "\>=" Exp
-             | non-assoc leq:  Exp "\<=" Exp
-           )
-           >
-           right assign: Ident ":=" Exp
-           >
-           right seq: Exp ";" Exp; 
+syntax FExp = let: "let" {Binding ","}* "in" FExp "end"
+            | cond: "if" FExp "then" FExp "else" FExp "end"
+            | bracket "(" FExp ")"
+            | var: Ident
+            | nat: Natural 
+            | call: Ident "(" {FExp ","}* ")"
+            > non-assoc (
+               left mul: FExp "*" FExp 
+             | non-assoc div: FExp "/" FExp
+            ) 
+            > left (
+               left add: FExp "+" FExp 
+             | left sub: FExp "-" FExp
+            )
+            >
+            non-assoc (
+               non-assoc gt: FExp "\>" FExp
+             | non-assoc lt:  FExp "\<" FExp
+             | non-assoc geq:  FExp "\>=" FExp
+             | non-assoc leq:  FExp "\<=" FExp
+            )
+            >
+            right assign: Ident ":=" FExp
+            >
+            right seq: FExp ";" FExp; 
 
-syntax Binding = binding: Ident "=" Exp;
+syntax Binding = binding: Ident "=" FExp;

@@ -54,7 +54,7 @@ list[Stat] decls(Declarations p)
  
 
 Type \type((Type) `natural`) = integer();
-Type \type((Type) `string`)  = string();
+Type \type((Type) `string`)  = lang::flybytes::Syntax::string();
   
 list[Stat] stats({Statement  ";"}* stats) = [stat(s)[src=s@\loc] | s <- stats];
   
@@ -77,7 +77,7 @@ Stat stat(s:(Statement)
    = \while(expr(cond), stats(body));
    
 Exp expr(e:(Expression) `<Id name>`)                        = load("<name>", src=e@\loc);
-Exp expr(e:(Expression) `<String s>`)                       = const(string(), "<s>"[1..-1], src=e@\loc);
+Exp expr(e:(Expression) `<String s>`)                       = const(lang::flybytes::Syntax::string(), "<s>"[1..-1], src=e@\loc);
 Exp expr(e:(Expression) `<Natural natcon>`)                 = const(integer(), toInt("<natcon>"), src=e@\loc);  
 Exp expr(e:(Expression) `(<Expression e>)`)                 = expr(e);
 Exp expr(e:(Expression) `<Expression l> || <Expression r>`) = String_concat(expr(l), expr(r))[src=e@\loc];
@@ -85,12 +85,12 @@ Exp expr(e:(Expression) `<Expression l> + <Expression r>`)  = add(expr(l), expr(
 Exp expr(e:(Expression) `<Expression l> - <Expression r>`)  = sub(expr(l), expr(r), src=e@\loc);
 
 list[Stat] output(Declarations p)
-  = [stdout(String_concat(const(string(), "<i>\t: "), toString(i, t)))[src=i@\loc] 
+  = [stdout(String_concat(const(lang::flybytes::Syntax::string(), "<i>\t: "), toString(i, t)))[src=i@\loc] 
     | (IdType) `<Id i> : <Type t>` <- p.decls]
     ;
     
 Exp toString(Id i, (Type) `natural`) 
-  = invokeStatic(object("java.lang.Integer"), methodDesc(string(), "toString", [integer()]), [load("<i>")])[src=i@\loc];    
+  = invokeStatic(object("java.lang.Integer"), methodDesc(lang::flybytes::Syntax::string(), "toString", [integer()]), [load("<i>")])[src=i@\loc];    
     
 Exp toString(Id i, (Type) `string`)
   = load("<i>", src=i@\loc);

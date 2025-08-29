@@ -40,9 +40,9 @@ Exp defVal(long()) = jconst(0);
 Exp defVal(byte()) = bconst(0);
 Exp defVal(character()) = cconst(0);
 Exp defVal(short()) = sconst(0);
-Exp defVal(object(str _)) = Exp::null();
-Exp defVal(array(Type _)) = Exp::null();
-Exp defVal(string()) = Exp::null();
+Exp defVal(object(str _)) = null();
+Exp defVal(array(Type _)) = null();
+Exp defVal(string()) = null();
 Exp defVal(boolean()) = \false();
 
 list[Type] primTypes = [integer(), short(), byte(), character(), long()];

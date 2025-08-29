@@ -52,7 +52,7 @@ data Field(list[Annotation] annotations = [], set[Modifier] modifiers = {\privat
 * `procedure` is a special extension since it contains only JVM bytecode instructions as a body, instead of high-level programming constructs like expressions and statements.
 * one alternative of `method` is *abstract* methods, which do not have a body, the other is methods
 * static blocks are also modeled as methods but without a signature.
-* normal static methods are methods with a static ((Modifier)).
+* normal static methods are methods with a static ((lang::flybytes::Syntax::Modifier)).
 
 The `src` field is important for stack traces and other debugging features.
 }         

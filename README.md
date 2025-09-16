@@ -66,7 +66,7 @@ Flybytes is an intermediate language towards JVM bytecode generation for Rascal-
 
 ### Status:
 
-* Flybytes is experimental and currently in alpha stage. 
+* Flybytes is stable and currently in beta stage. 
 * Expect renamings and API changes
 * The language is fully implemented, with the noted exception of nested classes
 * The language is fully tested, with the noted exception of the invokedynamic feature

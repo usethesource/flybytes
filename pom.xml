@@ -60,7 +60,7 @@
                     </execution>
                     <execution>
                         <id>flybytes-package</id>
-                        <phase>pre-package</phase>
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>package</goal>
                         </goals>

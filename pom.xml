@@ -31,12 +31,11 @@
 				</includes>
 			</resource>
 		</resources>
-		<testSourceDirectory>src</testSourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.rascalmpl</groupId>
                 <artifactId>rascal-maven-plugin</artifactId>
-                <version>0.31.0</version>
+                <version>0.31.1-SNAPSHOT</version>
                 <configuration>
                     <bin>${project.build.outputDirectory}</bin>
                     <srcs>
@@ -66,6 +65,14 @@
                         </goals>
                     </execution>
                     <execution>
+                        <id>flybytes-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                    </execution>
+
+                    <execution>
                         <id>default-cli</id>
                         <phase>compile</phase>
                         <goals>
@@ -87,33 +94,6 @@
                     </execution>
                 </executions>
             </plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.5.3</version>
-				<executions>
-					<execution>
-						<id>test</id>
-						<phase>test</phase>
-						<configuration>
-							<argLine>
-								-ea
-								-Xmx2G
-								-Xss128m
-								-Dfile.encoding=UTF-8
-							</argLine>
-							<includes>
-								<include>**/*Tests.java</include>
-							</includes>
-							<testSourceDirectory>${basedir}/src/</testSourceDirectory>
-						</configuration>
-						<goals>
-							<goal>test</goal>
-						</goals>
-					</execution>
-				</executions>
-
-                            </plugin>
                             <plugin>
                                 <groupId>org.apache.maven.plugins</groupId>
                                 <artifactId>maven-release-plugin</artifactId>
@@ -155,15 +135,10 @@
         </pluginRepositories>
 
 	<dependencies>
-		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<version>4.13.1</version>
-		</dependency>
                 <dependency>
                     <groupId>org.rascalmpl</groupId>
                     <artifactId>rascal</artifactId>
-                    <version>0.42.0</version>
+                    <version>0.42.3-SNAPSHOT</version>
                 </dependency>
                 <dependency>
                     <groupId>org.ow2.asm</groupId>

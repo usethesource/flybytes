@@ -45,18 +45,18 @@ Class compileProgram(Program p, str name)
           *stats(p.body),
           *output(p.decls),
           \return()
-        ])[src=p@\loc]
+        ])[src=p.src]
       ]
-  )[src=p@\loc];
+  )[src=p.src];
   
 list[Stat] decls(Declarations p)
-  = [decl(\type(t), "<i>")[src=i@\loc] | (IdType) `<Id i> : <Type t>` <- p.decls];
+  = [decl(\type(t), "<i>")[src=i.src] | (IdType) `<Id i> : <Type t>` <- p.decls];
  
 
 Type \type((Type) `natural`) = integer();
 Type \type((Type) `string`)  = lang::flybytes::Syntax::string();
   
-list[Stat] stats({Statement  ";"}* stats) = [stat(s)[src=s@\loc] | s <- stats];
+list[Stat] stats({Statement  ";"}* stats) = [stat(s)[src=s.src] | s <- stats];
   
 Stat stat(s:(Statement) `<Id var> := <Expression val>`)
    = store("<var>", expr(val)); 
@@ -76,24 +76,24 @@ Stat stat(s:(Statement)
                  'od`)
    = \while(expr(cond), stats(body));
    
-Exp expr(e:(Expression) `<Id name>`)                        = load("<name>", src=e@\loc);
-Exp expr(e:(Expression) `<String s>`)                       = const(lang::flybytes::Syntax::string(), "<s>"[1..-1], src=e@\loc);
-Exp expr(e:(Expression) `<Natural natcon>`)                 = const(integer(), toInt("<natcon>"), src=e@\loc);  
+Exp expr(e:(Expression) `<Id name>`)                        = load("<name>", src=e.src);
+Exp expr(e:(Expression) `<String s>`)                       = const(lang::flybytes::Syntax::string(), "<s>"[1..-1], src=e.src);
+Exp expr(e:(Expression) `<Natural natcon>`)                 = const(integer(), toInt("<natcon>"), src=e.src);  
 Exp expr(e:(Expression) `(<Expression e>)`)                 = expr(e);
-Exp expr(e:(Expression) `<Expression l> || <Expression r>`) = String_concat(expr(l), expr(r))[src=e@\loc];
-Exp expr(e:(Expression) `<Expression l> + <Expression r>`)  = add(expr(l), expr(r), src=e@\loc);
-Exp expr(e:(Expression) `<Expression l> - <Expression r>`)  = sub(expr(l), expr(r), src=e@\loc);
+Exp expr(e:(Expression) `<Expression l> || <Expression r>`) = String_concat(expr(l), expr(r))[src=e.src];
+Exp expr(e:(Expression) `<Expression l> + <Expression r>`)  = add(expr(l), expr(r), src=e.src);
+Exp expr(e:(Expression) `<Expression l> - <Expression r>`)  = sub(expr(l), expr(r), src=e.src);
 
 list[Stat] output(Declarations p)
-  = [stdout(String_concat(const(lang::flybytes::Syntax::string(), "<i>\t: "), toString(i, t)))[src=i@\loc] 
+  = [stdout(String_concat(const(lang::flybytes::Syntax::string(), "<i>\t: "), toString(i, t)))[src=i.src] 
     | (IdType) `<Id i> : <Type t>` <- p.decls]
     ;
     
 Exp toString(Id i, (Type) `natural`) 
-  = invokeStatic(object("java.lang.Integer"), methodDesc(lang::flybytes::Syntax::string(), "toString", [integer()]), [load("<i>")])[src=i@\loc];    
+  = invokeStatic(object("java.lang.Integer"), methodDesc(lang::flybytes::Syntax::string(), "toString", [integer()]), [load("<i>")])[src=i.src];    
     
 Exp toString(Id i, (Type) `string`)
-  = load("<i>", src=i@\loc);
+  = load("<i>", src=i.src);
       
 list[Stat] commandline(Declarations p) 
   = [for_array("$$args", "i", [
@@ -101,7 +101,7 @@ list[Stat] commandline(Declarations p)
         \if (equals(sconst("<i>"), aload(load("$$args"), load("i"))), [
           // varName = fromString(args[i+1])
           store("<i>", fromString(t, aload(load("$$args"), add(load("i"), iconst(1)))))
-        ])[src=i@\loc]
+        ])[src=i.src]
       ])
     | (IdType) `<Id i> : <Type t>` <- p.decls];
    

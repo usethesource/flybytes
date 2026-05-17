@@ -222,7 +222,7 @@ data Exp(loc src = |unknown:///|)
  
 @synopsis{The JVM low-level instruction set}
 @description{
-This is the target format for dissassemblig a binary class file. The compiler
+This is the target format for dissassembling a binary class file. The compiler
 supports assembling the same instructions back to a binary class file, but
 typically we use ((Exp)) and ((Stat)) to construct bytecode instructions because
 that is much easier and safer.
@@ -231,7 +231,6 @@ that is much easier and safer.
 * This instructon set maps one-to-one to the JVM bytecode standard.
 * Decompilation can recover ((Stat)) and ((Exp)) instances from these lower level instructions.
 * Types and signatures are fully symbolic, and have the same representation as used in ((Stat)) and ((Exp))
-
 }
 @pitfalls{
 * Flybytes does not compute well-formedness checks for ((Instruction))s before, during

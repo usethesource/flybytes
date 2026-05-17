@@ -231,6 +231,7 @@ that is much easier and safer.
 * This instructon set maps one-to-one to the JVM bytecode standard.
 * Decompilation can recover ((Stat)) and ((Exp)) instances from these lower level instructions.
 * Types and signatures are fully symbolic, and have the same representation as used in ((Stat)) and ((Exp))
+* The constructors are all in ALL_CAPS to avoid confusion with their higher-level counterparts.
 }
 @pitfalls{
 * Flybytes does not compute well-formedness checks for ((Instruction))s before, during

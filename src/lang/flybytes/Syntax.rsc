@@ -220,7 +220,25 @@ data Exp(loc src = |unknown:///|)
   | cond(Exp condition, Exp thenExp, Exp elseExp)
   ;
  
-@synopsis{The JVM low-level instruction set} 
+@synopsis{The JVM low-level instruction set}
+@description{
+This is the target format for dissassemblig a binary class file. The compiler
+supports assembling the same instructions back to a binary class file, but
+typically we use ((Exp)) and ((Stat)) to construct bytecode instructions because
+that is much easier and safer.
+} 
+@benefits{
+* This instructon set maps one-to-one to the JVM bytecode standard.
+* Decompilation can recover ((Stat)) and ((Exp)) instances from these lower level instructions.
+* Types and signatures are fully symbolic, and have the same representation as used in ((Stat)) and ((Exp))
+
+}
+@pitfalls{
+* Flybytes does not compute well-formedness checks for ((Instruction))s before, during
+or after compilation. Errors can be printed during class file generation or during
+class loading, pertaining type errors, well-formedness (stack shapes), reachability
+(illegal dead code), arities of static and non-static method calls, ...
+}
 data Instruction
   = LABEL(str label)
   | LINENUMBER(int line, str label)

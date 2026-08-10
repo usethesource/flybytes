@@ -34,7 +34,7 @@ jobs:
         uses: dorny/test-reporter@v3
         with:
           name: Rascal Tests            
-          path: target/surefire-reports/TEST-*.xml    
+          path: **/target/surefire-reports/TEST-*.xml
           reporter: jest-junit
 
       - name: Attach artifact

@@ -36,7 +36,7 @@
             <plugin>
                 <groupId>org.rascalmpl</groupId>
                 <artifactId>rascal-maven-plugin</artifactId>
-                <version>0.32.0-RC4-SNAPSHOT</version>
+                <version>0.32.0-RC4</version>
                 <configuration>
                     <bin>${project.build.outputDirectory}</bin>
                     <srcs>

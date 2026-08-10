@@ -26,6 +26,10 @@ jobs:
       - name: Test with Maven
         run: mvn -B --update-snapshots compile test
 
+      - name: Publish Test Reports
+        if: success() || failure()
+        uses: ScalableCapital/action-surefire-report@v2
+
       - name: Attach artifact
         id: build-artifact
         uses: SWAT-engineering/maven-full-artifacts-action@v1

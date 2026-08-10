@@ -30,8 +30,12 @@ jobs:
         run: mvn -B --update-snapshots compile test
 
       - name: Publish Test Reports
-        if: success() || failure()
-        uses: ScalableCapital/action-surefire-report@v2
+        if: ${{ !cancelled() }}
+        uses: dorny/test-reporter@v3
+        with:
+          name: Rascal Tests            
+          path: target/surefire-reports/TEST-*.xml    
+          reporter: jest-junit
 
       - name: Attach artifact
         id: build-artifact

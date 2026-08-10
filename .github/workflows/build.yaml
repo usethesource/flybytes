@@ -35,6 +35,14 @@ jobs:
         with:
           report-path: 'target/surefire-reports/*.xml'
           github-report: true
+          summary-delta-report: true
+          insights-report: true
+          flaky-rate-report: true
+          fail-rate-report: true
+          slowest-report: true
+          upload-artifact: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Attach artifact
         id: build-artifact

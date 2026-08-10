@@ -142,11 +142,6 @@
         </pluginRepositories>
 
 	<dependencies>
-		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<version>4.13.1</version>
-		</dependency>
                 <dependency>
                     <groupId>org.rascalmpl</groupId>
                     <artifactId>rascal</artifactId>

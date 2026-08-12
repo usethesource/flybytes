@@ -31,12 +31,11 @@
 				</includes>
 			</resource>
 		</resources>
-		<testSourceDirectory>src</testSourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.rascalmpl</groupId>
                 <artifactId>rascal-maven-plugin</artifactId>
-                <version>0.32.0-RC5</version>
+                <version>0.32.0-RC6</version>
                 <configuration>
                     <bin>${project.build.outputDirectory}</bin>
                     <srcs>
@@ -145,7 +144,7 @@
                 <dependency>
                     <groupId>org.rascalmpl</groupId>
                     <artifactId>rascal</artifactId>
-                    <version>0.43.0-RC11</version>
+                    <version>0.43.0-RC12-SNAPSHOT</version>
                 </dependency>
                 <dependency>
                     <groupId>org.ow2.asm</groupId>

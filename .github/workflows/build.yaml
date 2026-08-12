@@ -33,7 +33,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: ctrf-io/github-test-reporter@v1
         with:
-          report-path: 'target/surefire-reports/*.xml'
+          report-path: 'target/rascal-test-reports/*.json'
           github-report: true
           summary-delta-report: true
           insights-report: true

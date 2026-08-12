@@ -37,7 +37,6 @@ jobs:
           github-report: true
           summary-delta-report: true
           insights-report: true
-          flaky-rate-report: true
           fail-rate-report: true
           slowest-report: true
           upload-artifact: true

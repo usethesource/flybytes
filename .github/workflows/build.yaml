@@ -27,7 +27,7 @@ jobs:
           cache: 'maven'
 
       - name: Test with Maven
-        run: mvn -B --update-snapshots compile test -Drascal.compile.skip -Drascal.tutor.skip # watch remove before merge
+        run: mvn -B --update-snapshots compile test 
 
       - name: Publish Test Reports
         if: ${{ !cancelled() }}

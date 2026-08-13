@@ -38,6 +38,7 @@ jobs:
           file-report: true
           pull-request-report: true
           summary-delta-report: true
+          suite-folded-report: true
           insights-report: true
           fail-rate-report: true
           slowest-report: true

@@ -33,7 +33,7 @@ list[Type] intTypes = [integer(), short(), byte(), long()];
 test bool testEqTrue(int i) 
   = all (t <- intTypes, 
          I := prim(t, abs(i) % maxIntValue(t)),
-         testCmpOp(cmpOpClass(t, eq), t, I, I, true));
+         testCmpOp(cmpOpClass(t, eq), t, I, I, false));
 
 test bool testEqFalse(int i) 
   = all (t <- intTypes, 

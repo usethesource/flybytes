@@ -35,6 +35,7 @@ jobs:
         with:
           report-path: 'target/rascal-test-reports/*.json'
           github-report: true
+          file-report: true
           pull-request-report: true
           summary-delta-report: true
           insights-report: true

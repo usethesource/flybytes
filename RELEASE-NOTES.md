@@ -1,4 +1,12 @@
 
+## 0.2.6 -- 0.2.12
+
+* removed last uses of annotations (replaced by keyword fields)
+* added use of new Maven test runner/reporter for all Rascal tests
+* removed use of Rascal JUnitTestRunner 
+* added documentation to several modules
+* made all modules type-check correctly
+
 ## 0.2.5
 
 * maintenance release to depend on latest rascal

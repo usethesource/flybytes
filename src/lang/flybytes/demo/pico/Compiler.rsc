@@ -105,6 +105,6 @@ list[Stat] commandline(Declarations p)
       ])
     | (IdType) `<Id i> : <Type t>` <- p.decls];
    
-Exp fromString((Type) `natural`, Exp e) = Integer_parseInt(e, 10);
-Exp fromString((Type) `string`, Exp e)  = e;
+lang::flybytes::Syntax::Exp fromString((Type) `natural`, Exp e) = Integer_parseInt(e, 10);
+lang::flybytes::Syntax::Exp fromString((Type) `string`, Exp e)  = e;
  

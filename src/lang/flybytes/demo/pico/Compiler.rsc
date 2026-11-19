@@ -53,8 +53,8 @@ list[Stat] decls(Declarations p)
   = [decl(\type(t), "<i>")[src=i.src] | (IdType) `<Id i> : <Type t>` <- p.decls];
  
 
-Type \type((Type) `natural`) = integer();
-Type \type((Type) `string`)  = lang::flybytes::Syntax::string();
+lang::flybytes::Syntax::Type \type((Type) `natural`) = lang::flybytes::Syntax::integer();
+lang::flybytes::Syntax::Type \type((Type) `string`)  = lang::flybytes::Syntax::string();
   
 list[Stat] stats({Statement  ";"}* stats) = [stat(s)[src=s.src] | s <- stats];
   
